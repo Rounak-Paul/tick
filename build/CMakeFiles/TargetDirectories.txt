@@ -1,8 +1,0 @@
-/Users/duke/Code/tick/build/CMakeFiles/tdl.dir
-/Users/duke/Code/tick/build/CMakeFiles/test.dir
-/Users/duke/Code/tick/build/CMakeFiles/edit_cache.dir
-/Users/duke/Code/tick/build/CMakeFiles/rebuild_cache.dir
-/Users/duke/Code/tick/build/CMakeFiles/list_install_components.dir
-/Users/duke/Code/tick/build/CMakeFiles/install.dir
-/Users/duke/Code/tick/build/CMakeFiles/install/local.dir
-/Users/duke/Code/tick/build/CMakeFiles/install/strip.dir
