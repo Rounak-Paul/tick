@@ -9,6 +9,8 @@ Complete guide to the Temporal Deterministic Language.
 - 🔗 **[API Reference](./api_reference.md)** - Built-in functions and constructs
 - ⏰ **[Clock Modes](./clock_modes.md)** - Frequency-based and max-speed clocks
 - ⚙️ **[Parallelism Guide](./parallelism_guide.md)** - Understanding deterministic concurrency
+- 💾 **[.tickcache Guide](./tickcache_guide.md)** - Compiler caching system (like Python's __pycache__)
+- 🔬 **[Semi-Compiled Architecture](./semi_compiled_architecture.md)** - How TDL's hybrid compilation model works
 
 ## What is TDL?
 

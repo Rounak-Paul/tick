@@ -1,0 +1,6 @@
+func main() {
+  let a: int = 5;
+  if (a > 3) {
+    println(1);
+  }
+}

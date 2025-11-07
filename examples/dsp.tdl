@@ -1,28 +1,18 @@
-clock sys = 50hz;
+// DSP-like processing
 
-proc producer(chan<int> out) {
-  on sys.tick {
-    static i: int = 0;
-    out.send(i);
-    i = i + 1;
+func main() {
+  static i: int = 0;
+  static pass_through: int = 0;
+  
+  i = i + 1;
+  
+  if (pass_through == 0) {
+    println(100);
   }
-}
-
-proc filter(chan<int> in, chan<int> out) {
-  on sys.tick {
-    static pass_through: int = 0;
-    if (pass_through == 0) {
-      out.send(100);
-    }
-    pass_through = 1;
-    if (pass_through > 0) {
-      pass_through = 0;
-    }
+  pass_through = 1;
+  if (pass_through > 0) {
+    pass_through = 0;
   }
-}
-
-proc consumer(chan<int> in) {
-  on sys.tick {
-    println(999);
-  }
+  
+  println(999);
 }

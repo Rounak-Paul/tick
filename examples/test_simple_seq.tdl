@@ -1,0 +1,12 @@
+// Simple sequential test
+func add(int a, int b) -> int {
+  return a + b;
+}
+
+func main() {
+  let x: int = add(3, 4);
+  println(x);
+  
+  let y: int = add(10, 20);
+  println(y);
+}

@@ -1,28 +1,12 @@
 #include "scheduler.h"
-#include <thread>
-#include <chrono>
+#include "executor.h"
 
-Scheduler::Scheduler() : running(false) {}
-
-void Scheduler::addProcess(ProcessPtr process) {
-  processes.push_back(process);
-}
-
-void Scheduler::addClock(std::shared_ptr<Clock> clock) {
-  clocks.push_back(clock);
-}
-
-void Scheduler::run() {
-  running = true;
+int Scheduler::executeProgram(const std::shared_ptr<Program>& program) {
+  if (!program) return 1;
   
-  // Start all clocks with 100 ticks
-  for (auto& clock : clocks) {
-    clock->start(100);
-  }
+  // Create executor for auto-parallelized execution
+  auto executor = std::make_shared<Executor>();
+  executor->executeProgram(program);
   
-  running = false;
-}
-
-void Scheduler::stop() {
-  running = false;
+  return 0;
 }

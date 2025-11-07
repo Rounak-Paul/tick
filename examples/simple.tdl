@@ -1,2 +1,5 @@
 // Simple test
-clock sys = 100hz;
+
+func main() {
+  println(1);
+}

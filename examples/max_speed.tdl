@@ -1,31 +1,18 @@
-// Max-speed clock: No frequency specified, runs as fast as possible
-// Processes complete immediately when done, no sleep delays
-// Perfect for batch processing and maximum throughput
+// Max-speed processing concept (simplified)
+// Sequential processing without clock delays
 
-clock fast;  // No frequency - runs at max speed!
-
-proc producer(chan<int> out) {
-  on fast.tick {
-    static i: int = 0;
-    println(i);
-    out.send(i);
-    i = i + 1;
-  }
+func main() {
+  static i: int = 0;
+  static processed: int = 0;
+  static received: int = 0;
+  
+  i = i + 1;
+  processed = processed + 100;
+  received = received + 1;
+  
+  println(i);
+  println(processed);
+  println(received);
 }
 
-proc worker(chan<int> in, chan<int> out) {
-  on fast.tick {
-    static processed: int = 0;
-    processed = processed + 100;
-    println(processed);
-    out.send(processed);
-  }
-}
-
-proc consumer(chan<int> in) {
-  on fast.tick {
-    static received: int = 0;
-    received = received + 1;
-    println(received);
-  }
 }

@@ -1,21 +1,12 @@
-clock sys = 20hz;
+// Pipeline example
+// Shows sequential data transformation
 
-proc producer(chan<int> out) {
-  on sys.tick {
-    static i: int = 0;
-    out.send(i);
-    i = i + 1;
-  }
-}
-
-proc filter(chan<int> in, chan<int> out) {
-  on sys.tick {
-    println(100);
-  }
-}
-
-proc consumer(chan<int> in) {
-  on sys.tick {
-    println(200);
-  }
+func main() {
+  let input: int = 42;
+  let filtered: int = 100;
+  let processed: int = 200;
+  
+  println(input);
+  println(filtered);
+  println(processed);
 }

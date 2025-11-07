@@ -34,29 +34,15 @@ set(COMPILER_HEADERS
 
 # Runtime Sources
 set(RUNTIME_SOURCES
-  src/runtime/channel.cpp
-  src/runtime/clock.cpp
-  src/runtime/process.cpp
   src/runtime/scheduler.cpp
+  src/runtime/executor.cpp
+  src/runtime/dependency_analyzer.cpp
 )
 
 set(RUNTIME_HEADERS
-  src/runtime/channel.h
-  src/runtime/clock.h
-  src/runtime/process.h
+  src/runtime/executor.h
+  src/runtime/dependency_analyzer.h
   src/runtime/scheduler.h
-  src/runtime/runtime.h
-)
-
-# Code Generator Sources
-set(CODEGEN_SOURCES
-  src/codegen/codegen.cpp
-  src/codegen/codegen_new.cpp
-)
-
-set(CODEGEN_HEADERS
-  src/codegen/codegen.h
-  src/codegen/codegen_new.h
 )
 
 # Build the main executable
@@ -66,8 +52,6 @@ add_executable(tdl
   ${COMPILER_HEADERS}
   ${RUNTIME_SOURCES}
   ${RUNTIME_HEADERS}
-  ${CODEGEN_SOURCES}
-  ${CODEGEN_HEADERS}
 )
 
 # Enable testing

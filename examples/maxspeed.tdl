@@ -1,10 +1,7 @@
-// Max Speed Execution - Clock with no frequency runs at maximum speed
-clock fast;
+// Max Speed Execution Concept (simplified)
 
-proc speedtest() {
-  on fast.tick {
-    static count: int = 0;
-    count = count + 1;
-    println(count);
-  }
+func main() {
+  static count: int = 0;
+  count = count + 1;
+  println(count);
 }

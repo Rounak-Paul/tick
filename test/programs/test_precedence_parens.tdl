@@ -1,0 +1,4 @@
+func main() {
+  let result: int = (2 + 3) * 4;
+  println(result);
+}

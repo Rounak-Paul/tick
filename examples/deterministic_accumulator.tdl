@@ -1,31 +1,13 @@
-// Deterministic Accumulator Pipeline
-// Shows how TDL ensures identical execution and state across runs
-// This is impossible with traditional threading due to race conditions
+// Deterministic Accumulator
+// Shows deterministic state management with static variables
 
-clock tick = 50hz;
-
-proc incrementer(chan<int> out) {
-  on tick.tick {
-    static counter: int = 0;
-    counter = counter + 1;
-    println(counter);
-    out.send(counter);
-  }
-}
-
-proc accumulator(chan<int> in, chan<int> out) {
-  on tick.tick {
-    static sum: int = 0;
-    sum = sum + 10;
-    println(sum);
-    out.send(sum);
-  }
-}
-
-proc logger(chan<int> in) {
-  on tick.tick {
-    static logged: int = 0;
-    logged = logged + 1;
-    println(logged);
-  }
+func main() {
+  static counter: int = 0;
+  static sum: int = 0;
+  
+  counter = counter + 1;
+  sum = sum + 10;
+  
+  println(counter);
+  println(sum);
 }

@@ -4,7 +4,7 @@
 #include <filesystem>
 #include "compiler/lexer.h"
 #include "compiler/parser.h"
-#include "codegen/codegen_new.h"
+#include "runtime/scheduler.h"
 
 namespace fs = std::filesystem;
 
@@ -67,69 +67,42 @@ int main(int argc, char* argv[]) {
   }
   
   try {
-    // Read source file
-    std::string source = readFile(inputFile);
-    std::cout << "Compiling: " << inputFile << "\n";
+    // Resolve absolute path of input file
+    fs::path inputPath = fs::absolute(inputFile);
+    fs::path sourceDir = inputPath.parent_path();
     
-    // Lexical analysis
-    std::cout << "  [1/3] Lexical analysis...\n";
+    std::string source = readFile(inputFile);
+    
+    std::cout << "Compiling: " << inputFile << "\n";
+    std::cout << "  [1/2] Lexical analysis...\n";
+    
     Lexer lexer(source);
     auto tokens = lexer.tokenize();
-    std::cout << "    Tokens generated: " << tokens.size() << "\n";
+    std::cout << "    Tokens: " << tokens.size() << "\n";
     
     if (tokens.empty()) {
-      std::cerr << "Error: No tokens generated from source file\n";
+      std::cerr << "Error: No tokens generated\n";
       return 1;
     }
     
-    // Syntax analysis (parsing)
-    std::cout << "  [2/3] Parsing...\n";
+    std::cout << "  [2/2] Parsing...\n";
     Parser parser(tokens);
     auto program = parser.parse();
     
     if (!program) {
-      std::cerr << "Error: Failed to parse program\n";
+      std::cerr << "Error: Failed to parse\n";
       return 1;
     }
     
-    std::cout << "    Parsed " << program->declarations.size() << " declarations\n";
-    std::cout << "    Parsed " << program->globalStatements.size() << " statements\n";
+    std::cout << "    Declarations: " << program->declarations.size() << "\n";
+    std::cout << "    Statements: " << program->globalStatements.size() << "\n";
     
-    // Code generation
-    std::cout << "  [3/3] Code generation...\n";
-    ExecutableCodeGenerator codegen;
-    std::string generated = codegen.generate(program);
+    // Execute via unified deterministic scheduler
+    // Handles: pure functions, parallel processes, channels, clocks
+    std::cout << "\n=== Execution Output ===\n";
     
-    // Write generated code to file
-    std::string cppFileName = inputFile.substr(0, inputFile.rfind(".")) + ".cpp";
-    std::ofstream cppFile(cppFileName);
-    cppFile << generated;
-    cppFile.close();
-    std::cout << "Generated: " << cppFileName << "\n";
-    
-    // Compile the generated C++ code
-    std::cout << "  [4/4] Compiling C++...\n";
-    std::string compileCmd = "cd " + fs::path(cppFileName).parent_path().string() + " && "
-                             "g++ -std=c++17 -O2 -pthread " + fs::path(cppFileName).filename().string() +
-                             " -o " + fs::path(cppFileName).stem().string();
-    int result = system(compileCmd.c_str());
-    
-    if (result == 0) {
-      std::cout << "Compilation successful!\n";
-      
-      // Run the compiled program
-      std::cout << "\n=== Execution Output ===\n";
-      std::string execCmd = (fs::path(cppFileName).parent_path() / fs::path(cppFileName).stem()).string();
-      system(execCmd.c_str());
-      
-      // Keep generated files for debugging
-      // std::remove(cppFileName.c_str());
-      // std::string binaryName = fs::path(cppFileName).stem().string();
-      // std::remove(binaryName.c_str());
-    } else {
-      std::cerr << "C++ compilation failed!\n";
-      return 1;
-    }
+    Scheduler scheduler;
+    return scheduler.executeProgram(program);
     
   } catch (const std::exception& e) {
     std::cerr << "Error: " << e.what() << "\n";

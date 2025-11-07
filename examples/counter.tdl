@@ -1,15 +1,8 @@
-clock sys = 10hz;
+// Counter example
+// Shows static variable state management
 
-proc producer(chan<int> out) {
-  on sys.tick {
-    static i: int = 0;
-    out.send(i);
-    i = i + 1;
-  }
-}
-
-proc consumer(chan<int> in) {
-  on sys.tick {
-    println(42);
-  }
+func main() {
+  static i: int = 0;
+  i = i + 1;
+  println(i);
 }

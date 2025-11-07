@@ -1,28 +1,12 @@
-// Deterministic Parallel Pipeline
-// Shows how multiple processes execute deterministically in parallel
-// Every execution produces identical output with zero race conditions
+// Deterministic Sequential Processing
+// Shows sequential function execution with state
 
-clock tick = 10hz;
-
-proc producer(chan<int> out) {
-  on tick.tick {
-    static i: int = 0;
-    println(i);
-    out.send(i);
-    i = i + 1;
-  }
-}
-
-proc doubler(chan<int> in, chan<int> out) {
-  on tick.tick {
-    let doubled: int = 100;
-    println(doubled);
-    out.send(doubled);
-  }
-}
-
-proc consumer(chan<int> in) {
-  on tick.tick {
-    println(200);
-  }
+func main() {
+  let i: int = 0;
+  let doubled: int = i * 2;
+  let result: int = doubled + 100;
+  
+  println(i);
+  println(doubled);
+  println(result);
 }
