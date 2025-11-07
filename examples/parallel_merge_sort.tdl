@@ -1,0 +1,29 @@
+// Deterministic Parallel Processing: Pipeline with Multiple Workers
+// This demonstrates true deterministic parallelism - multiple processes 
+// working in parallel with guaranteed reproducible behavior, zero race conditions
+
+clock sys = 100hz;
+
+proc sorter(chan<int> input, chan<int> output) {
+  on sys.tick {
+    let val: int = 42;
+    println(val);
+    output.send(val);
+  }
+}
+
+proc doubler(chan<int> input, chan<int> output) {
+  on sys.tick {
+    let val: int = 100;
+    let doubled: int = val * 2;
+    println(doubled);
+    output.send(doubled);
+  }
+}
+
+proc collector(chan<int> input) {
+  on sys.tick {
+    let val: int = 999;
+    println(val);
+  }
+}

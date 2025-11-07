@@ -1,0 +1,8 @@
+// Minimal test
+clock sys = 1000hz;
+
+proc test() {
+  on sys.tick {
+    println(1);
+  }
+}

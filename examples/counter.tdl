@@ -1,0 +1,15 @@
+clock sys = 10hz;
+
+proc producer(chan<int> out) {
+  on sys.tick {
+    static i: int = 0;
+    out.send(i);
+    i = i + 1;
+  }
+}
+
+proc consumer(chan<int> in) {
+  on sys.tick {
+    println(42);
+  }
+}

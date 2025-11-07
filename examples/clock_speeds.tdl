@@ -1,0 +1,21 @@
+// Clock Frequency Comparison
+// Demonstrates how clock frequency controls execution speed
+
+clock slow = 10hz;
+clock fast;
+
+proc slow_worker() {
+  on slow.tick {
+    static i: int = 0;
+    i = i + 1;
+    println(i);
+  }
+}
+
+proc fast_worker() {
+  on fast.tick {
+    static j: int = 0;
+    j = j + 1;
+    println(j);
+  }
+}
