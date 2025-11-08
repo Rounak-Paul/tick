@@ -1,4 +1,0 @@
-func main() {
-  let a: int = 42;
-  println(-a);
-}

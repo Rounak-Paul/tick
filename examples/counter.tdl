@@ -1,8 +1,0 @@
-// Counter example
-// Shows static variable state management
-
-func main() {
-  static i: int = 0;
-  i = i + 1;
-  println(i);
-}

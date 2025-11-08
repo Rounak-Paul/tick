@@ -1,12 +1,12 @@
 # TDL Language Reference
 
-Complete syntax and semantics guide for TDL programming.
+Complete syntax and semantics guide for TDL (Temporal Deterministic Language) programming.
 
 ## Overview
 
-TDL (Temporal Deterministic Language) is a hardware description language for software. Write concurrent programs that are guaranteed to produce identical results every execution with zero race conditions.
+TDL is a deterministic programming language with automatic parallelization. The compiler analyzes data dependencies between statements and executes independent operations in parallel, while maintaining complete determinism.
 
-## Language Syntax
+## Language Basics
 
 ### Comments
 
@@ -14,71 +14,288 @@ TDL (Temporal Deterministic Language) is a hardware description language for sof
 // Single-line comment
 ```
 
-### Clock Declarations
+### Data Types
 
-Define clocks that synchronize program execution.
+TDL supports the following data types:
 
-**Frequency-based clock** (enforces timing):
 ```tdl
-clock sys = 100hz;
-clock tick = 50hz;
+int     // Integer values
+bool    // Boolean: true or false
 ```
 
-**Max-speed clock** (runs as fast as possible):
+### Variable Declarations
+
+**Local variables** (exist only during function execution):
 ```tdl
-clock fast;
+let x: int = 0;
+let flag: bool = true;
+let y: int = x + 5;
 ```
 
-**Available frequencies:**
-- Any positive integer followed by `hz`
-- Examples: `1hz`, `10hz`, `100hz`, `1000hz`
-- Default (no frequency): 999999 Hz (max speed)
+**Static variables** (persist across function calls):
+```tdl
+static counter: int = 0;
+static accumulator: int = 0;
+```
 
-### Process Declarations
+Static variables are initialized once and maintain their value across multiple invocations.
 
-Define deterministic concurrent units.
+## Function Declarations
+
+Define reusable blocks of code.
 
 ```tdl
-proc name(parameters) {
-  body
+func name(parameter1: type, parameter2: type) -> return_type {
+  // function body
+  return value;
 }
 ```
 
-**Parameters** (all optional):
-```tdl
-proc worker(chan<int> input, chan<int> output) { }
-proc sensor(chan<float> data) { }
-proc simple() { }
-```
+### Parameters and Return Types
 
-**Process body:**
-```tdl
-proc producer(chan<int> out) {
-  on sys.tick {
-    static counter: int = 0;
-    counter = counter + 1;
-    println(counter);
-    out.send(counter);
-  }
-}
-```
-
-### Function Declarations
-
-Define reusable logic.
-
-```tdl
-func name(parameters) -> return_type {
-  body
-}
-```
-
-**Examples:**
 ```tdl
 func add(int a, int b) -> int {
   return a + b;
 }
 
+func square(int x) -> int {
+  let result: int = x * x;
+  return result;
+}
+
+func is_positive(int x) -> bool {
+  return x > 0;
+}
+```
+
+Functions with no parameters:
+
+```tdl
+func get_default() -> int {
+  return 42;
+}
+```
+
+Functions with no return value use `main()` convention:
+
+```tdl
+func main() {
+  println(10);
+}
+```
+
+## Control Flow
+
+### If/Else Statements
+
+```tdl
+if (condition) {
+  // executed if condition is true
+} else if (other_condition) {
+  // executed if other_condition is true
+} else {
+  // executed otherwise
+}
+```
+
+Example:
+
+```tdl
+func max(int a, int b) -> int {
+  if (a > b) {
+    return a;
+  } else {
+    return b;
+  }
+}
+```
+
+### While Loops
+
+```tdl
+while (condition) {
+  // loop body executes while condition is true
+}
+```
+
+Example:
+
+```tdl
+func factorial(int n) -> int {
+  let result: int = 1;
+  let i: int = 1;
+  while (i <= n) {
+    result = result * i;
+    i = i + 1;
+  }
+  return result;
+}
+```
+
+## Expressions and Operators
+
+### Arithmetic Operators
+
+```tdl
+x + y       // Addition
+x - y       // Subtraction
+x * y       // Multiplication
+x / y       // Division
+```
+
+### Comparison Operators
+
+```tdl
+x == y      // Equal to
+x != y      // Not equal to
+x > y       // Greater than
+x < y       // Less than
+x >= y      // Greater than or equal to
+x <= y      // Less than or equal to
+```
+
+### Logical Operators
+
+```tdl
+x && y      // Logical AND
+x || y      // Logical OR
+!x          // Logical NOT
+```
+
+### Operator Precedence
+
+Operations follow standard mathematical precedence:
+
+1. Unary operators: `!`, `-`
+2. Multiplication/Division: `*`, `/`
+3. Addition/Subtraction: `+`, `-`
+4. Comparison: `==`, `!=`, `<`, `<=`, `>`, `>=`
+5. Logical AND: `&&`
+6. Logical OR: `||`
+
+## Automatic Parallelization
+
+### How It Works
+
+TDL automatically detects which statements can run in parallel:
+
+```tdl
+func main() {
+  let a: int = 1 + 2;      // Can run in parallel
+  let b: int = 3 + 4;      // Can run in parallel (independent of a)
+  let c: int = a + b;      // Must wait for a and b
+  println(c);
+}
+```
+
+The compiler:
+1. Analyzes which variables each statement reads and writes
+2. Groups statements into "layers" where statements in a layer don't depend on each other
+3. Executes each layer in parallel using multiple threads
+4. Maintains deterministic execution order between layers
+
+### Writing Parallelizable Code
+
+Statements are independent if they:
+- Don't read variables written by other statements
+- Don't write to variables read by other statements
+
+Independent statements:
+```tdl
+func compute() {
+  let x: int = 10 + 20;     // Layer 1
+  let y: int = 30 + 40;     // Layer 1
+  let z: int = 50 + 60;     // Layer 1
+  let sum: int = x + y + z; // Layer 2 (depends on Layer 1)
+}
+```
+
+Dependent statements (executed sequentially):
+```tdl
+func accumulate() {
+  let total: int = 0;       // Layer 1
+  total = total + 5;        // Layer 2 (depends on total)
+  total = total + 10;       // Layer 3 (depends on updated total)
+  println(total);
+}
+```
+
+## Built-in Functions
+
+### I/O Functions
+
+```tdl
+println(value)   // Print value followed by newline
+```
+
+Examples:
+```tdl
+func main() {
+  println(42);           // Output: 42
+  let x: int = 10 + 20;
+  println(x);            // Output: 30
+}
+```
+
+## Program Structure
+
+A TDL program consists of:
+
+1. Function declarations
+2. A `main()` function (entry point)
+
+```tdl
+func helper(int x) -> int {
+  return x * 2;
+}
+
+func main() {
+  let result: int = helper(21);
+  println(result);  // Output: 42
+}
+```
+
+The `main()` function is the entry point and executes automatically when the program runs.
+
+## Scope and Variable Lifetime
+
+**Global scope:** Functions are accessible throughout the program.
+
+**Function scope:** Variables declared with `let` exist only within that function.
+
+```tdl
+func process() {
+  let x: int = 10;      // x exists only in process()
+  println(x);
+}
+
+func main() {
+  // x does not exist here
+  process();
+}
+```
+
+**Static variables:** Maintain their value across function calls.
+
+```tdl
+func counter() -> int {
+  static count: int = 0;
+  count = count + 1;
+  return count;
+}
+
+func main() {
+  println(counter());    // Output: 1
+  println(counter());    // Output: 2
+  println(counter());    // Output: 3
+}
+```
+
+## Examples
+
+### Example 1: Fibonacci
+
+```tdl
 func fibonacci(int n) -> int {
   if (n <= 1) {
     return n;
@@ -86,352 +303,51 @@ func fibonacci(int n) -> int {
   return fibonacci(n - 1) + fibonacci(n - 2);
 }
 
-func greet(string name) -> string {
-  return name;
+func main() {
+  println(fibonacci(10));  // Output: 55
 }
 ```
 
-### Variable Declarations
-
-**Local variables** (exist only during tick):
-```tdl
-let x: int = 0;
-let name: string = "value";
-let flag: bool = true;
-let value: double = 3.14;
-```
-
-**Static variables** (persist across ticks):
-```tdl
-static counter: int = 0;
-static accumulator: double = 0.0;
-```
-
-### On-Clock Blocks
-
-Execute code synchronously every clock tick.
+### Example 2: Deterministic Counter
 
 ```tdl
-proc worker(chan<int> out) {
-  on sys.tick {
-    // Code runs every tick, deterministically
-    static i: int = 0;
-    println(i);
-    i = i + 1;
-  }
+func next() -> int {
+  static value: int = 0;
+  value = value + 1;
+  return value;
+}
+
+func main() {
+  println(next());    // Output: 1
+  println(next());    // Output: 2
+  println(next());    // Output: 3
 }
 ```
 
-Multiple on-clock blocks in one process:
+### Example 3: Parallel Computation
+
 ```tdl
-proc multi(chan<int> out) {
-  on sys.tick {
-    println("A");
-  }
+func main() {
+  let a: int = 100 + 200;     // Runs in parallel
+  let b: int = 300 + 400;     // Runs in parallel
+  let c: int = 500 + 600;     // Runs in parallel
   
-  on sys.tick {
-    println("B");
-  }
+  let total: int = a + b + c; // Waits for a, b, c
+  println(total);             // Output: 2100
 }
 ```
 
-### Channel Operations
+## Determinism Guarantee
 
-**Channel type:**
-```tdl
-chan<int>
-chan<double>
-chan<bool>
-chan<string>
-```
+Every TDL program produces identical output across all executions. This is guaranteed by:
 
-**Send to channel:**
-```tdl
-out.send(42);
-output.send(counter);
-result.send(100 * 2);
-```
+1. **No randomness:** No random functions or non-deterministic operations
+2. **No threading conflicts:** Parallelization happens automatically without race conditions
+3. **Deterministic ordering:** Independent operations run in parallel, but results are always combined in the same order
+4. **Static variables:** Always initialize to the same value and maintain state consistently
 
-### Control Flow
-
-**If statement:**
-```tdl
-if (condition) {
-  println("true");
-}
-```
-
-**While loop:**
-```tdl
-while (counter < 10) {
-  counter = counter + 1;
-}
-```
-
-**Return statement:**
-```tdl
-func getValue() -> int {
-  return 42;
-}
-
-func calculate() -> int {
-  if (flag) {
-    return 100;
-  }
-  return 0;
-}
-```
-
-### Expressions
-
-**Arithmetic operators:**
-```tdl
-x + 5        // Addition
-x - 3        // Subtraction
-x * 2        // Multiplication
-x / 4        // Division
-x % 3        // Modulo
-```
-
-**Comparison operators:**
-```tdl
-x == 5       // Equal
-x != 5       // Not equal
-x < 10       // Less than
-x > 3        // Greater than
-x <= 10      // Less than or equal
-x >= 0       // Greater than or equal
-```
-
-**Logical operators:**
-```tdl
-a && b       // AND
-a || b       // OR
-!a           // NOT
-```
-
-**Assignment:**
-```tdl
-x = 10;
-counter = counter + 1;
-name = "value";
-```
-
-### Built-in Functions
-
-**println** - Print to output:
-```tdl
-println(42);           // Integer
-println(3.14);         // Double
-println("hello");      // String
-println(true);         // Boolean
-```
-
-## Data Types
-
-| Type | Example | Size |
-|------|---------|------|
-| `int` | `42` | 32-bit signed integer |
-| `double` | `3.14` | 64-bit floating point |
-| `bool` | `true`, `false` | Boolean |
-| `string` | `"hello"` | Character sequence |
-| `chan<T>` | `chan<int>` | Channel of type T |
-
-## Execution Model
-
-### Clock Ticks
-
-Every clock tick, all processes synchronized to that clock execute:
-
-```
-Tick 0: [Process A] [Process B] [Process C] (parallel)
-Tick 1: [Process A] [Process B] [Process C] (parallel)
-Tick 2: [Process A] [Process B] [Process C] (parallel)
-...
-```
-
-### State Management
-
-**Local variables** (reset each tick):
-```tdl
-on sys.tick {
-  let temp: int = 0;  // Fresh every tick
-}
-```
-
-**Static variables** (persist across ticks):
-```tdl
-on sys.tick {
-  static count: int = 0;  // Carries over to next tick
-  count = count + 1;
-}
-```
-
-### Process Isolation
-
-- Each process has only local state
-- No shared memory between processes
-- Only communication: channels
-
-### Deterministic Scheduling
-
-- All processes execute in deterministic order
-- Same order every execution
-- Identical output every run
-
-## Program Structure
-
-Typical TDL program:
-
-```tdl
-// 1. Clock declarations
-clock sys = 50hz;
-clock fast;
-
-// 2. Function definitions (optional)
-func helper(int x) -> int {
-  return x * 2;
-}
-
-// 3. Process definitions
-proc producer(chan<int> out) {
-  on sys.tick {
-    static i: int = 0;
-    out.send(i);
-    i = i + 1;
-  }
-}
-
-proc consumer(chan<int> in) {
-  on fast.tick {
-    let value: int = 42;
-    println(value);
-  }
-}
-```
-
-## Scope and Lifetime
-
-### Local Variables
-
-```tdl
-on sys.tick {
-  let x: int = 0;  // Born here
-  let y: int = x + 1;
-}  // x, y destroyed here
-```
-
-Next tick:
-```tdl
-on sys.tick {
-  let x: int = 0;  // New x, different from previous
-}
-```
-
-### Static Variables
-
-```tdl
-static counter: int = 0;
-
-on sys.tick {
-  counter = counter + 1;  // Incremented every tick
-  println(counter);       // 1, 2, 3, 4, ...
-}
-```
-
-### Function Scope
-
-```tdl
-func calculate() -> int {
-  let temp: int = 42;  // Local to function
-  return temp;
-}
-```
-
-## Best Practices
-
-### 1. Use Static for State
-
-```tdl
-// Good: State persists across ticks
-proc counter(chan<int> out) {
-  on sys.tick {
-    static i: int = 0;
-    i = i + 1;
-    out.send(i);
-  }
-}
-
-// Avoid: State lost every tick
-proc bad(chan<int> out) {
-  on sys.tick {
-    let i: int = 0;  // Always 0
-    out.send(i);
-  }
-}
-```
-
-### 2. Use Functions for Reusable Logic
-
-```tdl
-// Good
-func double(int x) -> int { return x * 2; }
-
-proc worker(chan<int> out) {
-  on sys.tick {
-    let result: int = double(42);
-    out.send(result);
-  }
-}
-
-// Avoid: Duplicated logic
-proc worker1(chan<int> out) { on sys.tick { out.send(84); } }
-proc worker2(chan<int> out) { on sys.tick { out.send(84); } }
-```
-
-### 3. Use Appropriate Clock Frequency
-
-```tdl
-// Real-time systems
-clock sys = 100hz;    // 100 ticks/sec
-
-// Batch processing
-clock fast;           // No delays
-
-// Simulation
-clock sim = 1hz;      // 1 tick/sec
-```
-
-### 4. Name Processes Clearly
-
-```tdl
-// Good
-proc temperature_sensor(chan<double> out) { }
-proc data_processor(chan<double> in, chan<int> out) { }
-
-// Avoid
-proc p1(chan<double> out) { }
-proc p2(chan<double> in, chan<int> out) { }
-```
-
-## Limitations
-
-### Not Supported (Yet)
-
-- ❌ Array declarations
-- ❌ For loops (use while + recursion)
-- ❌ Break/continue
-- ❌ Structs/records
-- ❌ File I/O
-- ❌ Generics/templates
-- ❌ Pattern matching
-- ❌ Channel receive (read-only)
-
-### Notes
-
-- All execution is deterministic
-- No undefined behavior (by design)
-- No memory safety issues (statically checked)
-- No data races (guaranteed)
-
-## Next: See [Getting Started](./getting_started.md)
+This makes TDL ideal for:
+- Reproducible scientific computation
+- Reliable data processing pipelines
+- Deterministic simulation
+- Auditable algorithms

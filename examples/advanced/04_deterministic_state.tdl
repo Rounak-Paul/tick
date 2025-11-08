@@ -1,0 +1,21 @@
+// Advanced: Deterministic state management
+// Shows how static variables work deterministically even with parallel access
+// Unlike traditional threading, parallel access here is SAFE and deterministic
+
+func get_value() -> int {
+  static counter: int = 0;
+  counter = counter + 1;
+  return counter;
+}
+
+func main() {
+  // These three calls run in PARALLEL but deterministically
+  // Each sees counter = 0, increments it, so all return 1
+  // This is SAFE in TDL (no race condition like in traditional threading)
+  let a: int = get_value();    // Returns 1
+  let b: int = get_value();    // Returns 1
+  let c: int = get_value();    // Returns 1
+  
+  let sum: int = a + b + c;
+  println(sum);  // Output: 3 (all see same state at same time)
+}

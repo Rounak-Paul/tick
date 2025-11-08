@@ -1,0 +1,28 @@
+// Advanced: Mixed parallel and sequential computation
+// Some operations can parallelize, others must be sequential
+func compute_base() -> int {
+  return 10;
+}
+
+func process_value(int x) -> int {
+  return x * 2;
+}
+
+func aggregate(int a, int b, int c) -> int {
+  return a + b + c;
+}
+
+func main() {
+  // Get base value
+  let base: int = compute_base();  // Layer 1
+  
+  // Parallel: process multiple copies
+  let v1: int = process_value(base);      // Layer 2 (parallel)
+  let v2: int = process_value(base + 1);  // Layer 2 (parallel)
+  let v3: int = process_value(base + 2);  // Layer 2 (parallel)
+  
+  // Aggregate results
+  let result: int = aggregate(v1, v2, v3);  // Layer 3
+  
+  println(result);  // Output: 20 + 22 + 24 = 66
+}

@@ -1,0 +1,7 @@
+// Variables and arithmetic
+func main() {
+  let x: int = 10;
+  let y: int = 20;
+  let sum: int = x + y;
+  println(sum);  // Output: 30
+}

@@ -1,5 +1,0 @@
-func main() {
-  let a: int = 20;
-  let b: int = 4;
-  println(a / b);
-}

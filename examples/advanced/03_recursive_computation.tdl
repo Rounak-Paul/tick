@@ -1,0 +1,18 @@
+// Advanced: Recursive parallelization
+// Shows how recursion works with parallelization
+func sum_range(int n) -> int {
+  if (n <= 0) {
+    return 0;
+  }
+  
+  let recursive_part: int = sum_range(n - 1);
+  let current: int = n;
+  let result: int = recursive_part + current;
+  
+  return result;
+}
+
+func main() {
+  let result: int = sum_range(5);
+  println(result);  // Output: 1+2+3+4+5 = 15
+}

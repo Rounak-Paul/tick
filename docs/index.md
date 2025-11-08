@@ -1,22 +1,19 @@
 # TDL Documentation
 
-Complete guide to the Temporal Deterministic Language.
+Complete guide to the Temporal Deterministic Language (v1.0.0 Beta).
 
 ## Quick Links
 
 - 🚀 **[Getting Started](./getting_started.md)** - Write your first TDL program
 - 📖 **[Language Reference](./language_reference.md)** - Complete syntax documentation
 - 🔗 **[API Reference](./api_reference.md)** - Built-in functions and constructs
-- ⏰ **[Clock Modes](./clock_modes.md)** - Frequency-based and max-speed clocks
-- ⚙️ **[Parallelism Guide](./parallelism_guide.md)** - Understanding deterministic concurrency
-- 💾 **[.tickcache Guide](./tickcache_guide.md)** - Compiler caching system (like Python's __pycache__)
-- 🔬 **[Semi-Compiled Architecture](./semi_compiled_architecture.md)** - How TDL's hybrid compilation model works
+- ⚙️ **[Parallelism Guide](./parallelism_guide.md)** - Understanding automatic parallel execution
 
 ## What is TDL?
 
-TDL is a **hardware description language for software** that solves the fundamental problem of concurrent programming: **how to write deterministic, race-free concurrent code without manual synchronization**.
+TDL is a **language for deterministic, automatic parallel computation** that solves the fundamental problem of concurrent programming: **how to write race-free concurrent code without locks, channels, or manual synchronization**.
 
-**Key property:** Every program produces identical results every execution, with zero race conditions.
+**Key property:** Every program produces identical results every execution, with zero race conditions, and independent statements run in parallel automatically.
 
 ## Why TDL?
 
@@ -30,6 +27,7 @@ Non-determinism   ✗ Every run different
 Locks/mutexes     ✓ Required but error-prone
 Deadlocks         ✗ Always possible
 Debugging         ✗ Nearly impossible
+Manual threading  ✓ Developer burden
 ```
 
 ### The TDL Solution
@@ -37,82 +35,91 @@ Debugging         ✗ Nearly impossible
 ```
 Determinism       ✓ Guaranteed
 Race-free         ✓ By design
-Synchronization   ✓ Automatic
+Automatic parallel ✓ No manual threads/locks
 Deadlocks         ✓ Impossible
 Debugging         ✓ Reproducible
+Simplicity        ✓ No complexity overhead
 ```
 
 ## Core Concepts
 
-### 1. Clocks
+### 1. Functions
 
-Synchronize execution to deterministic time points.
-
-```tdl
-clock sys = 100hz;    // 100 ticks per second
-clock fast;           // Max speed, no delays
-```
-
-### 2. Processes
-
-Deterministic concurrent units with isolated state.
-
-```tdl
-proc worker(chan<int> in, chan<int> out) {
-  on sys.tick {
-    static counter: int = 0;
-    counter = counter + 1;
-    out.send(counter);
-  }
-}
-```
-
-### 3. Channels
-
-FIFO message passing with ordering guarantees.
-
-```tdl
-channel.send(value);  // Deterministic send
-```
-
-### 4. Functions
-
-Reusable logic with parameters and return types.
+The primary unit of computation in TDL. Functions compose into programs.
 
 ```tdl
 func fibonacci(int n) -> int {
   if (n <= 1) { return n; }
   return fibonacci(n - 1) + fibonacci(n - 2);
 }
+
+func main() {
+  let result: int = fibonacci(10);
+  println(result);
+}
+```
+
+### 2. Automatic Parallelization
+
+Independent statements execute in parallel automatically. The compiler analyzes data dependencies and parallelizes where safe.
+
+```tdl
+func main() {
+  let x: int = 1 + 2;      // Parallel Layer 1
+  let y: int = 3 + 4;      // Parallel Layer 1 (independent of x)
+  let z: int = x + y;      // Layer 2 (waits for x and y)
+  println(z);              // Layer 3 (waits for z)
+}
+```
+
+### 3. Static Variables
+
+Maintain state across function calls, enabling deterministic computation.
+
+```tdl
+func counter() -> int {
+  static count: int = 0;
+  count = count + 1;
+  return count;
+}
+```
+
+### 4. Control Flow
+
+Structured programming with if/else and while loops.
+
+```tdl
+func max(int a, int b) -> int {
+  if (a > b) {
+    return a;
+  }
+  return b;
+}
 ```
 
 ## Example Program
 
 ```tdl
-// Define clocks
-clock sys = 10hz;
-
-// Define functions
-func double_value(int x) -> int {
-  return x * 2;
-}
-
-// Define processes
-proc producer(chan<int> out) {
-  on sys.tick {
-    static i: int = 0;
-    println(i);
-    out.send(i);
-    i = i + 1;
-  }
-}
-
-proc consumer(chan<int> in) {
-  on sys.tick {
-    println(100);
-  }
+// Deterministic parallel computation
+func main() {
+  // These compute independently and run in parallel
+  let a: int = 10 + 20;
+  let b: int = 30 + 40;
+  let c: int = 50 + 60;
+  
+  // This waits for a, b, c to complete
+  let sum: int = a + b + c;
+  
+  println(sum);  // Output: 210
 }
 ```
+
+When you run this, the TDL compiler:
+1. Detects that `a`, `b`, `c` are independent
+2. Executes them in parallel on separate threads
+3. Waits for all to complete
+4. Computes `sum` with the results
+5. Produces deterministic output every time
 
 ## Documentation Map
 
@@ -122,8 +129,7 @@ docs/
 ├── getting_started.md       ← Start here
 ├── language_reference.md    ← Complete syntax
 ├── api_reference.md         ← Functions/builtins
-├── clock_modes.md          ← Clock configuration
-└── parallelism_guide.md    ← Concurrency concepts
+└── parallelism_guide.md     ← Automatic parallelization
 ```
 
 ## Learning Path
@@ -140,13 +146,8 @@ docs/
 
 3. **Understanding parallelism?**
    - Study [Parallelism Guide](./parallelism_guide.md)
-   - Compare with traditional threading
-   - See why TDL is different
-
-4. **Fine-tuning your code?**
-   - Read [Clock Modes](./clock_modes.md)
-   - Choose frequency vs max-speed
-   - Optimize for your use case
+   - See how dependency analysis works
+   - Learn how to write parallelizable code
 
 5. **Reference looking up?**
    - Use [API Reference](./api_reference.md)

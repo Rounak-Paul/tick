@@ -1,0 +1,19 @@
+// Pipeline pattern - sequential stages
+func stage1(int x) -> int {
+  return x * 2;
+}
+
+func stage2(int x) -> int {
+  return x + 10;
+}
+
+func stage3(int x) -> int {
+  return x * 3;
+}
+
+func main() {
+  let step1: int = stage1(5);      // 5 * 2 = 10
+  let step2: int = stage2(step1);  // 10 + 10 = 20
+  let step3: int = stage3(step2);  // 20 * 3 = 60
+  println(step3);
+}

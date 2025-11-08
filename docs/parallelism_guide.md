@@ -1,17 +1,17 @@
-# Understanding Deterministic Parallelism
+# Automatic Parallelization in TDL
 
-Core concepts behind TDL's deterministic concurrency model.
+How TDL automatically executes independent statements in parallel while maintaining determinism.
 
 ## The Problem with Traditional Threading
 
-### Traditional Approach (Race Conditions)
+### Traditional Concurrent Programming
 
 ```cpp
-// Java, C++, Go, Rust all have this problem
+// Java, C++, Go, Rust - all have this problem
 int counter = 0;
 
-// Thread 1: counter++
-// Thread 2: counter++
+thread_1: counter++;
+thread_2: counter++;
 
 // Result: Could be 1 or 2 (non-deterministic!)
 ```
@@ -20,362 +20,317 @@ Every run produces different results because threads interleave unpredictably:
 
 ```
 Run 1: T1 reads 0, T2 reads 0, T1 writes 1, T2 writes 1 → Result: 1
-Run 2: T1 reads 0, T2 reads 0, T2 writes 1, T1 writes 1 → Result: 1  (same by luck)
-Run 3: T1 reads 0, T1 increments, writes 1, T2 reads 1, increments, writes 2 → Result: 2
+Run 2: T1 reads 0, T2 reads 0, T2 writes 1, T1 writes 1 → Result: 1
+Run 3: T1 reads 0, T1 writes 1, T2 reads 1, T2 writes 2 → Result: 2
 ```
 
 **You never know what you'll get.**
 
-## The TDL Solution
+## The TDL Solution: Automatic Safe Parallelization
 
-### Deterministic Model
+### Deterministic Parallel Execution
 
 ```tdl
-clock sys = 100hz;
-
-proc p1(chan<int> out) {
-  on sys.tick {
-    static x: int = 0;
-    x = x + 1;
-    out.send(x);
-  }
-}
-
-proc p2(chan<int> out) {
-  on sys.tick {
-    static x: int = 0;
-    x = x + 1;
-    out.send(x);
-  }
+func main() {
+  let a: int = 1 + 2;      // Runs in parallel
+  let b: int = 3 + 4;      // Runs in parallel
+  let c: int = a + b;      // Waits for a and b
+  println(c);              // Output: 10 (always)
 }
 ```
 
 **Every execution produces identical results:**
 
 ```
-Run 1: p1 outputs 1,2,3...  p2 outputs 1,2,3...
-Run 2: p1 outputs 1,2,3...  p2 outputs 1,2,3...
-Run 3: p1 outputs 1,2,3...  p2 outputs 1,2,3...
+Run 1: a and b compute in parallel → c = 10
+Run 2: a and b compute in parallel → c = 10
+Run 3: a and b compute in parallel → c = 10
 ```
 
 **You always know exactly what you'll get.**
 
-## How TDL Guarantees Determinism
+## How TDL Guarantees Determinism with Parallelization
 
-### 1. Clock-Synchronized Execution
+### 1. Dependency Analysis
 
-All processes synchronize to clock ticks:
-
-```
-Clock Tick 0:
-  ├─ Process A executes (deterministic)
-  ├─ Process B executes (deterministic)
-  └─ Process C executes (deterministic)
-
-Clock Tick 1:
-  ├─ Process A executes (deterministic)
-  ├─ Process B executes (deterministic)
-  └─ Process C executes (deterministic)
-```
-
-**Key:** At each tick, processes execute in the same order, always.
-
-### 2. Process Isolation (No Shared Memory)
-
-Processes cannot share memory:
+The compiler analyzes which variables each statement reads and writes:
 
 ```tdl
-// ❌ NOT ALLOWED - processes are isolated
-static shared_counter: int = 0;  // Would be process-local
-
-proc p1() {
-  on sys.tick {
-    static my_counter: int = 0;  // ✓ Only this process sees this
-    my_counter = my_counter + 1;
-  }
-}
-
-proc p2() {
-  on sys.tick {
-    static my_counter: int = 0;  // ✓ Only this process sees this
-    my_counter = my_counter + 1;
-  }
+func compute() {
+  let x: int = 10 + 20;    // Writes: {x}
+  let y: int = 30 + 40;    // Writes: {y}
+  let z: int = x + y;      // Reads: {x, y}, Writes: {z}
 }
 ```
 
-**Each process has isolated state.** No races possible.
+### 2. Execution Layers
 
-### 3. Channel-Based Communication
+Statements are grouped into "layers" where statements in the same layer don't depend on each other:
 
-Only way to communicate: channels
+```
+Layer 1: [x = 10 + 20] and [y = 30 + 40]  (independent, run in parallel)
+         ↓
+Layer 2: [z = x + y]  (depends on Layer 1, waits for it)
+         ↓
+Layer 3: [println(z)]
+```
+
+### 3. Deterministic Layer Ordering
+
+Layers execute in a strict order:
+
+```
+Execution Timeline:
+Time 1: Layer 1 starts
+        ├─ Thread 1: x = 10 + 20
+        └─ Thread 2: y = 30 + 40
+        (layer completes when both threads finish)
+
+Time 2: Layer 2 starts
+        └─ z = x + y  (both x and y are ready)
+
+Time 3: Layer 3 starts
+        └─ println(z)
+```
+
+**The order is deterministic** - different runs produce the same layer execution order.
+
+## Writing Parallelizable Code
+
+### Independent Statements (Parallel)
+
+Statements that don't depend on each other run in parallel:
 
 ```tdl
-proc producer(chan<int> out) {
-  on sys.tick {
-    out.send(data);  // ✓ Deterministic send
-  }
-}
-
-proc consumer(chan<int> in) {
-  on sys.tick {
-    // ✓ Deterministic receive (FIFO)
-  }
+func parallel_computation() {
+  let a: int = 100 + 200;     // Layer 1
+  let b: int = 300 + 400;     // Layer 1 (independent of a)
+  let c: int = 500 + 600;     // Layer 1 (independent of a and b)
+  
+  let sum: int = a + b + c;   // Layer 2 (depends on a, b, c)
+  println(sum);               // Layer 3
 }
 ```
 
-**Channels guarantee:**
-- FIFO ordering (first sent, first received)
-- No interleaving of messages
-- Deterministic delivery
+**Execution:**
+```
+Layer 1: a, b, c compute on separate threads (parallel)
+Layer 2: sum computes (waits for Layer 1)
+Layer 3: println executes
+```
 
-### 4. Static Variables Persist
+### Dependent Statements (Sequential)
 
-State survives ticks:
+Statements that read variables written by other statements execute sequentially:
 
 ```tdl
-proc accumulator(chan<int> out) {
-  on sys.tick {
-    static sum: int = 0;    // ✓ Persists across ticks
-    sum = sum + 10;
-    out.send(sum);
-  }
+func sequential_computation() {
+  let total: int = 0;         // Layer 1
+  total = total + 5;          // Layer 2 (reads total)
+  total = total + 10;         // Layer 3 (reads total)
+  println(total);             // Layer 4
 }
 ```
 
-**Output:** 10, 20, 30, 40, 50...
-
-**Always the same sequence, every run.**
-
-## Execution Model
-
-### One Tick
-
+**Execution:**
 ```
-on sys.tick {
-  println("A");  // 1
-  println("B");  // 2
-}
+Layer 1: total = 0
+Layer 2: total = total + 5  (waits for Layer 1)
+Layer 3: total = total + 10 (waits for Layer 2)
+Layer 4: println(total)     (waits for Layer 3)
 ```
 
-Executes in order: 1, then 2. Always.
+### Mixed Parallelism
 
-### Multiple Processes, One Tick
+Combine parallel and sequential operations:
 
 ```tdl
-proc p1() { on sys.tick { println("P1"); } }
-proc p2() { on sys.tick { println("P2"); } }
+func mixed_computation() {
+  let a: int = 1 + 2;       // Layer 1
+  let b: int = 3 + 4;       // Layer 1 (parallel with a)
+  
+  let c: int = a + 5;       // Layer 2 (depends on a)
+  let d: int = b + 5;       // Layer 2 (depends on b, independent of c)
+  
+  let sum: int = c + d;     // Layer 3 (depends on c and d)
+  println(sum);             // Layer 4
+}
 ```
 
-Both run every tick. Order is deterministic (alphabetical by default):
+**Execution:**
 ```
-P1
-P2
-P1
-P2
-...
-```
-
-### Multiple Ticks
-
-```
-Tick 0: [All processes execute]
-Tick 1: [All processes execute]
-Tick 2: [All processes execute]
+Layer 1: a and b compute in parallel
+Layer 2: c and d compute in parallel (both depend on Layer 1 but independent of each other)
+Layer 3: sum computes (waits for Layer 2)
+Layer 4: println executes
 ```
 
-Each tick is independent but deterministic.
+## Static Variables and Determinism
 
-## Race-Free Guarantees
-
-### No Race Conditions
+Static variables maintain state across function calls in a deterministic way:
 
 ```tdl
-// ❌ Traditional threading - RACE CONDITION
-x++  // Thread 1
-x++  // Thread 2
-// Result: could be 1 or 2
+func counter() -> int {
+  static count: int = 0;
+  count = count + 1;
+  return count;
+}
 
-// ✓ TDL - DETERMINISTIC
-static x: int = 0;
-proc p1() { on sys.tick { x = x + 1; } }
-proc p2() { on sys.tick { x = x + 1; } }
-// Result: p1 always outputs 1,2,3... and p2 always outputs 1,2,3...
+func main() {
+  println(counter());    // Output: 1
+  println(counter());    // Output: 2
+  println(counter());    // Output: 3
+}
 ```
 
-### No Deadlocks
+**Deterministic guarantee:** Static variables always:
+- Initialize to the same value on first call
+- Increment/modify deterministically
+- Produce identical sequences across runs
+
+## Examples
+
+### Example 1: Embarrassingly Parallel
 
 ```tdl
-// ✓ No locks, so no deadlocks
-proc p1(chan<int> to_p2, chan<int> from_p2) {
-  on sys.tick {
-    to_p2.send(value);
-    // Other process receives deterministically
-  }
+func square(int x) -> int {
+  return x * x;
 }
 
-proc p2(chan<int> to_p1, chan<int> from_p1) {
-  on sys.tick {
-    to_p1.send(value);
-    // Other process receives deterministically
-  }
+func main() {
+  let a: int = square(2);    // Layer 1
+  let b: int = square(3);    // Layer 1
+  let c: int = square(4);    // Layer 1
+  let d: int = square(5);    // Layer 1
+  
+  let sum: int = a + b + c + d;  // Layer 2
+  println(sum);  // Output: 54
 }
 ```
 
-### No Lost Updates
+All four `square()` calls run in parallel in Layer 1.
+
+### Example 2: Pipeline Pattern
 
 ```tdl
-// ✓ Static variables are atomic (per tick)
-static counter: int = 0;
+func stage1(int x) -> int {
+  return x * 2;
+}
 
-proc increment() {
-  on sys.tick {
-    counter = counter + 1;  // Always executes completely
-  }
+func stage2(int x) -> int {
+  return x + 10;
+}
+
+func stage3(int x) -> int {
+  return x * 3;
+}
+
+func main() {
+  let step1: int = stage1(5);      // Layer 1 (5*2 = 10)
+  let step2: int = stage2(step1);  // Layer 2 (depends on step1)
+  let result: int = stage3(step2); // Layer 3 (depends on step2)
+  println(result);  // (10+10)*3 = 60
 }
 ```
 
-## Parallelism Without Synchronization
+**Execution:**
+```
+Layer 1: stage1(5) → 10
+Layer 2: stage2(10) → 20
+Layer 3: stage3(20) → 60
+```
 
-### True Parallelism
+### Example 3: Data Parallelism with Reduction
 
 ```tdl
-clock fast;
-
-proc heavy_compute(chan<int> out) {
-  on fast.tick {
-    static i: int = 0;
-    println(i);
-    i = i + 1;
-  }
-}
-
-proc io_operation(chan<int> out) {
-  on fast.tick {
-    static j: int = 100;
-    println(j);
-    j = j + 1;
-  }
-}
-
-proc data_logging(chan<int> out) {
-  on fast.tick {
-    static k: int = 200;
-    println(k);
-    k = k + 1;
-  }
+func main() {
+  // Independent computations (parallel)
+  let sum1: int = 1 + 2;     // Layer 1
+  let sum2: int = 3 + 4;     // Layer 1
+  let sum3: int = 5 + 6;     // Layer 1
+  let sum4: int = 7 + 8;     // Layer 1
+  
+  // Parallel reduction (parallel)
+  let partial1: int = sum1 + sum2;  // Layer 2
+  let partial2: int = sum3 + sum4;  // Layer 2
+  
+  // Final reduction (sequential)
+  let total: int = partial1 + partial2;  // Layer 3
+  
+  println(total);  // Output: 36
 }
 ```
 
-**All three run in parallel every tick.**
+**Performance:**
+- Layer 1: 4 operations in parallel
+- Layer 2: 2 operations in parallel
+- Layer 3: 1 operation
+- Total: Faster than sequential execution
 
-```
-Tick 0: [A runs] [B runs] [C runs] (parallel)
-Tick 1: [A runs] [B runs] [C runs] (parallel)
-Tick 2: [A runs] [B runs] [C runs] (parallel)
-```
+## Performance Considerations
 
-**Zero overhead:**
-- No mutex locks
-- No condition variables
-- No atomic operations
-- No synchronization primitives
+### Maximize Parallelization
 
-### Automatic Load Balancing
-
-Processes complete whenever done, then move to next tick:
+**Good:** Many independent operations
 
 ```tdl
-proc fast_process(chan<int> out) {
-  on sys.tick {
-    println("fast");
-  }
-}
-
-proc slow_process(chan<int> out) {
-  on sys.tick {
-    static i: int = 0;
-    while (i < 1000000) { i = i + 1; }
-    println("slow");
-  }
+func good() {
+  let a: int = compute1();
+  let b: int = compute2();
+  let c: int = compute3();
+  let d: int = compute4();
+  let result: int = a + b + c + d;  // All compute1-4 run in parallel
 }
 ```
 
-**Tick waits for slowest process** (deterministic).
+**Poor:** Long dependency chains
 
-## Provable Correctness
-
-### Identical Output Every Run
-
-```bash
-$ ./build/bin/tdl program.tdl
-Output: 1, 10, 1, 2, 20, 2, 3, 30, 3...
-
-$ ./build/bin/tdl program.tdl
-Output: 1, 10, 1, 2, 20, 2, 3, 30, 3...
-
-$ ./build/bin/tdl program.tdl
-Output: 1, 10, 1, 2, 20, 2, 3, 30, 3...
+```tdl
+func poor() {
+  let a: int = compute();
+  let b: int = a + compute();
+  let c: int = b + compute();
+  let d: int = c + compute();  // Sequential, can't parallelize
+}
 ```
 
-**This proves correctness.**
+### Understand Layer Structure
 
-### Verifiable Execution
-
-Check statistics to verify determinism:
+Think about your data flow:
 
 ```
-=== Statistics ===
-Ticks executed: 10
-Average slack: 19.95 ms
-Min slack: 19.91 ms
-Max slack: 20.01 ms
+Good parallelization:       Poor parallelization:
+┌─────┐                    ┌─────┐
+│ Op1 │                    │ Op1 │
+├─────┤                    ├─────┤
+│ Op2 │ (parallel)         │ Op2 │ (sequential)
+├─────┤                    ├─────┤
+│ Op3 │                    │ Op3 │
+├─────┤                    ├─────┤
+│ Op4 │                    │ Op4 │
+├─────────────────┐        ├─────┐
+│   Reduce       │        │Result│
+└─────────────────┘        └─────┘
 ```
 
-**Consistent slack means deterministic execution.**
+## Determinism Guarantee
 
-## Comparison: TDL vs Traditional Concurrency
+Every TDL program is deterministic because:
 
-| Aspect | Traditional | TDL |
-|--------|-------------|-----|
-| Race conditions | ✗ Unavoidable | ✓ Impossible |
-| Determinism | ✗ Non-deterministic | ✓ Guaranteed |
-| Synchronization | ✓ Locks, mutexes | ✓ Built-in |
-| Performance | ✗ Lock contention | ✓ Zero overhead |
-| Deadlocks | ✗ Possible | ✓ Impossible |
-| Correctness | ✗ Hard to prove | ✓ Automatic |
-| Debugging | ✗ Heisenbugs | ✓ Reproducible |
+1. **No Race Conditions:** Parallelization is automatic and safe - only independent statements run in parallel
+2. **Deterministic Ordering:** Layers execute in a strict, consistent order
+3. **Deterministic Results:** Independent operations produce the same result every time
+4. **No Randomness:** No random operations or non-deterministic sources
 
-## Real-World Impact
+This makes TDL ideal for:
+- **Scientific Computation:** Reproducible results
+- **Financial Systems:** Auditable calculations
+- **Simulation:** Repeatable experiments
+- **Data Processing:** Consistent transformations
+- **Debugging:** Every run looks the same
 
-### Traditional Concurrency Problem
+## Next Steps
 
-```
-Development:  "Works fine on my machine!"
-Testing:      "Works fine here too"
-Production:   "CRASHES RANDOMLY"
-Investigation: "Only happened once at 3am"
-```
-
-### TDL Solution
-
-```
-Development:  "Works fine on my machine!"
-Testing:      "Works fine here too"
-Production:   "Works exactly the same way"
-Investigation: "Output is reproducible, always"
-```
-
-## Key Takeaway
-
-**TDL proves that deterministic parallelism is not only possible but practical.**
-
-Unlike traditional threading:
-- ✓ Every execution identical
-- ✓ No race conditions
-- ✓ No manual synchronization
-- ✓ No deadlocks
-- ✓ Provably correct
-
-This is the future of concurrent programming.
-
-## Next: See [Clock Modes](./clock_modes.md)
+- See [Language Reference](./language_reference.md) for syntax details
+- Check [Getting Started](./getting_started.md) for practical examples
+- Review [API Reference](./api_reference.md) for built-in functions

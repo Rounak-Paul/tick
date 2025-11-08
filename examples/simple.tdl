@@ -1,5 +1,0 @@
-// Simple test
-
-func main() {
-  println(1);
-}

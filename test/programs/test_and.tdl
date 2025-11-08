@@ -1,5 +1,0 @@
-func main() {
-  let a: int = 1;
-  let b: int = 1;
-  println(a && b);
-}

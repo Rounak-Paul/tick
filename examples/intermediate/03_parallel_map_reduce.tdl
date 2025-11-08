@@ -1,0 +1,22 @@
+// Parallel map-reduce pattern
+// Compute multiple values in parallel, then reduce
+func square(int x) -> int {
+  return x * x;
+}
+
+func main() {
+  // Parallel: compute all squares at once
+  let sq1: int = square(2);
+  let sq2: int = square(3);
+  let sq3: int = square(4);
+  let sq4: int = square(5);
+  
+  // Parallel reduction phase 1
+  let sum12: int = sq1 + sq2;
+  let sum34: int = sq3 + sq4;
+  
+  // Sequential reduction phase 2
+  let total: int = sum12 + sum34;
+  
+  println(total);  // Output: 4+9+16+25 = 54
+}

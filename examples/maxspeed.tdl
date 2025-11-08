@@ -1,7 +1,0 @@
-// Max Speed Execution Concept (simplified)
-
-func main() {
-  static count: int = 0;
-  count = count + 1;
-  println(count);
-}

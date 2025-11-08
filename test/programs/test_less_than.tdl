@@ -1,5 +1,0 @@
-func main() {
-  let a: int = 3;
-  let b: int = 5;
-  println(a < b);
-}
