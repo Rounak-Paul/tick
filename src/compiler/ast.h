@@ -9,8 +9,6 @@ struct ASTNode;
 struct Expression;
 struct Statement;
 struct Declaration;
-struct ClockDecl;
-struct ProcDecl;
 struct ChannelDecl;
 
 // Base AST Node
@@ -120,22 +118,9 @@ struct ParallelBlock : public Statement {
   std::vector<std::shared_ptr<Statement>> processes;
 };
 
-struct OnClockStatement : public Statement {
-  std::string clock;
-  std::string event; // "tick", "rise", "fall"
-  std::vector<std::shared_ptr<Statement>> body;
-};
-
 // Declarations
 struct Declaration : public ASTNode {
   virtual ~Declaration() = default;
-};
-
-struct ClockDecl : public Declaration {
-  std::string name;
-  int frequency; // in Hz
-  
-  ClockDecl(const std::string& n, int freq) : name(n), frequency(freq) {}
 };
 
 struct ChannelDecl : public Declaration {
@@ -145,14 +130,6 @@ struct ChannelDecl : public Declaration {
   
   ChannelDecl(const std::string& n, const std::string& type, int b)
     : name(n), elementType(type), bound(b) {}
-};
-
-struct ProcDecl : public Declaration {
-  std::string name;
-  std::vector<std::pair<std::string, std::string>> parameters; // (name, type)
-  std::vector<std::shared_ptr<Statement>> body;
-  
-  explicit ProcDecl(const std::string& n) : name(n) {}
 };
 
 struct FunctionDecl : public Declaration {

@@ -9,17 +9,7 @@ std::shared_ptr<Program> Parser::parse() {
   
   while (!isAtEnd()) {
     try {
-      if (check(TokenType::CLOCK)) {
-        auto decl = clockDeclaration();
-        if (decl) {
-          program->declarations.push_back(decl);
-        }
-      } else if (check(TokenType::PROC)) {
-        auto decl = procDeclaration();
-        if (decl) {
-          program->declarations.push_back(decl);
-        }
-      } else if (check(TokenType::FUNC)) {
+      if (check(TokenType::FUNC)) {
         auto decl = functionDeclaration();
         if (decl) {
           program->declarations.push_back(decl);
@@ -91,112 +81,6 @@ bool Parser::isAtEnd() const {
   return peek().type == TokenType::EOF_TOKEN;
 }
 
-std::shared_ptr<Declaration> Parser::declaration() {
-  if (check(TokenType::CLOCK)) return clockDeclaration();
-  if (check(TokenType::PROC)) return procDeclaration();
-  if (check(TokenType::FUNC)) return functionDeclaration();
-  return nullptr;
-}
-
-std::shared_ptr<ClockDecl> Parser::clockDeclaration() {
-  try {
-    if (!match(TokenType::CLOCK)) {
-      error("Expected 'clock'");
-      return nullptr;
-    }
-    
-    if (!check(TokenType::IDENTIFIER)) {
-      error("Expected clock name");
-      return nullptr;
-    }
-    std::string name = advance().lexeme;
-    
-    // Frequency is optional - if not specified, use max speed (999999 Hz)
-    int frequency = 999999;  // Max speed by default
-    
-    if (match(TokenType::ASSIGN)) {
-      if (check(TokenType::INT)) {
-        try {
-          frequency = std::get<int>(advance().literal);
-        } catch (...) {
-          frequency = 999999;
-        }
-      }
-      
-      if (!match(TokenType::HZ)) {
-        std::cerr << "Warning: Expected 'hz' keyword\n";
-      }
-    }
-    
-    if (!match(TokenType::SEMICOLON)) {
-      error("Expected ';' after clock declaration");
-    }
-    
-    return std::make_shared<ClockDecl>(name, frequency);
-  } catch (const std::exception& e) {
-    std::cerr << "Exception in clockDeclaration: " << e.what() << "\n";
-    return nullptr;
-  }
-}
-
-std::shared_ptr<ProcDecl> Parser::procDeclaration() {
-  consume(TokenType::PROC, "Expected 'proc'");
-  std::string name = consume(TokenType::IDENTIFIER, "Expected procedure name").lexeme;
-  
-  auto proc = std::make_shared<ProcDecl>(name);
-  
-  consume(TokenType::LPAREN, "Expected '('");
-  
-  // Parse parameters
-  if (!check(TokenType::RPAREN)) {
-    do {
-      // Handle parameter types including chan<type>
-      std::string paramType;
-      if (check(TokenType::CHAN)) {
-        advance(); // consume 'chan'
-        paramType = "chan";
-        if (check(TokenType::LT)) {
-          advance(); // consume '<'
-          paramType += "<";
-          if (check(TokenType::IDENTIFIER)) {
-            paramType += advance().lexeme;
-          }
-          if (check(TokenType::GT)) {
-            advance(); // consume '>'
-            paramType += ">";
-          }
-        }
-      } else if (check(TokenType::IDENTIFIER)) {
-        paramType = advance().lexeme;
-      } else {
-        error("Expected parameter type");
-        advance();
-        continue;
-      }
-      
-      if (!check(TokenType::IDENTIFIER)) {
-        error("Expected parameter name");
-        continue;
-      }
-      std::string paramName = advance().lexeme;
-      proc->parameters.push_back({paramName, paramType});
-    } while (match(TokenType::COMMA));
-  }
-  
-  consume(TokenType::RPAREN, "Expected ')'");
-  consume(TokenType::LBRACE, "Expected '{'");
-  
-  // Parse body
-  while (!check(TokenType::RBRACE) && !isAtEnd()) {
-    auto stmt = statement();
-    if (stmt) proc->body.push_back(stmt);
-  }
-  
-  consume(TokenType::RBRACE, "Expected '}'");
-  
-  return proc;
-}
-
 std::shared_ptr<FunctionDecl> Parser::functionDeclaration() {
   consume(TokenType::FUNC, "Expected 'func'");
   std::string name = consume(TokenType::IDENTIFIER, "Expected function name").lexeme;
@@ -254,7 +138,6 @@ std::shared_ptr<FunctionDecl> Parser::functionDeclaration() {
 std::shared_ptr<Statement> Parser::statement() {
   if (match(TokenType::IF)) return ifStatement();
   if (match(TokenType::WHILE)) return whileStatement();
-  if (match(TokenType::ON)) return onClockStatement();
   if (match(TokenType::PAR)) return parallelBlock();
   if (match(TokenType::LBRACE)) {
     auto block = std::make_shared<Block>();
@@ -321,25 +204,6 @@ std::shared_ptr<Statement> Parser::whileStatement() {
   consume(TokenType::RBRACE, "Expected '}'");
   
   return whileStmt;
-}
-
-std::shared_ptr<Statement> Parser::onClockStatement() {
-  std::string clock = consume(TokenType::IDENTIFIER, "Expected clock name").lexeme;
-  consume(TokenType::DOT, "Expected '.'");
-  std::string event = consume(TokenType::IDENTIFIER, "Expected event (tick, rise, fall)").lexeme;
-  
-  auto onStmt = std::make_shared<OnClockStatement>();
-  onStmt->clock = clock;
-  onStmt->event = event;
-  
-  consume(TokenType::LBRACE, "Expected '{'");
-  while (!check(TokenType::RBRACE) && !isAtEnd()) {
-    auto stmt = statement();
-    if (stmt) onStmt->body.push_back(stmt);
-  }
-  consume(TokenType::RBRACE, "Expected '}'");
-  
-  return onStmt;
 }
 
 std::shared_ptr<Statement> Parser::parallelBlock() {
@@ -617,12 +481,11 @@ void Parser::synchronize() {
     if (tokens[current - 1].type == TokenType::SEMICOLON) return;
     
     switch (peek().type) {
-      case TokenType::PROC:
-      case TokenType::CLOCK:
       case TokenType::CHAN:
       case TokenType::IF:
       case TokenType::WHILE:
       case TokenType::RETURN:
+      case TokenType::FUNC:
         return;
       default:
         break;

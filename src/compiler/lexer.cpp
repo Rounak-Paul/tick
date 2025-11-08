@@ -3,11 +3,8 @@
 #include <unordered_map>
 
 static const std::unordered_map<std::string, TokenType> keywords = {
-  {"clock", TokenType::CLOCK},
-  {"proc", TokenType::PROC},
   {"func", TokenType::FUNC},
   {"chan", TokenType::CHAN},
-  {"on", TokenType::ON},
   {"if", TokenType::IF},
   {"let", TokenType::LET},
   {"static", TokenType::STATIC},
@@ -21,7 +18,6 @@ static const std::unordered_map<std::string, TokenType> keywords = {
   {"none", TokenType::NONE},
   {"true", TokenType::TRUE},
   {"false", TokenType::FALSE},
-  {"hz", TokenType::HZ},
 };
 
 Lexer::Lexer(const std::string& source)

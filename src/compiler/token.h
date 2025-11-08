@@ -5,7 +5,7 @@
 
 enum class TokenType {
   // Keywords
-  CLOCK, PROC, CHAN, ON, IF, LET, STATIC, WHILE, FOR, RETURN, PRINTLN,
+  CHAN, IF, LET, STATIC, WHILE, FOR, RETURN, PRINTLN,
   PAR, IS, SOME, NONE, TRUE, FALSE, IN, OUT, FUNC,
   
   // Operators
@@ -19,7 +19,6 @@ enum class TokenType {
   INT, FLOAT, STRING, IDENTIFIER,
   
   // Special
-  HZ,
   TRY_RECV, SEND, BIND,
   
   // End of file

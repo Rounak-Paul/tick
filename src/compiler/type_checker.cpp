@@ -98,8 +98,6 @@ void TypeChecker::checkStatement(const std::shared_ptr<Statement>& stmt) {
     for (const auto& proc : parallelBlock->processes) {
       checkStatement(proc);
     }
-  } else if (auto onClockStmt = std::dynamic_pointer_cast<OnClockStatement>(stmt)) {
-    checkBlock(onClockStmt->body);
   }
 }
 

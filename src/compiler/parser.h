@@ -25,16 +25,12 @@ private:
   bool isAtEnd() const;
   
   // Parsing methods
-  std::shared_ptr<Declaration> declaration();
-  std::shared_ptr<ClockDecl> clockDeclaration();
-  std::shared_ptr<ProcDecl> procDeclaration();
   std::shared_ptr<FunctionDecl> functionDeclaration();
   
   std::shared_ptr<Statement> statement();
   std::shared_ptr<Statement> blockStatement();
   std::shared_ptr<Statement> ifStatement();
   std::shared_ptr<Statement> whileStatement();
-  std::shared_ptr<Statement> onClockStatement();
   std::shared_ptr<Statement> parallelBlock();
   std::shared_ptr<Statement> variableDeclaration();
   std::shared_ptr<Statement> returnStatement();
