@@ -51,8 +51,16 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+# CMake build files
 build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+*.cmake
 
 # TDL Compiler Cache (like Python's __pycache__)
 # Contains generated C++ files, object files, and compiled binaries
 .tickcache/
+bin/
