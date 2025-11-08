@@ -4,7 +4,7 @@ Complete syntax and semantics guide for TDL (Temporal Deterministic Language) pr
 
 ## Overview
 
-TDL is a deterministic programming language with automatic parallelization. The compiler analyzes data dependencies between statements and executes independent operations in parallel, while maintaining complete determinism.
+TDL is a **strongly typed**, deterministic programming language with automatic parallelization. Every variable, function parameter, and function return value must have an explicit type annotation. The compiler performs comprehensive type checking to catch errors before execution and analyzes data dependencies between statements to execute independent operations in parallel, while maintaining complete determinism.
 
 ## Language Basics
 
@@ -16,11 +16,28 @@ TDL is a deterministic programming language with automatic parallelization. The 
 
 ### Data Types
 
-TDL supports the following data types:
+TDL supports the following primitive data types with strong typing:
 
 ```tdl
-int     // Integer values
-bool    // Boolean: true or false
+int       // 32-bit signed integer values
+float     // 32-bit floating-point numbers
+double    // 64-bit high-precision floating-point numbers
+bool      // Boolean: true or false
+string    // Text strings
+void      // No value (function return type only)
+```
+
+All variables and function parameters must have explicit type declarations. Type mismatches are compile-time errors.
+
+### Type Safety
+
+TDL enforces strict type checking:
+
+```tdl
+let x: int = 42;        // OK: integer value
+let y: int = 3.14;      // ERROR: cannot assign float to int
+let z: float = 3.14;    // OK: float value
+let name: string = "hello";  // OK: string value
 ```
 
 ### Variable Declarations
@@ -30,19 +47,54 @@ bool    // Boolean: true or false
 let x: int = 0;
 let flag: bool = true;
 let y: int = x + 5;
+let value: float = 2.71;
+let message: string = "Hello";
 ```
 
 **Static variables** (persist across function calls):
 ```tdl
 static counter: int = 0;
-static accumulator: int = 0;
+static accumulator: double = 0.0;
 ```
 
-Static variables are initialized once and maintain their value across multiple invocations.
+Static variables are initialized once and maintain their value across multiple invocations. Type annotations are required.
+
+## Type Compatibility Rules
+
+### Numeric Type Conversions
+
+Numeric types (int, float, double) can be used interchangeably in arithmetic operations:
+
+```tdl
+func mixed_arithmetic() -> double {
+  let i: int = 10;
+  let f: float = 2.5;
+  let d: double = 3.14159;
+  
+  // Automatic type promotion in operations
+  let result: double = i + f + d;  // Result is double
+  return result;
+}
+```
+
+The result type follows these rules:
+- If any operand is `double`, the result is `double`
+- Else if any operand is `float`, the result is `float`
+- Else the result is `int`
+
+### No Implicit Type Conversions
+
+Assignment requires exact type match or valid numeric conversion:
+
+```tdl
+let x: int = 5;
+let y: double = x;      // ERROR: cannot assign int to double
+let z: double = 5.0;    // OK: explicit double literal
+```
 
 ## Function Declarations
 
-Define reusable blocks of code.
+Define reusable blocks of code with required type annotations.
 
 ```tdl
 func name(parameter1: type, parameter2: type) -> return_type {
@@ -53,18 +105,24 @@ func name(parameter1: type, parameter2: type) -> return_type {
 
 ### Parameters and Return Types
 
+All function parameters and return types must be explicitly annotated:
+
 ```tdl
-func add(int a, int b) -> int {
+func add(a: int, b: int) -> int {
   return a + b;
 }
 
-func square(int x) -> int {
-  let result: int = x * x;
+func square(x: float) -> float {
+  let result: float = x * x;
   return result;
 }
 
-func is_positive(int x) -> bool {
+func is_positive(x: int) -> bool {
   return x > 0;
+}
+
+func format_message(name: string, count: int) -> string {
+  return name + " has " + count + " items";
 }
 ```
 
@@ -76,17 +134,43 @@ func get_default() -> int {
 }
 ```
 
-Functions with no return value use `main()` convention:
+Functions with no return value use explicit `void` return type:
 
 ```tdl
+func print_info(message: string) -> void {
+  println(message);
+}
+
+// Or implicitly (if no return statement):
 func main() {
   println(10);
 }
 ```
 
+### Type Checking on Function Calls
+
+Function calls are type-checked at compile time:
+
+```tdl
+func multiply(x: int, y: int) -> int {
+  return x * y;
+}
+
+// Valid calls
+multiply(2, 3);         // OK
+multiply(2, 3 + 4);     // OK
+
+// Type errors (caught at compile time)
+multiply(2.5, 3);       // ERROR: float passed where int expected
+multiply(2);            // ERROR: missing required argument
+multiply("hello", 3);   // ERROR: string passed where int expected
+```
+
 ## Control Flow
 
 ### If/Else Statements
+
+Conditions must be boolean expressions:
 
 ```tdl
 if (condition) {
@@ -101,7 +185,7 @@ if (condition) {
 Example:
 
 ```tdl
-func max(int a, int b) -> int {
+func max(a: int, b: int) -> int {
   if (a > b) {
     return a;
   } else {
@@ -121,7 +205,7 @@ while (condition) {
 Example:
 
 ```tdl
-func factorial(int n) -> int {
+func factorial(n: int) -> int {
   let result: int = 1;
   let i: int = 1;
   while (i <= n) {
@@ -132,34 +216,139 @@ func factorial(int n) -> int {
 }
 ```
 
+## Type Checking and Error Detection
+
+### Compile-Time Type Validation
+
+TDL performs comprehensive type checking at compile time:
+
+1. **Variable Initialization**: Initializer type must match variable type
+   ```tdl
+   let x: int = 5;        // OK
+   let y: int = 5.5;      // ERROR: float assigned to int
+   ```
+
+2. **Operator Type Constraints**:
+   ```tdl
+   let a: int = 5;
+   let b: bool = true;
+   let c: int = a + b;    // ERROR: cannot add int and bool
+   let d: bool = a && b;  // ERROR: && requires bool operands
+   ```
+
+3. **Function Argument Types**:
+   ```tdl
+   func process(x: int) -> string {
+     return "value";
+   }
+   
+   process(42);           // OK
+   process(3.14);         // ERROR: float passed to int parameter
+   process("text");       // ERROR: string passed to int parameter
+   ```
+
+4. **Return Type Validation**:
+   ```tdl
+   func get_count() -> int {
+     return 42;           // OK
+     return 3.14;         // ERROR: float returned from int function
+     return "count";      // ERROR: string returned from int function
+   }
+   ```
+
+### Operator Type Requirements
+
+- **Arithmetic** (`+`, `-`, `*`, `/`): Requires numeric operands (int, float, double)
+- **Modulo** (`%`): Requires integer operands
+- **Comparison** (`==`, `!=`, `<`, `<=`, `>`, `>=`): Requires same types (or numeric types)
+- **Logical** (`&&`, `||`): Requires boolean operands
+- **Logical NOT** (`!`): Requires boolean operand
+- **Unary minus** (`-`): Requires numeric operand
+
+### Type Errors
+
+The compiler catches many type errors before execution:
+
+```tdl
+let x: int = "hello";           // ERROR: type mismatch in assignment
+let y: bool = 5;                // ERROR: int assigned to bool
+let z: int = x / true;          // ERROR: cannot divide int by bool
+if (42) { println("ok"); }      // ERROR: if condition must be bool
+```
+
 ## Expressions and Operators
 
 ### Arithmetic Operators
+
+All operands must be numeric (int, float, or double):
 
 ```tdl
 x + y       // Addition
 x - y       // Subtraction
 x * y       // Multiplication
 x / y       // Division
+x % y       // Modulo (integer only)
+```
+
+Examples:
+
+```tdl
+let a: int = 10;
+let b: int = 3;
+let sum: int = a + b;           // 13
+let product: int = a * b;       // 30
+let quotient: int = a / b;      // 3
+let remainder: int = a % b;     // 1
+
+let x: float = 3.14;
+let y: float = 2.0;
+let result: float = x / y;      // 1.57
 ```
 
 ### Comparison Operators
 
+Operands must be compatible types (same type or both numeric):
+
 ```tdl
-x == y      // Equal to
-x != y      // Not equal to
-x > y       // Greater than
-x < y       // Less than
-x >= y      // Greater than or equal to
-x <= y      // Less than or equal to
+x == y      // Equal to (returns bool)
+x != y      // Not equal to (returns bool)
+x > y       // Greater than (returns bool)
+x < y       // Less than (returns bool)
+x >= y      // Greater than or equal to (returns bool)
+x <= y      // Less than or equal to (returns bool)
+```
+
+Examples:
+
+```tdl
+let a: int = 5;
+let b: int = 3;
+let equal: bool = a == b;       // false
+let greater: bool = a > b;      // true
+
+let name1: string = "Alice";
+let name2: string = "Bob";
+let same: bool = name1 == name2; // false
 ```
 
 ### Logical Operators
 
+All operands must be boolean:
+
 ```tdl
-x && y      // Logical AND
-x || y      // Logical OR
-!x          // Logical NOT
+x && y      // Logical AND (requires bool operands)
+x || y      // Logical OR (requires bool operands)
+!x          // Logical NOT (requires bool operand)
+```
+
+Examples:
+
+```tdl
+let a: bool = true;
+let b: bool = false;
+let both: bool = a && b;        // false
+let either: bool = a || b;      // true
+let not_a: bool = !a;           // false
 ```
 
 ### Operator Precedence

@@ -4,6 +4,7 @@ A compiler and runtime for a **Temporal Deterministic Language** - a domain-spec
 
 ## Features
 
+- **Strongly typed**: All variables and functions must have explicit type annotations for type safety
 - **Clock-based synchronization**: Define clocks with specific frequencies (Hz) that drive process execution
 - **Deterministic execution**: All operations are synchronized to clock ticks - no race conditions
 - **Channel-based communication**: Type-safe, bounded channels for inter-process communication
@@ -37,6 +38,32 @@ With options:
 ```
 
 ## Language Syntax
+
+### Strong Type System
+
+TDL supports the following primitive types:
+
+- `int` - Integer values (32-bit signed)
+- `float` - Floating-point numbers (32-bit)
+- `double` - High-precision floating-point numbers (64-bit)
+- `bool` - Boolean values (true or false)
+- `string` - Text strings
+- `void` - No value (used for functions with no return)
+
+All variables and function parameters must have explicit type annotations:
+
+```tdl
+let x: int = 42;
+let pi: float = 3.14;
+let name: string = "TDL";
+let flag: bool = true;
+
+func add(a: int, b: int) -> int {
+  return a + b;
+}
+```
+
+Type checking is performed at compile time to catch errors before runtime.
 
 ### Clocks
 
@@ -92,8 +119,8 @@ par {
 Variables with optional `static` keyword (persistent across ticks):
 
 ```tdl
-let x: int = 42;           // Local variable
-static counter: int = 0;   // Persists across ticks
+let x: int = 42;           // Local variable with type annotation
+static counter: int = 0;   // Persists across ticks with type annotation
 ```
 
 ## Project Structure

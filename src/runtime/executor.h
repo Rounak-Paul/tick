@@ -8,27 +8,52 @@
 #include "../compiler/ast.h"
 #include "dependency_analyzer.h"
 
-// Value type system for TDL
+// Value type system for TDL with strong typing support
 struct Value {
   enum Type {
     INT,
+    FLOAT,
+    DOUBLE,
     BOOL,
+    STRING,
     VOID,
     UNKNOWN
   };
 
   Type type;
   int intValue;
+  float floatValue;
+  double doubleValue;
   bool boolValue;
+  std::string stringValue;
 
-  Value() : type(VOID), intValue(0), boolValue(false) {}
-  explicit Value(int i) : type(INT), intValue(i), boolValue(false) {}
-  explicit Value(bool b) : type(BOOL), intValue(0), boolValue(b) {}
+  Value() : type(VOID), intValue(0), floatValue(0.0f), doubleValue(0.0), boolValue(false), stringValue("") {}
+  explicit Value(int i) : type(INT), intValue(i), floatValue(0.0f), doubleValue(0.0), boolValue(false), stringValue("") {}
+  explicit Value(float f) : type(FLOAT), intValue(0), floatValue(f), doubleValue(0.0), boolValue(false), stringValue("") {}
+  explicit Value(double d) : type(DOUBLE), intValue(0), floatValue(0.0f), doubleValue(d), boolValue(false), stringValue("") {}
+  explicit Value(bool b) : type(BOOL), intValue(0), floatValue(0.0f), doubleValue(0.0), boolValue(b), stringValue("") {}
+  explicit Value(const std::string& s) : type(STRING), intValue(0), floatValue(0.0f), doubleValue(0.0), boolValue(false), stringValue(s) {}
 
   static Value Void() { return Value(); }
   bool isInt() const { return type == INT; }
+  bool isFloat() const { return type == FLOAT; }
+  bool isDouble() const { return type == DOUBLE; }
   bool isBool() const { return type == BOOL; }
+  bool isString() const { return type == STRING; }
   bool isVoid() const { return type == VOID; }
+  bool isNumeric() const { return type == INT || type == FLOAT || type == DOUBLE; }
+  
+  std::string typeString() const {
+    switch (type) {
+      case INT: return "int";
+      case FLOAT: return "float";
+      case DOUBLE: return "double";
+      case BOOL: return "bool";
+      case STRING: return "string";
+      case VOID: return "void";
+      default: return "unknown";
+    }
+  }
 };
 
 // Scope for variable storage

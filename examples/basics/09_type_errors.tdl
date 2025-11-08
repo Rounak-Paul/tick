@@ -1,0 +1,118 @@
+// Type Errors - Examples of type mismatches that TDL catches
+// DO NOT RUN - This file contains intentional type errors for educational purposes
+
+// ERROR 1: Type mismatch in variable initialization
+// let wrong_type: int = 3.14;  // float value assigned to int variable
+
+// ERROR 2: Incompatible types in assignment
+// let x: int = 5;
+// x = "hello";  // string assigned to int variable
+
+// ERROR 3: Wrong type in function argument
+// func add(a: int, b: int) -> int {
+//   return a + b;
+// }
+// add(2.5, 3);  // float passed where int expected
+// add("two", 3);  // string passed where int expected
+
+// ERROR 4: Wrong return type
+// func get_age() -> int {
+//   return "not a number";  // string returned from int function
+// }
+
+// ERROR 5: Arithmetic with incompatible types
+// let num: int = 5;
+// let flag: bool = true;
+// let result: int = num + flag;  // cannot add int and bool
+
+// ERROR 6: Non-boolean condition in if statement
+// if (42) {  // integer used where bool expected
+//   println("error");
+// }
+
+// ERROR 7: Non-boolean operand in logical operation
+// let x: int = 5;
+// let y: bool = true;
+// let result: bool = x && y;  // cannot use && with int operand
+
+// ERROR 8: Logical NOT on non-boolean
+// let num: int = 10;
+// let result: bool = !num;  // logical NOT requires bool operand
+
+// ERROR 9: Modulo with non-integers
+// let x: float = 3.14;
+// let y: float = 2.0;
+// let result: int = x % y;  // modulo requires integer operands
+
+// ERROR 10: Non-boolean in while condition
+// let i: int = 0;
+// while (i) {  // int used where bool expected
+//   i = i + 1;
+// }
+
+// ERROR 11: Type mismatch in comparison result usage
+// let x: int = 5;
+// let comparison: int = x > 3;  // comparison returns bool, not int
+// ERROR: bool assigned to int
+
+// ERROR 12: Comparing incompatible types
+// let num: int = 5;
+// let text: string = "hello";
+// let result: bool = num == text;  // cannot compare int and string
+
+// ERROR 13: Undefined variable used
+// let result: int = undefined_var + 5;  // variable not declared
+
+// ERROR 14: Missing required function arguments
+// func multiply(a: int, b: int) -> int {
+//   return a * b;
+// }
+// multiply(5);  // missing second argument
+
+// ERROR 15: Too many function arguments
+// func add(a: int, b: int) -> int {
+//   return a + b;
+// }
+// add(1, 2, 3);  // too many arguments
+
+// Correct versions of the above:
+
+func add(a: int, b: int) -> int {
+  return a + b;
+}
+
+func get_age() -> int {
+  return 25;
+}
+
+func main() -> void {
+  // CORRECT: matching types
+  let correct_type: int = 5;
+  
+  // CORRECT: compatible types
+  let result: int = add(2, 3);
+  
+  // CORRECT: matching return type
+  let age: int = get_age();
+  
+  // CORRECT: arithmetic with same types
+  let num: int = 5;
+  let sum: int = num + 3;
+  
+  // CORRECT: boolean condition
+  let flag: bool = true;
+  if (flag) {
+    println("success");
+  }
+  
+  // CORRECT: boolean operations
+  let a: bool = true;
+  let b: bool = false;
+  let combined: bool = a && b;
+  let negated: bool = !a;
+  
+  // CORRECT: modulo with integers
+  let x: int = 10;
+  let y: int = 3;
+  let remainder: int = x % y;
+}

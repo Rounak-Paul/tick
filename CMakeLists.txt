@@ -23,6 +23,7 @@ set(COMPILER_SOURCES
   src/compiler/lexer.cpp
   src/compiler/parser.cpp
   src/compiler/ast.cpp
+  src/compiler/type_checker.cpp
 )
 
 set(COMPILER_HEADERS
@@ -30,6 +31,7 @@ set(COMPILER_HEADERS
   src/compiler/parser.h
   src/compiler/ast.h
   src/compiler/token.h
+  src/compiler/type_checker.h
 )
 
 # Runtime Sources

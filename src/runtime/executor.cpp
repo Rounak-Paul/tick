@@ -75,6 +75,14 @@ Value Executor::evaluateExpression(const std::shared_ptr<Expression>& expr, std:
     return Value(lit->value);
   }
 
+  if (auto lit = std::dynamic_pointer_cast<FloatLiteral>(expr)) {
+    return Value((float)lit->value);
+  }
+
+  if (auto lit = std::dynamic_pointer_cast<StringLiteral>(expr)) {
+    return Value(lit->value);
+  }
+
   if (auto ident = std::dynamic_pointer_cast<Identifier>(expr)) {
     return scope->get(ident->name);
   }
@@ -98,6 +106,7 @@ Value Executor::evaluateExpression(const std::shared_ptr<Expression>& expr, std:
   return Value::Void();
 }
 
+
 Value Executor::evaluateBinaryOp(const std::shared_ptr<BinaryOp>& op, std::shared_ptr<Scope> scope) {
   Value left = evaluateExpression(op->left, scope);
   Value right = evaluateExpression(op->right, scope);
@@ -110,24 +119,110 @@ Value Executor::evaluateBinaryOp(const std::shared_ptr<BinaryOp>& op, std::share
     throw std::runtime_error("Invalid assignment target");
   }
 
-  if (op->op == "+") return Value(left.intValue + right.intValue);
-  if (op->op == "-") return Value(left.intValue - right.intValue);
-  if (op->op == "*") return Value(left.intValue * right.intValue);
-  if (op->op == "/") {
-    if (right.intValue == 0) throw std::runtime_error("Division by zero");
-    return Value(left.intValue / right.intValue);
+  // Arithmetic operators - require numeric types
+  if (op->op == "+" || op->op == "-" || op->op == "*" || op->op == "/" || op->op == "%") {
+    if (!left.isNumeric() || !right.isNumeric()) {
+      throw std::runtime_error("Type error: arithmetic operator '" + op->op + "' requires numeric operands, got " + 
+                             left.typeString() + " and " + right.typeString());
+    }
+
+    if (op->op == "+") {
+      if (left.isDouble() || right.isDouble()) {
+        double l = left.isDouble() ? left.doubleValue : (left.isFloat() ? left.floatValue : left.intValue);
+        double r = right.isDouble() ? right.doubleValue : (right.isFloat() ? right.floatValue : right.intValue);
+        return Value(l + r);
+      } else if (left.isFloat() || right.isFloat()) {
+        float l = left.isFloat() ? left.floatValue : left.intValue;
+        float r = right.isFloat() ? right.floatValue : right.intValue;
+        return Value(l + r);
+      }
+      return Value(left.intValue + right.intValue);
+    }
+    if (op->op == "-") {
+      if (left.isDouble() || right.isDouble()) {
+        double l = left.isDouble() ? left.doubleValue : (left.isFloat() ? left.floatValue : left.intValue);
+        double r = right.isDouble() ? right.doubleValue : (right.isFloat() ? right.floatValue : right.intValue);
+        return Value(l - r);
+      } else if (left.isFloat() || right.isFloat()) {
+        float l = left.isFloat() ? left.floatValue : left.intValue;
+        float r = right.isFloat() ? right.floatValue : right.intValue;
+        return Value(l - r);
+      }
+      return Value(left.intValue - right.intValue);
+    }
+    if (op->op == "*") {
+      if (left.isDouble() || right.isDouble()) {
+        double l = left.isDouble() ? left.doubleValue : (left.isFloat() ? left.floatValue : left.intValue);
+        double r = right.isDouble() ? right.doubleValue : (right.isFloat() ? right.floatValue : right.intValue);
+        return Value(l * r);
+      } else if (left.isFloat() || right.isFloat()) {
+        float l = left.isFloat() ? left.floatValue : left.intValue;
+        float r = right.isFloat() ? right.floatValue : right.intValue;
+        return Value(l * r);
+      }
+      return Value(left.intValue * right.intValue);
+    }
+    if (op->op == "/") {
+      if (left.isDouble() || right.isDouble()) {
+        double l = left.isDouble() ? left.doubleValue : (left.isFloat() ? left.floatValue : left.intValue);
+        double r = right.isDouble() ? right.doubleValue : (right.isFloat() ? right.floatValue : right.intValue);
+        if (r == 0) throw std::runtime_error("Division by zero");
+        return Value(l / r);
+      } else if (left.isFloat() || right.isFloat()) {
+        float l = left.isFloat() ? left.floatValue : left.intValue;
+        float r = right.isFloat() ? right.floatValue : right.intValue;
+        if (r == 0) throw std::runtime_error("Division by zero");
+        return Value(l / r);
+      }
+      if (right.intValue == 0) throw std::runtime_error("Division by zero");
+      return Value(left.intValue / right.intValue);
+    }
+    if (op->op == "%") {
+      if (!left.isInt() || !right.isInt()) {
+        throw std::runtime_error("Type error: modulo operator '%' requires integer operands, got " + 
+                               left.typeString() + " and " + right.typeString());
+      }
+      return Value(left.intValue % right.intValue);
+    }
   }
-  if (op->op == "%") return Value(left.intValue % right.intValue);
 
-  if (op->op == "==") return Value(left.intValue == right.intValue);
-  if (op->op == "!=") return Value(left.intValue != right.intValue);
-  if (op->op == "<") return Value(left.intValue < right.intValue);
-  if (op->op == "<=") return Value(left.intValue <= right.intValue);
-  if (op->op == ">") return Value(left.intValue > right.intValue);
-  if (op->op == ">=") return Value(left.intValue >= right.intValue);
+  // Comparison operators
+  if (op->op == "==" || op->op == "!=" || op->op == "<" || op->op == "<=" || op->op == ">" || op->op == ">=") {
+    // Allow numeric comparisons
+    if (left.isNumeric() && right.isNumeric()) {
+      double l = left.isDouble() ? left.doubleValue : (left.isFloat() ? left.floatValue : left.intValue);
+      double r = right.isDouble() ? right.doubleValue : (right.isFloat() ? right.floatValue : right.intValue);
+      
+      if (op->op == "==") return Value(l == r);
+      if (op->op == "!=") return Value(l != r);
+      if (op->op == "<") return Value(l < r);
+      if (op->op == "<=") return Value(l <= r);
+      if (op->op == ">") return Value(l > r);
+      if (op->op == ">=") return Value(l >= r);
+    }
+    // Allow same-type comparisons
+    else if (left.type == right.type) {
+      if (left.isBool()) {
+        if (op->op == "==") return Value(left.boolValue == right.boolValue);
+        if (op->op == "!=") return Value(left.boolValue != right.boolValue);
+      } else if (left.isString()) {
+        if (op->op == "==") return Value(left.stringValue == right.stringValue);
+        if (op->op == "!=") return Value(left.stringValue != right.stringValue);
+      }
+    } else {
+      throw std::runtime_error("Type error: cannot compare " + left.typeString() + " and " + right.typeString());
+    }
+  }
 
-  if (op->op == "&&") return Value(left.boolValue && right.boolValue);
-  if (op->op == "||") return Value(left.boolValue || right.boolValue);
+  // Logical operators - require bool operands
+  if (op->op == "&&" || op->op == "||") {
+    if (!left.isBool() || !right.isBool()) {
+      throw std::runtime_error("Type error: logical operator '" + op->op + "' requires boolean operands, got " + 
+                             left.typeString() + " and " + right.typeString());
+    }
+    if (op->op == "&&") return Value(left.boolValue && right.boolValue);
+    if (op->op == "||") return Value(left.boolValue || right.boolValue);
+  }
 
   throw std::runtime_error("Unknown operator: " + op->op);
 }
@@ -135,8 +230,20 @@ Value Executor::evaluateBinaryOp(const std::shared_ptr<BinaryOp>& op, std::share
 Value Executor::evaluateUnaryOp(const std::shared_ptr<UnaryOp>& op, std::shared_ptr<Scope> scope) {
   Value operand = evaluateExpression(op->operand, scope);
 
-  if (op->op == "-") return Value(-operand.intValue);
-  if (op->op == "!") return Value(!operand.boolValue);
+  if (op->op == "-") {
+    if (!operand.isNumeric()) {
+      throw std::runtime_error("Type error: unary minus requires numeric operand, got " + operand.typeString());
+    }
+    if (operand.isDouble()) return Value(-operand.doubleValue);
+    if (operand.isFloat()) return Value(-operand.floatValue);
+    return Value(-operand.intValue);
+  }
+  if (op->op == "!") {
+    if (!operand.isBool()) {
+      throw std::runtime_error("Type error: logical NOT requires boolean operand, got " + operand.typeString());
+    }
+    return Value(!operand.boolValue);
+  }
 
   throw std::runtime_error("Unknown unary operator: " + op->op);
 }
@@ -145,8 +252,27 @@ Value Executor::callFunction(const std::string& name, const std::vector<Value>& 
   // Check for built-in functions
   if (name == "println") {
     if (!args.empty()) {
-      output += std::to_string(args[0].intValue) + "\n";
-      std::cout << args[0].intValue << std::endl;
+      const Value& arg = args[0];
+      std::string outputStr;
+      
+      if (arg.isInt()) {
+        outputStr = std::to_string(arg.intValue);
+      } else if (arg.isFloat()) {
+        outputStr = std::to_string(arg.floatValue);
+      } else if (arg.isDouble()) {
+        outputStr = std::to_string(arg.doubleValue);
+      } else if (arg.isBool()) {
+        outputStr = arg.boolValue ? "true" : "false";
+      } else if (arg.isString()) {
+        outputStr = arg.stringValue;
+      } else if (arg.isVoid()) {
+        outputStr = "";
+      } else {
+        outputStr = "unknown";
+      }
+      
+      output += outputStr + "\n";
+      std::cout << outputStr << std::endl;
     }
     return Value::Void();
   }

@@ -53,6 +53,7 @@ run_test "03_if_else" "/Users/duke/Code/tick/examples/basics/03_if_else.tdl" "15
 run_test "04_while_loop" "/Users/duke/Code/tick/examples/basics/04_while_loop.tdl" "0"
 run_test "05_recursion" "/Users/duke/Code/tick/examples/basics/05_recursion.tdl" "120"
 run_test "06_static_variables" "/Users/duke/Code/tick/examples/basics/06_static_variables.tdl" "1"
+run_test "07_strong_typing" "/Users/duke/Code/tick/examples/basics/07_strong_typing.tdl" "15"
 
 echo ""
 echo -e "${YELLOW}Intermediate:${NC}"
