@@ -1,0 +1,49 @@
+event compute;
+event aggregate;
+
+signal<int> result1;
+signal<int> result2;
+signal<int> final_result;
+
+@compute
+process worker1 {
+  int a = 10;
+  int b = 20;
+  int sum = a + b;
+  result1.emit(sum);
+}
+
+@compute
+process worker2 {
+  int x = 5;
+  int y = 3;
+  int product = x * y;
+  result2.emit(product);
+}
+
+@aggregate
+process combiner {
+  int val1 = result1.recv();
+  int val2 = result2.recv();
+  int combined = val1 + val2;
+  final_result.emit(combined);
+}
+
+int calculate(int n) {
+  int result = n * 2;
+  return result;
+}
+
+int main() {
+  compute.execute();
+  
+  aggregate.execute();
+  
+  int final_value = final_result.recv();
+  
+  int doubled = calculate(final_value);
+  
+  println(format("int: {}, double: {}", final_value, double));
+
+  return 0;
+}

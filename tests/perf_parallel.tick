@@ -1,0 +1,59 @@
+event compute;
+signal<int> result_channel;
+
+@compute
+process worker1 {
+  int sum = 0;
+  int i = 0;
+  while (i < 100) {
+    sum = sum + i;
+    i = i + 1;
+  }
+  result_channel.emit(sum);
+}
+
+@compute
+process worker2 {
+  int sum = 0;
+  int i = 100;
+  while (i < 200) {
+    sum = sum + i;
+    i = i + 1;
+  }
+  result_channel.emit(sum);
+}
+
+@compute
+process worker3 {
+  int sum = 0;
+  int i = 200;
+  while (i < 300) {
+    sum = sum + i;
+    i = i + 1;
+  }
+  result_channel.emit(sum);
+}
+
+@compute
+process worker4 {
+  int sum = 0;
+  int i = 300;
+  while (i < 400) {
+    sum = sum + i;
+    i = i + 1;
+  }
+  result_channel.emit(sum);
+}
+
+int main() {
+  compute.execute();
+  
+  int r1 = result_channel.recv();
+  int r2 = result_channel.recv();
+  int r3 = result_channel.recv();
+  int r4 = result_channel.recv();
+  
+  int total = r1 + r2 + r3 + r4;
+  
+  return 0;
+}
