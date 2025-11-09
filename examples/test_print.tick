@@ -1,0 +1,4 @@
+int main() {
+    println(42);
+    return 0;
+}

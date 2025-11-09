@@ -1,0 +1,52 @@
+event compute;
+event aggregate;
+
+signal<float> result1;
+signal<float> result2;
+signal<float> final_result;
+
+@compute
+process worker1 {
+  float a = 10.1;
+  float b = 20.1;
+  float sum = a + b;
+  result1.emit(sum);
+}
+
+@compute
+process worker2 {
+  float x = 5.2;
+  float y = 3.1;
+  float product = x * y;
+  result2.emit(product);
+}
+
+@aggregate
+process combiner {
+  float val1 = result1.recv();
+  float val2 = result2.recv();
+  float combined = val1 + val2;
+  final_result.emit(combined);
+}
+
+float calculate(float n) {
+  float result = n * 2.0;
+  return result;
+}
+
+int main() {
+  println("Starting compute...");
+  compute.execute();
+  
+  println("Starting aggregate...");
+  aggregate.execute();
+  
+  println("Waiting for result...");
+  float final_value = final_result.recv();
+  
+  float doubled = calculate(final_value);
+  
+  println(format("float: {}, doubled: {}", final_value, doubled));
+
+  return 0;
+}

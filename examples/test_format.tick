@@ -1,0 +1,6 @@
+int main() {
+    println(format("Hello, {}!", "World"));
+    println(format("Number: {}", 42));
+    println(format("{} + {} = {}", 10, 20, 30));
+    return 0;
+}
