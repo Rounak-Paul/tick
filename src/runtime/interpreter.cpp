@@ -62,6 +62,16 @@ Value Interpreter::execute(DynamicArray<Instruction>* code, DynamicArray<Value>*
                     int result_id = _string_pool->add(String(result));
                     free(result);
                     push(Value(result_id, true));
+                } else if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a + val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a + val_b));
                 } else {
                     push(Value(a.int_val + b.int_val));
                 }
@@ -71,21 +81,57 @@ Value Interpreter::execute(DynamicArray<Instruction>* code, DynamicArray<Value>*
             case OpCode::SUB: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val - b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a - val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a - val_b));
+                } else {
+                    push(Value(a.int_val - b.int_val));
+                }
                 break;
             }
             
             case OpCode::MUL: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val * b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a * val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a * val_b));
+                } else {
+                    push(Value(a.int_val * b.int_val));
+                }
                 break;
             }
             
             case OpCode::DIV: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val / b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a / val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a / val_b));
+                } else {
+                    push(Value(a.int_val / b.int_val));
+                }
                 break;
             }
             
@@ -116,42 +162,114 @@ Value Interpreter::execute(DynamicArray<Instruction>* code, DynamicArray<Value>*
             case OpCode::EQ: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val == b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a == val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a == val_b));
+                } else {
+                    push(Value(a.int_val == b.int_val));
+                }
                 break;
             }
             
             case OpCode::NEQ: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val != b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a != val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a != val_b));
+                } else {
+                    push(Value(a.int_val != b.int_val));
+                }
                 break;
             }
             
             case OpCode::LT: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val < b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a < val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a < val_b));
+                } else {
+                    push(Value(a.int_val < b.int_val));
+                }
                 break;
             }
             
             case OpCode::GT: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val > b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a > val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a > val_b));
+                } else {
+                    push(Value(a.int_val > b.int_val));
+                }
                 break;
             }
             
             case OpCode::LTE: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val <= b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a <= val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a <= val_b));
+                } else {
+                    push(Value(a.int_val <= b.int_val));
+                }
                 break;
             }
             
             case OpCode::GTE: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val >= b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a >= val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a >= val_b));
+                } else {
+                    push(Value(a.int_val >= b.int_val));
+                }
                 break;
             }
             
@@ -177,7 +295,13 @@ Value Interpreter::execute(DynamicArray<Instruction>* code, DynamicArray<Value>*
             
             case OpCode::NEG: {
                 Value a = pop();
-                push(Value(-a.int_val));
+                if (a.type == Value::DOUBLE) {
+                    push(Value(-a.double_val));
+                } else if (a.type == Value::FLOAT) {
+                    push(Value(-a.float_val));
+                } else {
+                    push(Value(-a.int_val));
+                }
                 break;
             }
             
@@ -269,6 +393,38 @@ Value Interpreter::execute(DynamicArray<Instruction>* code, DynamicArray<Value>*
                 push(peek());
                 break;
                 
+            case OpCode::BUILD_ARRAY: {
+                int size = inst.operand;
+                DynamicArray<Value>* arr = new DynamicArray<Value>();
+                for (int i = 0; i < size; i++) {
+                    arr->push(pop());
+                }
+                for (int i = 0; i < size / 2; i++) {
+                    Value temp = (*arr)[i];
+                    (*arr)[i] = (*arr)[size - 1 - i];
+                    (*arr)[size - 1 - i] = temp;
+                }
+                push(Value((void*)arr, false));
+                break;
+            }
+            
+            case OpCode::ARRAY_INDEX: {
+                Value index = pop();
+                Value array = pop();
+                DynamicArray<Value>* arr = (DynamicArray<Value>*)array.array_ptr;
+                push((*arr)[index.int_val]);
+                break;
+            }
+            
+            case OpCode::ARRAY_STORE: {
+                Value value = pop();
+                Value index = pop();
+                Value array = pop();
+                DynamicArray<Value>* arr = (DynamicArray<Value>*)array.array_ptr;
+                (*arr)[index.int_val] = value;
+                break;
+            }
+                
             case OpCode::HALT:
                 return Value(0);
         }
@@ -324,28 +480,88 @@ Value Interpreter::execute_function(DynamicArray<Instruction>* code, DynamicArra
             case OpCode::ADD: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val + b.int_val));
+                if (a.type == Value::STRING && b.type == Value::STRING) {
+                    const char* str_a = _string_pool->get(a.string_id);
+                    const char* str_b = _string_pool->get(b.string_id);
+                    size_t len_a = strlen(str_a);
+                    size_t len_b = strlen(str_b);
+                    char* result = (char*)malloc(len_a + len_b + 1);
+                    memcpy(result, str_a, len_a);
+                    memcpy(result + len_a, str_b, len_b);
+                    result[len_a + len_b] = '\0';
+                    int result_id = _string_pool->add(String(result));
+                    free(result);
+                    push(Value(result_id, true));
+                } else if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a + val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a + val_b));
+                } else {
+                    push(Value(a.int_val + b.int_val));
+                }
                 break;
             }
                 
             case OpCode::SUB: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val - b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a - val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a - val_b));
+                } else {
+                    push(Value(a.int_val - b.int_val));
+                }
                 break;
             }
                 
             case OpCode::MUL: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val * b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a * val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a * val_b));
+                } else {
+                    push(Value(a.int_val * b.int_val));
+                }
                 break;
             }
                 
             case OpCode::DIV: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val / b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a / val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a / val_b));
+                } else {
+                    push(Value(a.int_val / b.int_val));
+                }
                 break;
             }
                 
@@ -359,42 +575,114 @@ Value Interpreter::execute_function(DynamicArray<Instruction>* code, DynamicArra
             case OpCode::EQ: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val == b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a == val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a == val_b));
+                } else {
+                    push(Value(a.int_val == b.int_val));
+                }
                 break;
             }
                 
             case OpCode::NEQ: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val != b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a != val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a != val_b));
+                } else {
+                    push(Value(a.int_val != b.int_val));
+                }
                 break;
             }
                 
             case OpCode::LT: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val < b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a < val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a < val_b));
+                } else {
+                    push(Value(a.int_val < b.int_val));
+                }
                 break;
             }
                 
             case OpCode::GT: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val > b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a > val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a > val_b));
+                } else {
+                    push(Value(a.int_val > b.int_val));
+                }
                 break;
             }
                 
             case OpCode::LTE: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val <= b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a <= val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a <= val_b));
+                } else {
+                    push(Value(a.int_val <= b.int_val));
+                }
                 break;
             }
                 
             case OpCode::GTE: {
                 Value b = pop();
                 Value a = pop();
-                push(Value(a.int_val >= b.int_val));
+                if (a.type == Value::DOUBLE || b.type == Value::DOUBLE) {
+                    double val_a = (a.type == Value::DOUBLE) ? a.double_val : 
+                                   (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    double val_b = (b.type == Value::DOUBLE) ? b.double_val : 
+                                   (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a >= val_b));
+                } else if (a.type == Value::FLOAT || b.type == Value::FLOAT) {
+                    float val_a = (a.type == Value::FLOAT) ? a.float_val : a.int_val;
+                    float val_b = (b.type == Value::FLOAT) ? b.float_val : b.int_val;
+                    push(Value(val_a >= val_b));
+                } else {
+                    push(Value(a.int_val >= b.int_val));
+                }
                 break;
             }
                 
@@ -420,7 +708,13 @@ Value Interpreter::execute_function(DynamicArray<Instruction>* code, DynamicArra
                 
             case OpCode::NEG: {
                 Value a = pop();
-                push(Value(-a.int_val));
+                if (a.type == Value::DOUBLE) {
+                    push(Value(-a.double_val));
+                } else if (a.type == Value::FLOAT) {
+                    push(Value(-a.float_val));
+                } else {
+                    push(Value(-a.int_val));
+                }
                 break;
             }
                 
@@ -503,6 +797,38 @@ Value Interpreter::execute_function(DynamicArray<Instruction>* code, DynamicArra
             case OpCode::DUP:
                 push(peek());
                 break;
+                
+            case OpCode::BUILD_ARRAY: {
+                int size = inst.operand;
+                DynamicArray<Value>* arr = new DynamicArray<Value>();
+                for (int i = 0; i < size; i++) {
+                    arr->push(pop());
+                }
+                for (int i = 0; i < size / 2; i++) {
+                    Value temp = (*arr)[i];
+                    (*arr)[i] = (*arr)[size - 1 - i];
+                    (*arr)[size - 1 - i] = temp;
+                }
+                push(Value((void*)arr, false));
+                break;
+            }
+            
+            case OpCode::ARRAY_INDEX: {
+                Value index = pop();
+                Value array = pop();
+                DynamicArray<Value>* arr = (DynamicArray<Value>*)array.array_ptr;
+                push((*arr)[index.int_val]);
+                break;
+            }
+            
+            case OpCode::ARRAY_STORE: {
+                Value value = pop();
+                Value index = pop();
+                Value array = pop();
+                DynamicArray<Value>* arr = (DynamicArray<Value>*)array.array_ptr;
+                (*arr)[index.int_val] = value;
+                break;
+            }
                 
             case OpCode::HALT:
                 return Value(0);

@@ -26,8 +26,12 @@ enum class AstNodeType {
     UNARY_EXPR,
     CALL_EXPR,
     MEMBER_EXPR,
+    INDEX_EXPR,
+    ARRAY_EXPR,
     IDENTIFIER_EXPR,
     INTEGER_LITERAL,
+    FLOAT_LITERAL,
+    DOUBLE_LITERAL,
     BOOL_LITERAL,
     STRING_LITERAL
 };
@@ -52,6 +56,20 @@ struct IntegerLiteral : public ExprNode {
     
     IntegerLiteral(int val) 
         : ExprNode(AstNodeType::INTEGER_LITERAL), value(val) {}
+};
+
+struct FloatLiteral : public ExprNode {
+    float value;
+    
+    FloatLiteral(float val) 
+        : ExprNode(AstNodeType::FLOAT_LITERAL), value(val) {}
+};
+
+struct DoubleLiteral : public ExprNode {
+    double value;
+    
+    DoubleLiteral(double val) 
+        : ExprNode(AstNodeType::DOUBLE_LITERAL), value(val) {}
 };
 
 struct BoolLiteral : public ExprNode {
@@ -125,6 +143,31 @@ struct MemberExpr : public ExprNode {
     
     ~MemberExpr() {
         delete object;
+    }
+};
+
+struct IndexExpr : public ExprNode {
+    ExprNode* array;
+    ExprNode* index;
+    
+    IndexExpr(ExprNode* arr, ExprNode* idx)
+        : ExprNode(AstNodeType::INDEX_EXPR), array(arr), index(idx) {}
+    
+    ~IndexExpr() {
+        delete array;
+        delete index;
+    }
+};
+
+struct ArrayExpr : public ExprNode {
+    DynamicArray<ExprNode*> elements;
+    
+    ArrayExpr() : ExprNode(AstNodeType::ARRAY_EXPR) {}
+    
+    ~ArrayExpr() {
+        for (size_t i = 0; i < elements.size(); i++) {
+            delete elements[i];
+        }
     }
 };
 

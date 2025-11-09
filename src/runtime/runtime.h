@@ -16,20 +16,29 @@ struct Value {
     enum Type {
         INT,
         BOOL,
+        FLOAT,
+        DOUBLE,
         STRING,
+        ARRAY,
         NONE
     } type;
     
     union {
         int int_val;
         bool bool_val;
+        float float_val;
+        double double_val;
         int string_id;
+        void* array_ptr;
     };
     
     Value() : type(NONE), int_val(0) {}
     Value(int v) : type(INT), int_val(v) {}
     Value(bool v) : type(BOOL), bool_val(v) {}
+    Value(float v) : type(FLOAT), float_val(v) {}
+    Value(double v) : type(DOUBLE), double_val(v) {}
     Value(int sid, bool is_string) : type(STRING), string_id(sid) {}
+    Value(void* arr, bool is_array) : type(ARRAY), array_ptr(arr) {}
 };
 
 class SignalQueue {

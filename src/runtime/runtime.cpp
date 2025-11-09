@@ -204,6 +204,12 @@ Runtime::Runtime() {
 }
 
 Runtime::~Runtime() {
+    _signals.for_each([](const char*, SignalQueue* queue) {
+        delete queue;
+    });
+    _user_functions.for_each([](const char*, DynamicArray<Instruction>* code) {
+        delete code;
+    });
     delete _scheduler;
 }
 

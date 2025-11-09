@@ -46,6 +46,36 @@ void Parser::advance() {
     }
 }
 
+bool Parser::is_type_keyword() {
+    TokenType type = current_token().type;
+    return type == TokenType::INT || type == TokenType::BOOL || 
+           type == TokenType::FLOAT || type == TokenType::DOUBLE;
+}
+
+Token Parser::parse_type() {
+    if (!is_type_keyword()) {
+        fprintf(stderr, "Parse error: Expected type\n");
+        exit(1);
+    }
+    Token type_token = current_token();
+    advance();
+    
+    if (check(TokenType::LBRACKET)) {
+        advance();
+        consume(TokenType::RBRACKET, "Expected ']' after '['");
+        size_t base_len = type_token.lexeme.length();
+        char* array_type = (char*)malloc(base_len + 3);
+        memcpy(array_type, type_token.lexeme.c_str(), base_len);
+        array_type[base_len] = '[';
+        array_type[base_len + 1] = ']';
+        array_type[base_len + 2] = '\0';
+        type_token.lexeme = String(array_type);
+        free(array_type);
+    }
+    
+    return type_token;
+}
+
 Program* Parser::parse() {
     Program* program = new Program();
     
@@ -59,11 +89,12 @@ Program* Parser::parse() {
         else if (check(TokenType::AT)) {
             program->processes.push(parse_process_decl());
         }
-        else if (check(TokenType::INT)) {
+        else if (is_type_keyword()) {
             program->functions.push(parse_function_decl());
         }
         else {
-            advance();
+            fprintf(stderr, "Unexpected token at top level\n");
+            exit(1);
         }
     }
     
@@ -81,7 +112,7 @@ EventDecl* Parser::parse_event_decl() {
 SignalDecl* Parser::parse_signal_decl() {
     consume(TokenType::SIGNAL, "Expected 'signal'");
     consume(TokenType::LANGLE, "Expected '<'");
-    Token type = consume(TokenType::INT, "Expected type parameter");
+    Token type = parse_type();
     consume(TokenType::RANGLE, "Expected '>'");
     Token name = consume(TokenType::IDENTIFIER, "Expected signal name");
     consume(TokenType::SEMICOLON, "Expected ';' after signal declaration");
@@ -100,7 +131,7 @@ ProcessDecl* Parser::parse_process_decl() {
 }
 
 FunctionDecl* Parser::parse_function_decl() {
-    Token return_type = consume(TokenType::INT, "Expected return type");
+    Token return_type = parse_type();
     Token name = consume(TokenType::IDENTIFIER, "Expected function name");
     consume(TokenType::LPAREN, "Expected '(' after function name");
     
@@ -108,7 +139,7 @@ FunctionDecl* Parser::parse_function_decl() {
     
     if (!check(TokenType::RPAREN)) {
         do {
-            Token param_type = consume(TokenType::INT, "Expected parameter type");
+            Token param_type = parse_type();
             Token param_name = consume(TokenType::IDENTIFIER, "Expected parameter name");
             func->parameters.push(new Parameter(param_type.lexeme, param_name.lexeme));
         } while (match(TokenType::COMMA));
@@ -134,7 +165,7 @@ BlockStmt* Parser::parse_block() {
 }
 
 StmtNode* Parser::parse_statement() {
-    if (check(TokenType::INT)) {
+    if (is_type_keyword()) {
         return parse_var_decl();
     }
     if (check(TokenType::IF)) {
@@ -156,7 +187,7 @@ StmtNode* Parser::parse_statement() {
 }
 
 StmtNode* Parser::parse_var_decl() {
-    Token type = consume(TokenType::INT, "Expected type");
+    Token type = parse_type();
     Token name = consume(TokenType::IDENTIFIER, "Expected variable name");
     
     ExprNode* initializer = nullptr;
@@ -325,11 +356,24 @@ ExprNode* Parser::parse_call() {
 }
 
 ExprNode* Parser::parse_member() {
-    ExprNode* expr = parse_primary();
+    ExprNode* expr = parse_postfix();
     
     while (match(TokenType::DOT)) {
         Token member = consume(TokenType::IDENTIFIER, "Expected member name");
         expr = new MemberExpr(expr, member.lexeme);
+    }
+    
+    return expr;
+}
+
+ExprNode* Parser::parse_postfix() {
+    ExprNode* expr = parse_primary();
+    
+    while (check(TokenType::LBRACKET)) {
+        advance();
+        ExprNode* index = parse_expression();
+        consume(TokenType::RBRACKET, "Expected ']' after index");
+        expr = new IndexExpr(expr, index);
     }
     
     return expr;
@@ -349,6 +393,63 @@ ExprNode* Parser::parse_primary() {
             value = value * 10 + (token.lexeme[i] - '0');
         }
         return new IntegerLiteral(value);
+    }
+    if (match(TokenType::FLOAT_LITERAL)) {
+        Token token = _tokens[_current - 1];
+        float value = 0.0f;
+        float decimal = 0.0f;
+        int decimal_places = 0;
+        bool is_decimal = false;
+        
+        for (size_t i = 0; i < token.lexeme.length(); i++) {
+            if (token.lexeme[i] == '.') {
+                is_decimal = true;
+                continue;
+            }
+            if (token.lexeme[i] == 'f') break;
+            
+            if (is_decimal) {
+                decimal = decimal * 10.0f + (token.lexeme[i] - '0');
+                decimal_places++;
+            } else {
+                value = value * 10.0f + (token.lexeme[i] - '0');
+            }
+        }
+        
+        for (int i = 0; i < decimal_places; i++) {
+            decimal /= 10.0f;
+        }
+        value += decimal;
+        
+        return new FloatLiteral(value);
+    }
+    if (match(TokenType::DOUBLE_LITERAL)) {
+        Token token = _tokens[_current - 1];
+        double value = 0.0;
+        double decimal = 0.0;
+        int decimal_places = 0;
+        bool is_decimal = false;
+        
+        for (size_t i = 0; i < token.lexeme.length(); i++) {
+            if (token.lexeme[i] == '.') {
+                is_decimal = true;
+                continue;
+            }
+            
+            if (is_decimal) {
+                decimal = decimal * 10.0 + (token.lexeme[i] - '0');
+                decimal_places++;
+            } else {
+                value = value * 10.0 + (token.lexeme[i] - '0');
+            }
+        }
+        
+        for (int i = 0; i < decimal_places; i++) {
+            decimal /= 10.0;
+        }
+        value += decimal;
+        
+        return new DoubleLiteral(value);
     }
     if (match(TokenType::STRING)) {
         Token token = _tokens[_current - 1];
@@ -378,6 +479,18 @@ ExprNode* Parser::parse_primary() {
         ExprNode* expr = parse_expression();
         consume(TokenType::RPAREN, "Expected ')' after expression");
         return expr;
+    }
+    if (match(TokenType::LBRACKET)) {
+        ArrayExpr* array = new ArrayExpr();
+        
+        if (!check(TokenType::RBRACKET)) {
+            do {
+                array->elements.push(parse_expression());
+            } while (match(TokenType::COMMA));
+        }
+        
+        consume(TokenType::RBRACKET, "Expected ']' after array elements");
+        return array;
     }
     
     fprintf(stderr, "Unexpected token in expression\n");

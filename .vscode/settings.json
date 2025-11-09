@@ -21,7 +21,8 @@
         "unordered_set": "cpp",
         "valarray": "cpp",
         "regex": "cpp",
-        "future": "cpp"
+        "future": "cpp",
+        "istream": "cpp"
     },
     "cmake.options.statusBarVisibility": "visible",
     "cmake.options.advanced": {

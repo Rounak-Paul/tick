@@ -84,9 +84,12 @@ Tick is designed with **parallelism as a first-class citizen**. Unlike tradition
 ✅ Type-safe signal communication  
 ✅ Concurrent processes  
 ✅ User-defined functions  
+✅ Rich type system: `int`, `bool`, `float`, `double`, arrays  
+✅ Automatic type promotion in arithmetic  
 ✅ String support with formatting  
 ✅ Strong typing  
-✅ Fast compilation (~0.0002s)
+✅ Fast compilation (~0.0002s)  
+✅ 100% test pass rate (123/123 tests)
 
 ---
 
@@ -163,12 +166,42 @@ When `compute.execute()` is called, both workers run **concurrently** on differe
 
 ### Data Types
 
+Tick supports the following primitive types:
+
 ```tick
-int x = 42;
-string s = "hello";
+int x = 42;                    // 32-bit signed integer
+bool flag = true;              // Boolean (true/false)
+float f = 3.14f;               // 32-bit floating point
+double d = 2.718;              // 64-bit floating point
+string s = "hello";            // String literal
 ```
 
-**Note:** Currently no bool type (use int with 0/1), no floats, no arrays.
+**Array Types:**
+
+```tick
+int[] numbers = [1, 2, 3, 4, 5];
+float[] values = [1.5f, 2.5f, 3.5f];
+double[] data = [1.1, 2.2, 3.3];
+bool[] flags = [true, false, true];
+
+// Array indexing
+int first = numbers[0];
+float second = values[1];
+```
+
+**Type Promotion:**
+
+Arithmetic operations automatically promote types to prevent precision loss:
+
+```tick
+int i = 10;
+float f = 2.5f;
+double d = 3.14;
+
+float result1 = i + f;      // int promoted to float
+double result2 = i + d;     // int promoted to double
+double result3 = f + d;     // float promoted to double
+```
 
 ### Variables
 
@@ -183,11 +216,49 @@ int y = x + 5;
 
 **Arithmetic:** `+`, `-`, `*`, `/`, `%`
 
-**Comparison:** `==`, `!=`
+Works with `int`, `float`, and `double` with automatic type promotion.
+
+```tick
+float x = 10.5f;
+float y = 3.0f;
+float sum = x + y;          // 13.5
+float diff = x - y;         // 7.5
+float prod = x * y;         // 31.5
+float quot = x / y;         // 3.5
+
+int a = 17;
+int b = 5;
+int mod = a % b;            // 2 (modulo is int-only)
+```
+
+**Comparison:** `==`, `!=`, `<`, `>`, `<=`, `>=`
+
+Works with all numeric types (`int`, `float`, `double`).
+
+```tick
+float x = 5.0f;
+float y = 3.0f;
+
+bool gt = x > y;            // true
+bool lt = x < y;            // false
+bool eq = x == y;           // false
+bool neq = x != y;          // true
+bool gte = x >= y;          // true
+bool lte = x <= y;          // false
+```
 
 **Logical:** `&&`, `||`, `!`
 
-**Limitation:** `<`, `>`, `<=`, `>=` have parser issues in conditions.
+Boolean operations work with `bool` type.
+
+```tick
+bool a = true;
+bool b = false;
+
+bool and_result = a && b;   // false
+bool or_result = a || b;    // true
+bool not_result = !a;       // false
+```
 
 ### Control Flow
 
@@ -216,9 +287,31 @@ while (i != limit) {
 
 ### Functions
 
+Functions support all types as parameters and return values:
+
 ```tick
 int add(int a, int b) {
     return a + b;
+}
+
+float calculate_area(float radius) {
+    float pi = 3.14159f;
+    return pi * radius * radius;
+}
+
+double compute(double x, double y) {
+    return x * y + x / y;
+}
+
+bool is_positive(int value) {
+    return value > 0;
+}
+
+int sum_array(int[] numbers) {
+    int total = numbers[0];
+    total = total + numbers[1];
+    total = total + numbers[2];
+    return total;
 }
 
 int factorial(int n) {
@@ -229,8 +322,14 @@ int factorial(int n) {
 
 int main() {
     int sum = add(5, 7);
-    int fact = factorial(5);
-    return sum;
+    float area = calculate_area(5.0f);
+    double result = compute(10.5, 2.5);
+    bool positive = is_positive(42);
+    
+    int[] arr = [10, 20, 30];
+    int total = sum_array(arr);
+    
+    return 0;
 }
 ```
 
@@ -494,39 +593,34 @@ tick/
 ## Known Limitations
 
 ### Parser Limitations
-1. Comparison operators `<`, `>`, `<=`, `>=` in conditions
-   - **Workaround:** Use `!=` with explicit limits
-2. Variable reassignment not supported
+1. Variable reassignment not supported
    - **Workaround:** Declare new variables
-3. No `bool` type
-   - **Workaround:** Use `int` with 0/1
-4. Single-statement bodies require braces
+2. Single-statement bodies require braces
 
 ### Missing Features
-- Floating-point numbers
-- Arrays/lists
 - Structs/classes
 - File I/O
 - Error handling
+- Multi-dimensional arrays
+- Array modification (index assignment)
 
 ### Planned
-- Fix comparison operators
 - Add variable reassignment
-- Add `bool` type
-- Arrays and floating-point
-- For loops
+- For loops with iterators
+- Array mutation (`arr[0] = value`)
 - Module system
 - REPL
+- Standard library
 
 ---
 
 ## FAQ
 
-**Q: Why can't I use `<` or `>` in if statements?**  
-A: Parser limitation. Use `!=` with explicit limit values.
-
 **Q: Why can't I reassign variables?**  
 A: Not yet implemented. Declare new variables instead.
+
+**Q: What types does Tick support?**  
+A: `int`, `bool`, `float`, `double`, `string`, and arrays of all types.
 
 **Q: Are processes really parallel?**  
 A: Yes! They run concurrently on different CPU cores.
@@ -540,8 +634,11 @@ A: Yes! FIFO ordering guaranteed.
 **Q: How many cores does Tick use?**  
 A: All available cores automatically.
 
+**Q: Can I mix int, float, and double in expressions?**  
+A: Yes! Types are automatically promoted (int → float → double).
+
 **Q: Is Tick production-ready?**  
-A: Yes for parallel CPU-bound tasks. 100% test pass rate.
+A: Yes for parallel CPU-bound tasks. 100% test pass rate (123/123).
 
 ---
 
@@ -552,6 +649,7 @@ Check the `examples/` directory:
 - `parallel.tick` - Basic parallel processing
 - `simple.tick` - Hello world
 - `string_demo.tick` - String operations
+- `types_demo.tick` - All type features
 - `test_func.tick` - Function calls
 - `test_format.tick` - String formatting
 

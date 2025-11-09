@@ -160,11 +160,23 @@ void CodeGenerator::generate_expression(ExprNode* expr) {
         case AstNodeType::INTEGER_LITERAL:
             generate_integer_literal(static_cast<IntegerLiteral*>(expr));
             break;
+        case AstNodeType::FLOAT_LITERAL:
+            generate_float_literal(static_cast<FloatLiteral*>(expr));
+            break;
+        case AstNodeType::DOUBLE_LITERAL:
+            generate_double_literal(static_cast<DoubleLiteral*>(expr));
+            break;
         case AstNodeType::BOOL_LITERAL:
             generate_bool_literal(static_cast<BoolLiteral*>(expr));
             break;
         case AstNodeType::STRING_LITERAL:
             generate_string_literal(static_cast<StringLiteral*>(expr));
+            break;
+        case AstNodeType::ARRAY_EXPR:
+            generate_array_expr(static_cast<ArrayExpr*>(expr));
+            break;
+        case AstNodeType::INDEX_EXPR:
+            generate_index_expr(static_cast<IndexExpr*>(expr));
             break;
         case AstNodeType::IDENTIFIER_EXPR:
             generate_identifier(static_cast<IdentifierExpr*>(expr));
@@ -282,6 +294,16 @@ void CodeGenerator::generate_integer_literal(IntegerLiteral* node) {
     emit(OpCode::LOAD_CONST, const_index);
 }
 
+void CodeGenerator::generate_float_literal(FloatLiteral* node) {
+    int const_index = add_constant(Value(node->value));
+    emit(OpCode::LOAD_CONST, const_index);
+}
+
+void CodeGenerator::generate_double_literal(DoubleLiteral* node) {
+    int const_index = add_constant(Value(node->value));
+    emit(OpCode::LOAD_CONST, const_index);
+}
+
 void CodeGenerator::generate_bool_literal(BoolLiteral* node) {
     int const_index = add_constant(Value(node->value));
     emit(OpCode::LOAD_CONST, const_index);
@@ -291,6 +313,19 @@ void CodeGenerator::generate_string_literal(StringLiteral* node) {
     int str_index = _string_pool.add(node->value);
     int const_index = add_constant(Value(str_index, true));
     emit(OpCode::LOAD_CONST, const_index);
+}
+
+void CodeGenerator::generate_array_expr(ArrayExpr* node) {
+    for (size_t i = 0; i < node->elements.size(); i++) {
+        generate_expression(node->elements[i]);
+    }
+    emit(OpCode::BUILD_ARRAY, node->elements.size());
+}
+
+void CodeGenerator::generate_index_expr(IndexExpr* node) {
+    generate_expression(node->array);
+    generate_expression(node->index);
+    emit(OpCode::ARRAY_INDEX);
 }
 
 void CodeGenerator::emit(OpCode opcode, int operand) {

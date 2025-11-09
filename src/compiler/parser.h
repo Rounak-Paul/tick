@@ -47,7 +47,11 @@ private:
     ExprNode* parse_unary();
     ExprNode* parse_call();
     ExprNode* parse_member();
+    ExprNode* parse_postfix();
     ExprNode* parse_primary();
+    
+    bool is_type_keyword();
+    Token parse_type();
 };
 
 }

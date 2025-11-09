@@ -47,8 +47,12 @@ private:
     void generate_member_expr(MemberExpr* node);
     void generate_identifier(IdentifierExpr* node);
     void generate_integer_literal(IntegerLiteral* node);
+    void generate_float_literal(FloatLiteral* node);
+    void generate_double_literal(DoubleLiteral* node);
     void generate_bool_literal(BoolLiteral* node);
     void generate_string_literal(StringLiteral* node);
+    void generate_array_expr(ArrayExpr* node);
+    void generate_index_expr(IndexExpr* node);
     
     void emit(OpCode opcode, int operand = 0);
     int add_constant(Value value);

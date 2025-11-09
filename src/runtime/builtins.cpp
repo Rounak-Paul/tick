@@ -78,6 +78,20 @@ Value Builtins::builtin_format(DynamicArray<Value>& args) {
                     memcpy(result + result_pos, temp, len);
                     result_pos += len;
                 }
+            } else if (arg.type == Value::FLOAT) {
+                snprintf(temp, sizeof(temp), "%g", arg.float_val);
+                size_t len = strlen(temp);
+                if (result_pos + len < 1023) {
+                    memcpy(result + result_pos, temp, len);
+                    result_pos += len;
+                }
+            } else if (arg.type == Value::DOUBLE) {
+                snprintf(temp, sizeof(temp), "%g", arg.double_val);
+                size_t len = strlen(temp);
+                if (result_pos + len < 1023) {
+                    memcpy(result + result_pos, temp, len);
+                    result_pos += len;
+                }
             } else if (arg.type == Value::BOOL) {
                 const char* bool_str = arg.bool_val ? "true" : "false";
                 size_t len = strlen(bool_str);

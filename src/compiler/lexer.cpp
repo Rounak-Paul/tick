@@ -53,6 +53,9 @@ TokenType Lexer::check_keyword(const char* str, size_t length) {
     if (length == 6 && memcmp(str, "signal", 6) == 0) return TokenType::SIGNAL;
     if (length == 7 && memcmp(str, "process", 7) == 0) return TokenType::PROCESS;
     if (length == 3 && memcmp(str, "int", 3) == 0) return TokenType::INT;
+    if (length == 4 && memcmp(str, "bool", 4) == 0) return TokenType::BOOL;
+    if (length == 5 && memcmp(str, "float", 5) == 0) return TokenType::FLOAT;
+    if (length == 6 && memcmp(str, "double", 6) == 0) return TokenType::DOUBLE;
     if (length == 5 && memcmp(str, "while", 5) == 0) return TokenType::WHILE;
     if (length == 3 && memcmp(str, "for", 3) == 0) return TokenType::FOR;
     if (length == 2 && memcmp(str, "if", 2) == 0) return TokenType::IF;
@@ -83,10 +86,31 @@ Token Lexer::read_identifier() {
 Token Lexer::read_number() {
     const char* start = &_source[_position];
     size_t length = 0;
+    bool is_float = false;
     
     while (current_char() >= '0' && current_char() <= '9') {
         advance();
         length++;
+    }
+    
+    if (current_char() == '.' && peek_char() >= '0' && peek_char() <= '9') {
+        is_float = true;
+        advance();
+        length++;
+        
+        while (current_char() >= '0' && current_char() <= '9') {
+            advance();
+            length++;
+        }
+    }
+    
+    if (is_float) {
+        if (current_char() == 'f' || current_char() == 'F') {
+            advance();
+            length++;
+            return make_token(TokenType::FLOAT_LITERAL, start, length);
+        }
+        return make_token(TokenType::DOUBLE_LITERAL, start, length);
     }
     
     return make_token(TokenType::INTEGER, start, length);
@@ -156,6 +180,14 @@ DynamicArray<Token> Lexer::tokenize() {
         else if (c == '}') {
             advance();
             tokens.push(make_token(TokenType::RBRACE, "}", 1));
+        }
+        else if (c == '[') {
+            advance();
+            tokens.push(make_token(TokenType::LBRACKET, "[", 1));
+        }
+        else if (c == ']') {
+            advance();
+            tokens.push(make_token(TokenType::RBRACKET, "]", 1));
         }
         else if (c == '<') {
             advance();

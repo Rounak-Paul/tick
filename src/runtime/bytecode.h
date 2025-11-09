@@ -42,6 +42,10 @@ enum class OpCode : uint8_t {
     SIGNAL_RECV,
     EVENT_EXECUTE,
     
+    BUILD_ARRAY,
+    ARRAY_INDEX,
+    ARRAY_STORE,
+    
     POP,
     DUP,
     
