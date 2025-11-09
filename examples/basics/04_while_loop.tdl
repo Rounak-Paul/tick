@@ -1,9 +1,0 @@
-// Control flow: while loops
-func main() {
-  let i: int = 0;
-  while (i < 3) {
-    println(i);
-    i = i + 1;
-  }
-  // Output: 0, 1, 2
-}

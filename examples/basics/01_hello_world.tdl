@@ -1,4 +1,0 @@
-// Basic I/O - print a simple message
-func main() {
-  println(42);
-}
