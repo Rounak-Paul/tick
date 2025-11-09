@@ -1,0 +1,18 @@
+int main() {
+    println("=== Calculator ===");
+    
+    print("Enter first number: ");
+    string num1_str = input();
+    float num1 = str_to_float(num1_str);
+    
+    print("Enter second number: ");
+    string num2_str = input();
+    float num2 = str_to_float(num2_str);
+    
+    println(format("Sum: {}", num1 + num2));
+    println(format("Difference: {}", num1 - num2));
+    println(format("Product: {}", num1 * num2));
+    println(format("Quotient: {}", num1 / num2));
+    
+    return 0;
+}

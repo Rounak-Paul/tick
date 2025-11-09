@@ -1,0 +1,10 @@
+int main() {
+    string name = input("What is your name? ");
+    println(format("Hello, {}!", name));
+    
+    string age_str = input("How old are you? ");
+    int age = str_to_int(age_str);
+    println(format("In 10 years, you will be {} years old.", age + 10));
+    
+    return 0;
+}

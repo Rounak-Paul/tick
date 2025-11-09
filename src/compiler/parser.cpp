@@ -49,7 +49,8 @@ void Parser::advance() {
 bool Parser::is_type_keyword() {
     TokenType type = current_token().type;
     return type == TokenType::INT || type == TokenType::BOOL || 
-           type == TokenType::FLOAT || type == TokenType::DOUBLE;
+           type == TokenType::FLOAT || type == TokenType::DOUBLE ||
+           type == TokenType::STRING_TYPE;
 }
 
 Token Parser::parse_type() {

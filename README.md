@@ -84,9 +84,9 @@ Tick is designed with **parallelism as a first-class citizen**. Unlike tradition
 ✅ Type-safe signal communication  
 ✅ Concurrent processes  
 ✅ User-defined functions  
-✅ Rich type system: `int`, `bool`, `float`, `double`, arrays  
+✅ Rich type system: `int`, `bool`, `float`, `double`, `string`, arrays  
 ✅ Automatic type promotion in arithmetic  
-✅ String support with formatting  
+✅ String formatting and terminal input  
 ✅ Strong typing  
 ✅ Fast compilation (~0.0002s)  
 ✅ 100% test pass rate (123/123 tests)
@@ -350,6 +350,27 @@ println(format("x = {}, y = {}", x, y));
 
 ## Examples
 
+### Example 0: Interactive Calculator
+
+```tick
+int main() {
+    println("=== Simple Calculator ===");
+    
+    string num1 = input("First number: ");
+    string num2 = input("Second number: ");
+    
+    float a = str_to_float(num1);
+    float b = str_to_float(num2);
+    
+    println(format("{} + {} = {}", a, b, a + b));
+    println(format("{} - {} = {}", a, b, a - b));
+    println(format("{} * {} = {}", a, b, a * b));
+    println(format("{} / {} = {}", a, b, a / b));
+    
+    return 0;
+}
+```
+
 ### Example 1: Parallel Data Processing
 
 ```tick
@@ -556,9 +577,33 @@ Total:           123/123  (100%)
 
 ### Built-in Functions
 
-**`println(string)`** - Print with newline  
-**`print(string)`** - Print without newline  
-**`format(string, ...)`** - Format string with `{}` placeholders
+**Output Functions:**
+- **`println(string)`** - Print with newline  
+- **`print(string)`** - Print without newline  
+- **`format(string, ...)`** - Format string with `{}` placeholders
+
+**Input Functions:**
+- **`input()`** - Read a line from stdin, returns string
+- **`input(prompt)`** - Print prompt and read a line, returns string
+
+**String Conversion Functions:**
+- **`str_to_int(string)`** - Convert string to int
+- **`str_to_float(string)`** - Convert string to float  
+- **`str_to_double(string)`** - Convert string to double
+
+**Example:**
+```tick
+int main() {
+    string name = input("What is your name? ");
+    println(format("Hello, {}!", name));
+    
+    string age_str = input("Enter your age: ");
+    int age = str_to_int(age_str);
+    println(format("In 10 years, you will be {}", age + 10));
+    
+    return 0;
+}
+```
 
 ### Event Operations
 

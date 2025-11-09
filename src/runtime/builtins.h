@@ -17,6 +17,9 @@ private:
     static Value builtin_println(DynamicArray<Value>& args);
     static Value builtin_input(DynamicArray<Value>& args);
     static Value builtin_format(DynamicArray<Value>& args);
+    static Value builtin_str_to_int(DynamicArray<Value>& args);
+    static Value builtin_str_to_float(DynamicArray<Value>& args);
+    static Value builtin_str_to_double(DynamicArray<Value>& args);
 };
 
 }

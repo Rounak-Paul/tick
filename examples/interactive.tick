@@ -1,0 +1,32 @@
+int main() {
+    println("╔═══════════════════════════════════════╗");
+    println("║    Tick Interactive Demo              ║");
+    println("╚═══════════════════════════════════════╝");
+    println("");
+    
+    string name = input("Enter your name: ");
+    string age_str = input("Enter your age: ");
+    int age = str_to_int(age_str);
+    
+    string height_str = input("Enter your height in meters: ");
+    float height = str_to_float(height_str);
+    
+    string weight_str = input("Enter your weight in kg: ");
+    float weight = str_to_float(weight_str);
+    
+    float bmi = weight / (height * height);
+    int birth_year = 2025 - age;
+    
+    println("");
+    println("╔═══════════════════════════════════════╗");
+    println("║           Your Profile                ║");
+    println("╚═══════════════════════════════════════╝");
+    println(format("Name:        {}", name));
+    println(format("Age:         {}", age));
+    println(format("Birth Year:  {}", birth_year));
+    println(format("Height:      {} m", height));
+    println(format("Weight:      {} kg", weight));
+    println(format("BMI:         {}", bmi));
+    
+    return 0;
+}

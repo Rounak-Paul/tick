@@ -19,6 +19,7 @@ enum class TokenType {
     BOOL,
     FLOAT,
     DOUBLE,
+    STRING_TYPE,
     WHILE,
     FOR,
     IF,
