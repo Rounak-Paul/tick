@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "interpreter.h"
 #include <cstdlib>
 #include <unistd.h>
 
@@ -181,6 +182,16 @@ void EventScheduler::wait_completion() {
 }
 
 void* EventScheduler::execute_process(void* arg) {
+    ProcessContext* ctx = static_cast<ProcessContext*>(arg);
+    if (ctx && ctx->bytecode && ctx->runtime && ctx->string_pool && ctx->constants) {
+        Interpreter interpreter(ctx->runtime, ctx->string_pool);
+        DynamicArray<Instruction> code;
+        Instruction* instructions = static_cast<Instruction*>(ctx->bytecode);
+        for (size_t i = 0; i < ctx->bytecode_size; i++) {
+            code.push(instructions[i]);
+        }
+        interpreter.execute(&code, ctx->constants);
+    }
     return nullptr;
 }
 
@@ -189,6 +200,7 @@ Runtime::Runtime() {
     if (num_cores <= 0) num_cores = 4;
     _scheduler = new EventScheduler(num_cores);
     _string_pool = nullptr;
+    _constants = nullptr;
 }
 
 Runtime::~Runtime() {
@@ -201,6 +213,14 @@ void Runtime::set_string_pool(StringPool* pool) {
 
 StringPool* Runtime::get_string_pool() {
     return _string_pool;
+}
+
+void Runtime::set_constants(DynamicArray<Value>* constants) {
+    _constants = constants;
+}
+
+DynamicArray<Value>* Runtime::get_constants() {
+    return _constants;
 }
 
 void Runtime::register_signal(const char* name) {
@@ -234,11 +254,22 @@ void Runtime::wait_event_completion() {
     _scheduler->wait_completion();
 }
 
+void Runtime::register_user_function(const char* name, DynamicArray<Instruction>* code) {
+    _user_functions.insert(name, code);
+}
+
 Value Runtime::call_function(const char* name, DynamicArray<Value>& args) {
     Value (**func)(DynamicArray<Value>&) = _functions.find(name);
     if (func) {
         return (*func)(args);
     }
+    
+    DynamicArray<Instruction>** user_func = _user_functions.find(name);
+    if (user_func && _string_pool && _constants) {
+        Interpreter interpreter(this, _string_pool);
+        return interpreter.execute_function(*user_func, _constants, args);
+    }
+    
     return Value();
 }
 

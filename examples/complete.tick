@@ -35,15 +35,18 @@ int calculate(int n) {
 }
 
 int main() {
+  println("Starting compute...");
   compute.execute();
   
+  println("Starting aggregate...");
   aggregate.execute();
   
+  println("Waiting for result...");
   int final_value = final_result.recv();
   
   int doubled = calculate(final_value);
   
-  println(format("int: {}, double: {}", final_value, double));
+  println(format("int: {}, doubled: {}", final_value, doubled));
 
   return 0;
 }

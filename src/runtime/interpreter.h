@@ -13,6 +13,7 @@ public:
     Interpreter(Runtime* runtime, StringPool* string_pool);
     
     Value execute(DynamicArray<Instruction>* code, DynamicArray<Value>* constants);
+    Value execute_function(DynamicArray<Instruction>* code, DynamicArray<Value>* constants, DynamicArray<Value>& args);
 
 private:
     Runtime* _runtime;

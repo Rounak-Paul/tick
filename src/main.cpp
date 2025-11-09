@@ -92,6 +92,16 @@ int main(int argc, char** argv) {
         return 1;
     }
     
+    for (size_t i = 0; i < program->functions.size(); i++) {
+        FunctionDecl* func = program->functions[i];
+        if (strcmp(func->name.c_str(), "main") != 0) {
+            DynamicArray<Instruction>* code = codegen.get_function_code(func->name.c_str());
+            if (code) {
+                runtime.register_user_function(func->name.c_str(), code);
+            }
+        }
+    }
+    
     for (size_t i = 0; i < program->processes.size(); i++) {
         ProcessDecl* proc = program->processes[i];
         ProcessContext* ctx = new ProcessContext();
@@ -100,8 +110,13 @@ int main(int argc, char** argv) {
             ctx->bytecode = code->data();
             ctx->bytecode_size = code->size();
         }
+        ctx->runtime = &runtime;
+        ctx->string_pool = codegen.get_string_pool();
+        ctx->constants = codegen.get_constants();
         runtime.register_process(proc->event_name.c_str(), ctx);
     }
+    
+    runtime.set_constants(codegen.get_constants());
     
     Interpreter interpreter(&runtime, codegen.get_string_pool());
     DynamicArray<Instruction>* main_code = codegen.get_function_code("main");

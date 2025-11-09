@@ -9,6 +9,8 @@
 namespace Tick {
 
 class StringPool;
+class Runtime;
+struct Instruction;
 
 struct Value {
     enum Type {
@@ -50,8 +52,12 @@ struct ProcessContext {
     void* bytecode;
     size_t bytecode_size;
     HashMap<const char*, Value>* local_vars;
+    Runtime* runtime;
+    StringPool* string_pool;
+    DynamicArray<Value>* constants;
     
-    ProcessContext() : bytecode(nullptr), bytecode_size(0), local_vars(nullptr) {}
+    ProcessContext() : bytecode(nullptr), bytecode_size(0), local_vars(nullptr), 
+                       runtime(nullptr), string_pool(nullptr), constants(nullptr) {}
 };
 
 class ThreadPool {
@@ -109,6 +115,7 @@ public:
     void register_event(const char* name);
     void register_process(const char* event_name, ProcessContext* process);
     void register_function(const char* name, Value (*func)(DynamicArray<Value>&));
+    void register_user_function(const char* name, DynamicArray<Instruction>* code);
     
     SignalQueue* get_signal(const char* name);
     void execute_event(const char* event_name);
@@ -121,14 +128,18 @@ public:
     
     void set_string_pool(StringPool* pool);
     StringPool* get_string_pool();
+    void set_constants(DynamicArray<Value>* constants);
+    DynamicArray<Value>* get_constants();
 
 private:
     HashMap<const char*, SignalQueue*> _signals;
     HashMap<const char*, bool> _events;
     HashMap<const char*, Value (*)(DynamicArray<Value>&)> _functions;
+    HashMap<const char*, DynamicArray<Instruction>*> _user_functions;
     HashMap<const char*, Value> _globals;
     EventScheduler* _scheduler;
     StringPool* _string_pool;
+    DynamicArray<Value>* _constants;
 };
 
 }

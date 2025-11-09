@@ -213,6 +213,30 @@ void CodeGenerator::generate_unary_expr(UnaryExpr* node) {
 }
 
 void CodeGenerator::generate_call_expr(CallExpr* node) {
+    if (node->callee->type == AstNodeType::MEMBER_EXPR) {
+        MemberExpr* member = static_cast<MemberExpr*>(node->callee);
+        if (member->object->type == AstNodeType::IDENTIFIER_EXPR) {
+            IdentifierExpr* obj = static_cast<IdentifierExpr*>(member->object);
+            
+            if (member->member == "emit") {
+                for (size_t i = 0; i < node->arguments.size(); i++) {
+                    generate_expression(node->arguments[i]);
+                }
+                int name_index = _string_pool.add(obj->name);
+                emit(OpCode::SIGNAL_EMIT, name_index);
+                return;
+            } else if (member->member == "recv") {
+                int name_index = _string_pool.add(obj->name);
+                emit(OpCode::SIGNAL_RECV, name_index);
+                return;
+            } else if (member->member == "execute") {
+                int name_index = _string_pool.add(obj->name);
+                emit(OpCode::EVENT_EXECUTE, name_index);
+                return;
+            }
+        }
+    }
+    
     for (size_t i = 0; i < node->arguments.size(); i++) {
         generate_expression(node->arguments[i]);
     }
