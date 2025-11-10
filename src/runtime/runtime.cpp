@@ -1,6 +1,7 @@
 #include "runtime.h"
 #include "interpreter.h"
 #include <cstdlib>
+#include <cstdio>
 #include <unistd.h>
 
 namespace Tick {
@@ -185,12 +186,7 @@ void* EventScheduler::execute_process(void* arg) {
     ProcessContext* ctx = static_cast<ProcessContext*>(arg);
     if (ctx && ctx->bytecode && ctx->runtime && ctx->string_pool && ctx->constants) {
         Interpreter interpreter(ctx->runtime, ctx->string_pool);
-        DynamicArray<Instruction> code;
-        Instruction* instructions = static_cast<Instruction*>(ctx->bytecode);
-        for (size_t i = 0; i < ctx->bytecode_size; i++) {
-            code.push(instructions[i]);
-        }
-        interpreter.execute(&code, ctx->constants);
+        interpreter.execute(ctx->bytecode, ctx->constants);
     }
     return nullptr;
 }
@@ -265,6 +261,7 @@ void Runtime::register_user_function(const char* name, DynamicArray<Instruction>
 }
 
 Value Runtime::call_function(const char* name, DynamicArray<Value>& args) {
+    
     Value (**func)(DynamicArray<Value>&) = _functions.find(name);
     if (func) {
         return (*func)(args);

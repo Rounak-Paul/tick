@@ -48,32 +48,44 @@ void Parser::advance() {
 
 bool Parser::is_type_keyword() {
     TokenType type = current_token().type;
-    return type == TokenType::INT || type == TokenType::BOOL || 
-           type == TokenType::FLOAT || type == TokenType::DOUBLE;
+    if (type == TokenType::INT || type == TokenType::BOOL || 
+        type == TokenType::FLOAT || type == TokenType::DOUBLE ||
+        type == TokenType::STRING_TYPE) {
+        return true;
+    }
+    if (type == TokenType::IDENTIFIER) {
+        Token next = peek_token(1);
+        return next.type == TokenType::IDENTIFIER || next.type == TokenType::LBRACKET;
+    }
+    return false;
 }
 
 Token Parser::parse_type() {
-    if (!is_type_keyword()) {
-        fprintf(stderr, "Parse error: Expected type\n");
-        exit(1);
-    }
-    Token type_token = current_token();
-    advance();
-    
-    if (check(TokenType::LBRACKET)) {
+    TokenType type = current_token().type;
+    if (type == TokenType::INT || type == TokenType::BOOL || 
+        type == TokenType::FLOAT || type == TokenType::DOUBLE ||
+        type == TokenType::STRING_TYPE || type == TokenType::IDENTIFIER) {
+        Token type_token = current_token();
         advance();
-        consume(TokenType::RBRACKET, "Expected ']' after '['");
-        size_t base_len = type_token.lexeme.length();
-        char* array_type = (char*)malloc(base_len + 3);
-        memcpy(array_type, type_token.lexeme.c_str(), base_len);
-        array_type[base_len] = '[';
-        array_type[base_len + 1] = ']';
-        array_type[base_len + 2] = '\0';
-        type_token.lexeme = String(array_type);
-        free(array_type);
+        
+        if (check(TokenType::LBRACKET)) {
+            advance();
+            consume(TokenType::RBRACKET, "Expected ']' after '['");
+            size_t base_len = type_token.lexeme.length();
+            char* array_type = (char*)malloc(base_len + 3);
+            memcpy(array_type, type_token.lexeme.c_str(), base_len);
+            array_type[base_len] = '[';
+            array_type[base_len + 1] = ']';
+            array_type[base_len + 2] = '\0';
+            type_token.lexeme = String(array_type);
+            free(array_type);
+        }
+        
+        return type_token;
     }
     
-    return type_token;
+    fprintf(stderr, "Parse error: Expected type\n");
+    exit(1);
 }
 
 Program* Parser::parse() {
@@ -89,7 +101,10 @@ Program* Parser::parse() {
         else if (check(TokenType::AT)) {
             program->processes.push(parse_process_decl());
         }
-        else if (is_type_keyword()) {
+        else if (check(TokenType::CLASS)) {
+            program->classes.push(parse_class_decl());
+        }
+        else if (check(TokenType::FUNC)) {
             program->functions.push(parse_function_decl());
         }
         else {
@@ -130,22 +145,81 @@ ProcessDecl* Parser::parse_process_decl() {
     return new ProcessDecl(event_name.lexeme, name.lexeme, body);
 }
 
+ClassDecl* Parser::parse_class_decl() {
+    consume(TokenType::CLASS, "Expected 'class'");
+    Token name = consume(TokenType::IDENTIFIER, "Expected class name");
+    consume(TokenType::LBRACE, "Expected '{' after class name");
+    
+    ClassDecl* cls = new ClassDecl(name.lexeme);
+    
+    while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
+        if (check(TokenType::VAR)) {
+            advance();
+            Token field_name = consume(TokenType::IDENTIFIER, "Expected field name after 'var'");
+            consume(TokenType::COLON, "Expected ':' after field name");
+            Token type = parse_type();
+            
+            ExprNode* initializer = nullptr;
+            if (match(TokenType::ASSIGN)) {
+                initializer = parse_expression();
+            }
+            consume(TokenType::SEMICOLON, "Expected ';' after field declaration");
+            cls->fields.push(new VarDecl(type.lexeme, field_name.lexeme, initializer));
+        } else if (check(TokenType::FUNC)) {
+            advance();
+            Token method_name = consume(TokenType::IDENTIFIER, "Expected method name after 'func'");
+            consume(TokenType::LPAREN, "Expected '(' after method name");
+            
+            FunctionDecl* method = new FunctionDecl("", method_name.lexeme, nullptr);
+            
+            if (!check(TokenType::RPAREN)) {
+                do {
+                    Token param_name = consume(TokenType::IDENTIFIER, "Expected parameter name");
+                    consume(TokenType::COLON, "Expected ':' after parameter name");
+                    Token param_type = parse_type();
+                    method->parameters.push(new Parameter(param_type.lexeme, param_name.lexeme));
+                } while (match(TokenType::COMMA));
+            }
+            
+            consume(TokenType::RPAREN, "Expected ')' after parameters");
+            consume(TokenType::COLON, "Expected ':' after parameters");
+            Token return_type = parse_type();
+            method->return_type = return_type.lexeme;
+            method->body = parse_block();
+            cls->methods.push(method);
+        } else {
+            fprintf(stderr, "Expected 'var' or 'func' in class body\n");
+            exit(1);
+        }
+    }
+    
+    consume(TokenType::RBRACE, "Expected '}' after class body");
+    return cls;
+}
+
 FunctionDecl* Parser::parse_function_decl() {
-    Token return_type = parse_type();
-    Token name = consume(TokenType::IDENTIFIER, "Expected function name");
+    advance();
+    
+    Token name = consume(TokenType::IDENTIFIER, "Expected function name after 'func'");
     consume(TokenType::LPAREN, "Expected '(' after function name");
     
-    FunctionDecl* func = new FunctionDecl(return_type.lexeme, name.lexeme, nullptr);
+    FunctionDecl* func = new FunctionDecl("", name.lexeme, nullptr);
     
     if (!check(TokenType::RPAREN)) {
         do {
-            Token param_type = parse_type();
             Token param_name = consume(TokenType::IDENTIFIER, "Expected parameter name");
+            consume(TokenType::COLON, "Expected ':' after parameter name");
+            Token param_type = parse_type();
+            
             func->parameters.push(new Parameter(param_type.lexeme, param_name.lexeme));
         } while (match(TokenType::COMMA));
     }
     
     consume(TokenType::RPAREN, "Expected ')' after parameters");
+    consume(TokenType::COLON, "Expected ':' after parameters");
+    Token return_type = parse_type();
+    
+    func->return_type = return_type.lexeme;
     func->body = parse_block();
     
     return func;
@@ -165,7 +239,7 @@ BlockStmt* Parser::parse_block() {
 }
 
 StmtNode* Parser::parse_statement() {
-    if (is_type_keyword()) {
+    if (check(TokenType::VAR)) {
         return parse_var_decl();
     }
     if (check(TokenType::IF)) {
@@ -187,8 +261,10 @@ StmtNode* Parser::parse_statement() {
 }
 
 StmtNode* Parser::parse_var_decl() {
+    advance();
+    Token name = consume(TokenType::IDENTIFIER, "Expected variable name after 'var'");
+    consume(TokenType::COLON, "Expected ':' after variable name");
     Token type = parse_type();
-    Token name = consume(TokenType::IDENTIFIER, "Expected variable name");
     
     ExprNode* initializer = nullptr;
     if (match(TokenType::ASSIGN)) {
@@ -474,6 +550,24 @@ ExprNode* Parser::parse_primary() {
     }
     if (match(TokenType::IDENTIFIER)) {
         return new IdentifierExpr(_tokens[_current - 1].lexeme);
+    }
+    if (match(TokenType::THIS)) {
+        return new ThisExpr();
+    }
+    if (match(TokenType::NEW)) {
+        Token class_name = consume(TokenType::IDENTIFIER, "Expected class name after 'new'");
+        consume(TokenType::LPAREN, "Expected '(' after class name");
+        
+        NewExpr* new_expr = new NewExpr(class_name.lexeme);
+        
+        if (!check(TokenType::RPAREN)) {
+            do {
+                new_expr->arguments.push(parse_expression());
+            } while (match(TokenType::COMMA));
+        }
+        
+        consume(TokenType::RPAREN, "Expected ')' after arguments");
+        return new_expr;
     }
     if (match(TokenType::LPAREN)) {
         ExprNode* expr = parse_expression();

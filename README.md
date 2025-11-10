@@ -4,6 +4,15 @@
 
 Tick is a strongly-typed, general-purpose programming language designed for automatic parallelism. Applications built with Tick naturally utilize all available CPU cores without race conditions or deadlocks.
 
+## Syntax Note
+
+Tick uses a **verbose, Python-like syntax** with explicit type annotations:
+- Variables: `var name : type = value;`
+- Functions: `func name(param : type) : returnType { }`
+- Classes: `class Name { var field : type = value; func method() : type { } }`
+
+This ensures code is self-documenting and easy to read.
+
 ## Table of Contents
 - [Quick Start](#quick-start)
 - [Language Overview](#language-overview)
@@ -32,7 +41,7 @@ make
 ### Hello World
 
 ```tick
-int main() {
+func main() : int {
     println("Hello, World!");
     return 0;
 }
@@ -56,10 +65,10 @@ process worker2 {
     done.emit(1);
 }
 
-int main() {
+func main() : int {
     greet.execute();
-    int r1 = done.recv();
-    int r2 = done.recv();
+    var r1 : int = done.recv();
+    var r2 : int = done.recv();
     return 0;
 }
 ```
@@ -84,9 +93,10 @@ Tick is designed with **parallelism as a first-class citizen**. Unlike tradition
 ✅ Type-safe signal communication  
 ✅ Concurrent processes  
 ✅ User-defined functions  
-✅ Rich type system: `int`, `bool`, `float`, `double`, arrays  
+✅ **Object-oriented programming with classes**  
+✅ Rich type system: `int`, `bool`, `float`, `double`, `string`, arrays, objects  
 ✅ Automatic type promotion in arithmetic  
-✅ String support with formatting  
+✅ String formatting and terminal input  
 ✅ Strong typing  
 ✅ Fast compilation (~0.0002s)  
 ✅ 100% test pass rate (123/123 tests)
@@ -109,8 +119,9 @@ process worker {
     // Work happens here
 }
 
-int main() {
+func main() : int {
     compute.execute();
+    return 0;
 }
 ```
 
@@ -126,9 +137,9 @@ process producer {
     result.emit(42);
 }
 
-int main() {
+func main() : int {
     compute.execute();
-    int value = result.recv();
+    var value : int = result.recv();
     return value;
 }
 ```
@@ -147,13 +158,13 @@ Processes are **concurrent execution units** that run independently and communic
 ```tick
 @compute
 process worker1 {
-    int result = 10 + 20;
+    var result : int = 10 + 20;
     output.emit(result);
 }
 
 @compute
 process worker2 {
-    int result = 5 * 3;
+    var result : int = 5 * 3;
     output.emit(result);
 }
 ```
@@ -169,11 +180,11 @@ When `compute.execute()` is called, both workers run **concurrently** on differe
 Tick supports the following primitive types:
 
 ```tick
-int x = 42;                    // 32-bit signed integer
-bool flag = true;              // Boolean (true/false)
-float f = 3.14f;               // 32-bit floating point
-double d = 2.718;              // 64-bit floating point
-string s = "hello";            // String literal
+var x : int = 42;                    // 32-bit signed integer
+var flag : bool = true;              // Boolean (true/false)
+var f : float = 3.14;                // 32-bit floating point
+var d : double = 2.718;              // 64-bit floating point
+var s : string = "hello";            // String literal
 ```
 
 **Array Types:**
@@ -206,8 +217,8 @@ double result3 = f + d;     // float promoted to double
 ### Variables
 
 ```tick
-int x = 10;
-int y = x + 5;
+var x : int = 10;
+var y : int = x + 5;
 ```
 
 **Limitation:** Variable reassignment not yet supported.
@@ -219,16 +230,16 @@ int y = x + 5;
 Works with `int`, `float`, and `double` with automatic type promotion.
 
 ```tick
-float x = 10.5f;
-float y = 3.0f;
-float sum = x + y;          // 13.5
-float diff = x - y;         // 7.5
-float prod = x * y;         // 31.5
-float quot = x / y;         // 3.5
+var x : float = 10.5;
+var y : float = 3.0;
+var sum : float = x + y;          // 13.5
+var diff : float = x - y;         // 7.5
+var prod : float = x * y;         // 31.5
+var quot : float = x / y;         // 3.5
 
-int a = 17;
-int b = 5;
-int mod = a % b;            // 2 (modulo is int-only)
+var a : int = 17;
+var b : int = 5;
+var mod : int = a % b;            // 2 (modulo is int-only)
 ```
 
 **Comparison:** `==`, `!=`, `<`, `>`, `<=`, `>=`
@@ -236,15 +247,15 @@ int mod = a % b;            // 2 (modulo is int-only)
 Works with all numeric types (`int`, `float`, `double`).
 
 ```tick
-float x = 5.0f;
-float y = 3.0f;
+var x : float = 5.0;
+var y : float = 3.0;
 
-bool gt = x > y;            // true
-bool lt = x < y;            // false
-bool eq = x == y;           // false
-bool neq = x != y;          // true
-bool gte = x >= y;          // true
-bool lte = x <= y;          // false
+var gt : bool = x > y;            // true
+var lt : bool = x < y;            // false
+var eq : bool = x == y;           // false
+var neq : bool = x != y;          // true
+var gte : bool = x >= y;          // true
+var lte : bool = x <= y;          // false
 ```
 
 **Logical:** `&&`, `||`, `!`
@@ -252,12 +263,12 @@ bool lte = x <= y;          // false
 Boolean operations work with `bool` type.
 
 ```tick
-bool a = true;
-bool b = false;
+var a : bool = true;
+var b : bool = false;
 
-bool and_result = a && b;   // false
-bool or_result = a || b;    // true
-bool not_result = !a;       // false
+var and_result : bool = a && b;   // false
+var or_result : bool = a || b;    // true
+var not_result : bool = !a;       // false
 ```
 
 ### Control Flow
@@ -277,8 +288,8 @@ if (condition) {
 
 **While Loops:**
 ```tick
-int i = 0;
-int limit = 10;
+var i : int = 0;
+var limit : int = 10;
 while (i != limit) {
     // code
     i = i + 1;
@@ -290,44 +301,44 @@ while (i != limit) {
 Functions support all types as parameters and return values:
 
 ```tick
-int add(int a, int b) {
+func add(a : int, b : int) : int {
     return a + b;
 }
 
-float calculate_area(float radius) {
-    float pi = 3.14159f;
+func calculate_area(radius : float) : float {
+    var pi : float = 3.14159;
     return pi * radius * radius;
 }
 
-double compute(double x, double y) {
+func compute(x : double, y : double) : double {
     return x * y + x / y;
 }
 
-bool is_positive(int value) {
+func is_positive(value : int) : bool {
     return value > 0;
 }
 
-int sum_array(int[] numbers) {
-    int total = numbers[0];
+func sum_array(numbers : int[]) : int {
+    var total : int = numbers[0];
     total = total + numbers[1];
     total = total + numbers[2];
     return total;
 }
 
-int factorial(int n) {
+func factorial(n : int) : int {
     if (n == 0) return 1;
     if (n == 1) return 1;
     return n * factorial(n - 1);
 }
 
-int main() {
-    int sum = add(5, 7);
-    float area = calculate_area(5.0f);
-    double result = compute(10.5, 2.5);
-    bool positive = is_positive(42);
+func main() : int {
+    var sum : int = add(5, 7);
+    var area : float = calculate_area(5.0);
+    var result : double = compute(10.5, 2.5);
+    var positive : bool = is_positive(42);
     
-    int[] arr = [10, 20, 30];
-    int total = sum_array(arr);
+    var arr : int[] = [10, 20, 30];
+    var total : int = sum_array(arr);
     
     return 0;
 }
@@ -336,19 +347,40 @@ int main() {
 ### Strings
 
 ```tick
-string msg = "Hello, World!";
+var msg : string = "Hello, World!";
 println(msg);
 
-string text = "Line 1\nLine 2\tTabbed";
+var text : string = "Line 1\nLine 2\tTabbed";
 
-int x = 42;
-int y = 100;
+var x : int = 42;
+var y : int = 100;
 println(format("x = {}, y = {}", x, y));
 ```
 
 ---
 
 ## Examples
+
+### Example 0: Interactive Calculator
+
+```tick
+func main() : int {
+    println("=== Simple Calculator ===");
+    
+    var num1 : string = input("First number: ");
+    var num2 : string = input("Second number: ");
+    
+    var a : float = str_to_float(num1);
+    var b : float = str_to_float(num2);
+    
+    println(format("{} + {} = {}", a, b, a + b));
+    println(format("{} - {} = {}", a, b, a - b));
+    println(format("{} * {} = {}", a, b, a * b));
+    println(format("{} / {} = {}", a, b, a / b));
+    
+    return 0;
+}
+```
 
 ### Example 1: Parallel Data Processing
 
@@ -360,31 +392,31 @@ signal<int> result3;
 
 @process_data
 process worker1 {
-    int data = 100 * 2;
+    var data : int = 100 * 2;
     result1.emit(data);
 }
 
 @process_data
 process worker2 {
-    int data = 200 * 2;
+    var data : int = 200 * 2;
     result2.emit(data);
 }
 
 @process_data
 process worker3 {
-    int data = 300 * 2;
+    var data : int = 300 * 2;
     result3.emit(data);
 }
 
-int main() {
+func main() : int {
     println("Starting parallel processing...");
     process_data.execute();
     
-    int v1 = result1.recv();
-    int v2 = result2.recv();
-    int v3 = result3.recv();
+    var v1 : int = result1.recv();
+    var v2 : int = result2.recv();
+    var v3 : int = result3.recv();
     
-    int total = v1 + v2 + v3;
+    var total : int = v1 + v2 + v3;
     println(format("Total: {}", total));
     return 0;
 }
@@ -399,20 +431,20 @@ signal<int> result;
 
 @work
 process producer {
-    int value = 42;
+    var value : int = 42;
     data.emit(value);
 }
 
 @work
 process consumer {
-    int value = data.recv();
-    int processed = value * 2;
+    var value : int = data.recv();
+    var processed : int = value * 2;
     result.emit(processed);
 }
 
-int main() {
+func main() : int {
     work.execute();
-    int final_result = result.recv();
+    var final_result : int = result.recv();
     println(format("Result: {}", final_result));
     return 0;
 }
@@ -431,37 +463,89 @@ signal<int> final_out;
 
 @stage1
 process load_data {
-    int data = 100;
+    var data : int = 100;
     stage1_out.emit(data);
 }
 
 @stage2
 process transform {
-    int data = stage1_out.recv();
-    int transformed = data * 2;
+    var data : int = stage1_out.recv();
+    var transformed : int = data * 2;
     stage2_out.emit(transformed);
 }
 
 @stage3
 process aggregate {
-    int data = stage2_out.recv();
-    int result = data + 50;
+    var data : int = stage2_out.recv();
+    var result : int = data + 50;
     final_out.emit(result);
 }
 
-int main() {
+func main() : int {
     println("Pipeline processing...");
     stage1.execute();
     stage2.execute();
     stage3.execute();
     
-    int result = final_out.recv();
+    var result : int = final_out.recv();
     println(format("Final result: {}", result));
     return 0;
 }
 ```
 
-### Example 4: Complete Integration
+### Example 4: Object-Oriented Programming with Classes
+
+```tick
+class Rectangle {
+    var width : int = 0;
+    var height : int = 0;
+    
+    func area() : int {
+        var w : int = this.width;
+        var h : int = this.height;
+        return w * h;
+    }
+    
+    func perimeter() : int {
+        var w : int = this.width;
+        var h : int = this.height;
+        var sum : int = w + h;
+        return sum + sum;
+    }
+}
+
+class Account {
+    var balance : int = 100;
+    
+    func get_balance() : int {
+        return this.balance;
+    }
+}
+
+func main() : int {
+    var rect : Rectangle = Rectangle();
+    var area : int = rect.area();
+    var perim : int = rect.perimeter();
+    println(format("Rectangle area: {}", area));
+    println(format("Rectangle perimeter: {}", perim));
+    
+    var acc : Account = Account();
+    var bal : int = acc.get_balance();
+    println(format("Account balance: {}", bal));
+    
+    return 0;
+}
+```
+
+**Classes in Tick:**
+- Define classes with fields and methods using `var` and `func` keywords
+- Syntax: `var fieldName : type = value;` and `func methodName(param : type) : returnType { }`
+- Create instances with `ClassName()` (no `new` keyword)
+- Access members with dot notation: `object.field` or `object.method()`
+- Use `this` keyword inside methods to reference current instance
+- All fields must have initializers
+
+### Example 5: Complete Integration
 
 See `examples/complete.tick` for a full MapReduce-style example with:
 - Multiple parallel workers
@@ -556,9 +640,33 @@ Total:           123/123  (100%)
 
 ### Built-in Functions
 
-**`println(string)`** - Print with newline  
-**`print(string)`** - Print without newline  
-**`format(string, ...)`** - Format string with `{}` placeholders
+**Output Functions:**
+- **`println(string)`** - Print with newline  
+- **`print(string)`** - Print without newline  
+- **`format(string, ...)`** - Format string with `{}` placeholders
+
+**Input Functions:**
+- **`input()`** - Read a line from stdin, returns string
+- **`input(prompt)`** - Print prompt and read a line, returns string
+
+**String Conversion Functions:**
+- **`str_to_int(string)`** - Convert string to int
+- **`str_to_float(string)`** - Convert string to float  
+- **`str_to_double(string)`** - Convert string to double
+
+**Example:**
+```tick
+func main() : int {
+    var name : string = input("What is your name? ");
+    println(format("Hello, {}!", name));
+    
+    var age_str : string = input("Enter your age: ");
+    var age : int = str_to_int(age_str);
+    println(format("In 10 years, you will be {}", age + 10));
+    
+    return 0;
+}
+```
 
 ### Event Operations
 
@@ -598,7 +706,7 @@ tick/
 2. Single-statement bodies require braces
 
 ### Missing Features
-- Structs/classes
+- Structs (classes are available!)
 - File I/O
 - Error handling
 - Multi-dimensional arrays

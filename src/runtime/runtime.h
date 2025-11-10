@@ -20,6 +20,7 @@ struct Value {
         DOUBLE,
         STRING,
         ARRAY,
+        OBJECT,
         NONE
     } type;
     
@@ -30,6 +31,7 @@ struct Value {
         double double_val;
         int string_id;
         void* array_ptr;
+        void* object_ptr;
     };
     
     Value() : type(NONE), int_val(0) {}
@@ -39,6 +41,20 @@ struct Value {
     Value(double v) : type(DOUBLE), double_val(v) {}
     Value(int sid, bool is_string) : type(STRING), string_id(sid) {}
     Value(void* arr, bool is_array) : type(ARRAY), array_ptr(arr) {}
+    
+    static Value object(void* obj) {
+        Value v;
+        v.type = OBJECT;
+        v.object_ptr = obj;
+        return v;
+    }
+};
+
+struct Object {
+    const char* class_name;
+    HashMap<const char*, Value> fields;
+    
+    Object(const char* name) : class_name(name) {}
 };
 
 class SignalQueue {
@@ -58,14 +74,13 @@ private:
 };
 
 struct ProcessContext {
-    void* bytecode;
-    size_t bytecode_size;
+    DynamicArray<Instruction>* bytecode;
     HashMap<const char*, Value>* local_vars;
     Runtime* runtime;
     StringPool* string_pool;
     DynamicArray<Value>* constants;
     
-    ProcessContext() : bytecode(nullptr), bytecode_size(0), local_vars(nullptr), 
+    ProcessContext() : bytecode(nullptr), local_vars(nullptr), 
                        runtime(nullptr), string_pool(nullptr), constants(nullptr) {}
 };
 

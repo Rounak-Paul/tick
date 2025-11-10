@@ -1,0 +1,39 @@
+class Rectangle {
+    var width : int = 10;
+    var height : int = 20;
+    
+    func area() : int {
+        var w : int = this.width;
+        var h : int = this.height;
+        return w * h;
+    }
+    
+    func perimeter() : int {
+        var w : int = this.width;
+        var h : int = this.height;
+        var sum : int = w + h;
+        return sum + sum;
+    }
+}
+
+class Account {
+    var balance : int = 100;
+    
+    func get_balance() : int {
+        return this.balance;
+    }
+}
+
+func main() : int {
+    var rect : Rectangle = new Rectangle();
+    var area : int = rect.area();
+    var perim : int = rect.perimeter();
+    println(format("Rectangle area: {}", area));
+    println(format("Rectangle perimeter: {}", perim));
+    
+    var acc : Account = new Account();
+    var bal : int = acc.get_balance();
+    println(format("Account balance: {}", bal));
+    
+    return 0;
+}

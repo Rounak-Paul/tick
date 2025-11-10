@@ -1,4 +1,6 @@
-int main() {
-    print(42);
+func main() : int {
+    println("Testing print function");
+    println(42);
+    println(format("Format test: {}", 100));
     return 0;
 }

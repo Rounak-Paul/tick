@@ -49,13 +49,19 @@ Token Lexer::make_token(TokenType type, const char* start, size_t length) {
 }
 
 TokenType Lexer::check_keyword(const char* str, size_t length) {
+    if (length == 3 && memcmp(str, "var", 3) == 0) return TokenType::VAR;
+    if (length == 4 && memcmp(str, "func", 4) == 0) return TokenType::FUNC;
     if (length == 5 && memcmp(str, "event", 5) == 0) return TokenType::EVENT;
     if (length == 6 && memcmp(str, "signal", 6) == 0) return TokenType::SIGNAL;
     if (length == 7 && memcmp(str, "process", 7) == 0) return TokenType::PROCESS;
+    if (length == 5 && memcmp(str, "class", 5) == 0) return TokenType::CLASS;
+    if (length == 3 && memcmp(str, "new", 3) == 0) return TokenType::NEW;
+    if (length == 4 && memcmp(str, "this", 4) == 0) return TokenType::THIS;
     if (length == 3 && memcmp(str, "int", 3) == 0) return TokenType::INT;
     if (length == 4 && memcmp(str, "bool", 4) == 0) return TokenType::BOOL;
     if (length == 5 && memcmp(str, "float", 5) == 0) return TokenType::FLOAT;
     if (length == 6 && memcmp(str, "double", 6) == 0) return TokenType::DOUBLE;
+    if (length == 6 && memcmp(str, "string", 6) == 0) return TokenType::STRING_TYPE;
     if (length == 5 && memcmp(str, "while", 5) == 0) return TokenType::WHILE;
     if (length == 3 && memcmp(str, "for", 3) == 0) return TokenType::FOR;
     if (length == 2 && memcmp(str, "if", 2) == 0) return TokenType::IF;
@@ -214,6 +220,10 @@ DynamicArray<Token> Lexer::tokenize() {
         else if (c == ';') {
             advance();
             tokens.push(make_token(TokenType::SEMICOLON, ";", 1));
+        }
+        else if (c == ':') {
+            advance();
+            tokens.push(make_token(TokenType::COLON, ":", 1));
         }
         else if (c == '.') {
             advance();

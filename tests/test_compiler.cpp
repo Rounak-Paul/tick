@@ -83,7 +83,7 @@ void test_lexer_identifiers_and_numbers() {
 void test_parser_simple_function() {
     printf("\n=== Parser Simple Function ===\n");
     
-    const char* source = "int main() { return 0; }";
+    const char* source = "func main() : int { return 0; }";
     Lexer lexer(source);
     DynamicArray<Token> tokens = lexer.tokenize();
     Parser parser(tokens);
@@ -118,7 +118,7 @@ void test_parser_event_and_signal() {
 void test_parser_process() {
     printf("\n=== Parser Process ===\n");
     
-    const char* source = "@e1 process p1 { int x = 10; }";
+    const char* source = "@e1 process p1 { var x : int = 10; }";
     Lexer lexer(source);
     DynamicArray<Token> tokens = lexer.tokenize();
     Parser parser(tokens);
@@ -134,7 +134,7 @@ void test_parser_process() {
 void test_parser_expressions() {
     printf("\n=== Parser Expressions ===\n");
     
-    const char* source = "int main() { int x = 1 + 2 * 3; return x; }";
+    const char* source = "func main() : int { var x : int = 1 + 2 * 3; return x; }";
     Lexer lexer(source);
     DynamicArray<Token> tokens = lexer.tokenize();
     Parser parser(tokens);
@@ -150,7 +150,7 @@ void test_parser_expressions() {
 void test_semantic_analyzer() {
     printf("\n=== Semantic Analyzer Tests ===\n");
     
-    const char* source = "event e1; int main() { return 0; }";
+    const char* source = "event e1; func main() : int { return 0; }";
     Lexer lexer(source);
     DynamicArray<Token> tokens = lexer.tokenize();
     Parser parser(tokens);
@@ -166,7 +166,7 @@ void test_semantic_analyzer() {
 void benchmark_lexer() {
     printf("\n=== Lexer Performance ===\n");
     
-    const char* large_source = "int x = 10 + 20; int y = 30 * 40; int z = x + y;";
+    const char* large_source = "var x : int = 10 + 20; var y : int = 30 * 40; var z : int = x + y;";
     
     struct timeval start, end;
     gettimeofday(&start, nullptr);
@@ -187,7 +187,7 @@ void benchmark_lexer() {
 void benchmark_parser() {
     printf("\n=== Parser Performance ===\n");
     
-    const char* source = "int main() { int x1 = 10; int x2 = 20; int x3 = 30; return 0; }";
+    const char* source = "func main() : int { var x1 : int = 10; var x2 : int = 20; var x3 : int = 30; return 0; }";
     
     Lexer lexer(source);
     DynamicArray<Token> tokens = lexer.tokenize();

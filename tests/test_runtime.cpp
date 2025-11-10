@@ -95,7 +95,7 @@ void test_runtime_registration() {
 void test_interpreter_arithmetic() {
     printf("\n=== Interpreter Arithmetic Tests ===\n");
     
-    const char* source = "int main() { return 30; }";
+    const char* source = "func main() : int { return 30; }";
     
     Lexer lexer(source);
     DynamicArray<Token> tokens = lexer.tokenize();
@@ -123,7 +123,7 @@ void test_interpreter_arithmetic() {
 void test_interpreter_control_flow() {
     printf("\n=== Interpreter Control Flow Tests ===\n");
     
-    const char* source = "int main() { return 42; }";
+    const char* source = "func main() : int { return 42; }";
     
     Lexer lexer(source);
     DynamicArray<Token> tokens = lexer.tokenize();
@@ -149,7 +149,7 @@ void test_interpreter_control_flow() {
 void test_interpreter_loops() {
     printf("\n=== Interpreter Loop Tests ===\n");
     
-    const char* source = "int main() { return 45; }";
+    const char* source = "func main() : int { return 45; }";
     
     Lexer lexer(source);
     DynamicArray<Token> tokens = lexer.tokenize();
@@ -210,7 +210,7 @@ void benchmark_signal_throughput() {
 void benchmark_interpreter() {
     printf("\n=== Interpreter Performance ===\n");
     
-    const char* source = "int main() { return 100; }";
+    const char* source = "func main() : int { return 100; }";
     
     Lexer lexer(source);
     DynamicArray<Token> tokens = lexer.tokenize();

@@ -339,6 +339,7 @@ Value Interpreter::execute(DynamicArray<Instruction>* code, DynamicArray<Value>*
                 Value arg_count_val = pop();
                 int arg_count = arg_count_val.int_val;
                 
+                
                 DynamicArray<Value> args;
                 for (int i = 0; i < arg_count; i++) {
                     args.push(Value());
@@ -348,8 +349,17 @@ Value Interpreter::execute(DynamicArray<Instruction>* code, DynamicArray<Value>*
                 }
                 
                 const char* func_name = _string_pool->get(inst.operand);
-                Value result = _runtime->call_function(func_name, args);
-                push(result);
+                
+                if (arg_count > 0 && args[0].type == Value::OBJECT) {
+                    Object* obj = (Object*)args[0].object_ptr;
+                    char method_name[256];
+                    snprintf(method_name, sizeof(method_name), "%s.%s", obj->class_name, func_name);
+                    Value result = _runtime->call_function(method_name, args);
+                    push(result);
+                } else {
+                    Value result = _runtime->call_function(func_name, args);
+                    push(result);
+                }
                 break;
             }
             
@@ -422,6 +432,43 @@ Value Interpreter::execute(DynamicArray<Instruction>* code, DynamicArray<Value>*
                 Value array = pop();
                 DynamicArray<Value>* arr = (DynamicArray<Value>*)array.array_ptr;
                 (*arr)[index.int_val] = value;
+                break;
+            }
+            
+            case OpCode::NEW_OBJECT: {
+                const char* class_name = _string_pool->get(inst.operand);
+                Object* obj = new Object(class_name);
+                push(Value::object(obj));
+                break;
+            }
+            
+            case OpCode::GET_FIELD: {
+                Value object = pop();
+                if (object.type == Value::OBJECT) {
+                    Object* obj = (Object*)object.object_ptr;
+                    const char* field_name = _string_pool->get(inst.operand);
+                    Value* field_val = obj->fields.find(field_name);
+                    if (field_val) {
+                        push(*field_val);
+                    } else {
+                        push(Value(0));
+                    }
+                }
+                break;
+            }
+            
+            case OpCode::SET_FIELD: {
+                Value value = pop();
+                Value object = pop();
+                if (object.type == Value::OBJECT) {
+                    Object* obj = (Object*)object.object_ptr;
+                    const char* field_name = _string_pool->get(inst.operand);
+                    obj->fields.insert(field_name, value);
+                }
+                break;
+            }
+            
+            case OpCode::CALL_METHOD: {
                 break;
             }
                 
@@ -700,45 +747,37 @@ Value Interpreter::execute_function(DynamicArray<Instruction>* code, DynamicArra
                 break;
             }
                 
-            case OpCode::NOT: {
-                Value a = pop();
-                push(Value(!a.bool_val));
+            case OpCode::NOT:
+                push(Value(!pop().bool_val));
                 break;
-            }
                 
             case OpCode::NEG: {
-                Value a = pop();
-                if (a.type == Value::DOUBLE) {
-                    push(Value(-a.double_val));
-                } else if (a.type == Value::FLOAT) {
-                    push(Value(-a.float_val));
+                Value val = pop();
+                if (val.type == Value::DOUBLE) {
+                    push(Value(-val.double_val));
+                } else if (val.type == Value::FLOAT) {
+                    push(Value(-val.float_val));
                 } else {
-                    push(Value(-a.int_val));
+                    push(Value(-val.int_val));
                 }
                 break;
             }
                 
             case OpCode::JUMP:
-                pc = inst.operand;
-                continue;
+                pc = inst.operand - 1;
+                break;
                 
-            case OpCode::JUMP_IF_FALSE: {
-                Value cond = pop();
-                if (!cond.bool_val) {
-                    pc = inst.operand;
-                    continue;
+            case OpCode::JUMP_IF_FALSE:
+                if (!pop().bool_val) {
+                    pc = inst.operand - 1;
                 }
                 break;
-            }
                 
-            case OpCode::JUMP_IF_TRUE: {
-                Value cond = pop();
-                if (cond.bool_val) {
-                    pc = inst.operand;
-                    continue;
+            case OpCode::JUMP_IF_TRUE:
+                if (pop().bool_val) {
+                    pc = inst.operand - 1;
                 }
                 break;
-            }
                 
             case OpCode::CALL: {
                 Value arg_count_val = pop();
@@ -753,8 +792,17 @@ Value Interpreter::execute_function(DynamicArray<Instruction>* code, DynamicArra
                 }
                 
                 const char* func_name = _string_pool->get(inst.operand);
-                Value result = _runtime->call_function(func_name, args);
-                push(result);
+                
+                if (arg_count > 0 && args[0].type == Value::OBJECT) {
+                    Object* obj = (Object*)args[0].object_ptr;
+                    char method_name[256];
+                    snprintf(method_name, sizeof(method_name), "%s.%s", obj->class_name, func_name);
+                    Value result = _runtime->call_function(method_name, args);
+                    push(result);
+                } else {
+                    Value result = _runtime->call_function(func_name, args);
+                    push(result);
+                }
                 break;
             }
             
@@ -827,6 +875,47 @@ Value Interpreter::execute_function(DynamicArray<Instruction>* code, DynamicArra
                 Value array = pop();
                 DynamicArray<Value>* arr = (DynamicArray<Value>*)array.array_ptr;
                 (*arr)[index.int_val] = value;
+                break;
+            }
+            
+            case OpCode::NEW_OBJECT: {
+                const char* class_name = _string_pool->get(inst.operand);
+                Object* obj = new Object(class_name);
+                push(Value::object(obj));
+                break;
+            }
+            
+            case OpCode::GET_FIELD: {
+                Value object = pop();
+                if (object.type == Value::OBJECT) {
+                    Object* obj = (Object*)object.object_ptr;
+                    const char* field_name = _string_pool->get(inst.operand);
+                    Value* field_val = obj->fields.find(field_name);
+                    if (field_val) {
+                        push(*field_val);
+                    } else {
+                        push(Value(0));
+                    }
+                }
+                break;
+            }
+            
+            case OpCode::SET_FIELD: {
+                Value value = pop();
+                Value object = pop();
+                if (object.type == Value::OBJECT) {
+                    Object* obj = (Object*)object.object_ptr;
+                    const char* field_name = _string_pool->get(inst.operand);
+                    obj->fields.insert(field_name, value);
+                }
+                break;
+            }
+            
+            case OpCode::CALL_METHOD: {
+                break;
+            }
+            
+            case OpCode::CONCAT: {
                 break;
             }
                 

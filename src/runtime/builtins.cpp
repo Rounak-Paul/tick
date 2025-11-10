@@ -17,6 +17,9 @@ void Builtins::register_all(Runtime* runtime) {
     runtime->register_function("println", builtin_println);
     runtime->register_function("input", builtin_input);
     runtime->register_function("format", builtin_format);
+    runtime->register_function("str_to_int", builtin_str_to_int);
+    runtime->register_function("str_to_float", builtin_str_to_float);
+    runtime->register_function("str_to_double", builtin_str_to_double);
 }
 
 Value Builtins::builtin_print(DynamicArray<Value>& args) {
@@ -49,11 +52,26 @@ Value Builtins::builtin_println(DynamicArray<Value>& args) {
 }
 
 Value Builtins::builtin_input(DynamicArray<Value>& args) {
-    int value = 0;
-    if (scanf("%d", &value) == 1) {
-        return Value(value);
+    StringPool* pool = _runtime ? _runtime->get_string_pool() : nullptr;
+    if (!pool) return Value(0, true);
+    
+    if (args.size() > 0 && args[0].type == Value::STRING) {
+        const char* prompt = pool->get(args[0].string_id);
+        printf("%s", prompt);
+        fflush(stdout);
     }
-    return Value(0);
+    
+    char buffer[1024];
+    if (fgets(buffer, sizeof(buffer), stdin)) {
+        size_t len = strlen(buffer);
+        if (len > 0 && buffer[len - 1] == '\n') {
+            buffer[len - 1] = '\0';
+        }
+        int string_id = pool->add(String(buffer));
+        return Value(string_id, true);
+    }
+    
+    return Value(pool->add(String("")), true);
 }
 
 Value Builtins::builtin_format(DynamicArray<Value>& args) {
@@ -117,6 +135,48 @@ Value Builtins::builtin_format(DynamicArray<Value>& args) {
     int result_id = pool->add(String(result));
     free(result);
     return Value(result_id, true);
+}
+
+Value Builtins::builtin_str_to_int(DynamicArray<Value>& args) {
+    if (args.size() == 0 || args[0].type != Value::STRING) {
+        return Value(0);
+    }
+    
+    StringPool* pool = _runtime ? _runtime->get_string_pool() : nullptr;
+    if (!pool) return Value(0);
+    
+    const char* str = pool->get(args[0].string_id);
+    int value = 0;
+    sscanf(str, "%d", &value);
+    return Value(value);
+}
+
+Value Builtins::builtin_str_to_float(DynamicArray<Value>& args) {
+    if (args.size() == 0 || args[0].type != Value::STRING) {
+        return Value(0.0f);
+    }
+    
+    StringPool* pool = _runtime ? _runtime->get_string_pool() : nullptr;
+    if (!pool) return Value(0.0f);
+    
+    const char* str = pool->get(args[0].string_id);
+    float value = 0.0f;
+    sscanf(str, "%f", &value);
+    return Value(value);
+}
+
+Value Builtins::builtin_str_to_double(DynamicArray<Value>& args) {
+    if (args.size() == 0 || args[0].type != Value::STRING) {
+        return Value(0.0);
+    }
+    
+    StringPool* pool = _runtime ? _runtime->get_string_pool() : nullptr;
+    if (!pool) return Value(0.0);
+    
+    const char* str = pool->get(args[0].string_id);
+    double value = 0.0;
+    sscanf(str, "%lf", &value);
+    return Value(value);
 }
 
 }

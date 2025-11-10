@@ -27,6 +27,7 @@ private:
     SignalDecl* parse_signal_decl();
     ProcessDecl* parse_process_decl();
     FunctionDecl* parse_function_decl();
+    ClassDecl* parse_class_decl();
     
     StmtNode* parse_statement();
     StmtNode* parse_var_decl();

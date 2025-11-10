@@ -1,0 +1,14 @@
+class Test {
+    var value : int = 42;
+    
+    func get_value() : int {
+        return this.value;
+    }
+}
+
+func main() : int {
+    var t : Test = new Test();
+    var v : int = t.get_value();
+    println(format("Value: {}", v));
+    return 0;
+}

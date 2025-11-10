@@ -1,0 +1,70 @@
+event compute;
+event process_results;
+
+signal<int> task_result;
+signal<int> final_result;
+
+class Task {
+    var id : int = 0;
+    var value : int = 10;
+    
+    func compute_square() : int {
+        var result : int = this.value * this.value;
+        return result;
+    }
+    
+    func get_id() : int {
+        return this.id;
+    }
+}
+
+class Accumulator {
+    var total : int = 0;
+    
+    func add(val : int) : int {
+        var new_total : int = this.total + val;
+        return new_total;
+    }
+    
+    func get_total() : int {
+        return this.total;
+    }
+}
+
+@compute
+process worker1 {
+    var t : Task = new Task();
+    var result : int = t.compute_square();
+    task_result.emit(result);
+}
+
+@compute
+process worker2 {
+    var t : Task = new Task();
+    var result : int = t.compute_square();
+    task_result.emit(result);
+}
+
+@process_results
+process aggregator {
+    var val1 : int = task_result.recv();
+    var val2 : int = task_result.recv();
+    
+    var sum : int = val1 + val2;
+    
+    final_result.emit(sum);
+}
+
+func main() : int {
+    println("Starting parallel computation with classes...");
+    
+    compute.execute();
+    
+    println("Processing results...");
+    process_results.execute();
+    
+    var result : int = final_result.recv();
+    println(format("Final result: {}", result));
+    
+    return 0;
+}

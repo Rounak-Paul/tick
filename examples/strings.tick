@@ -1,4 +1,4 @@
-int main() {
+func main() : int {
     println("Hello, World!");
     println("Testing string literals");
     

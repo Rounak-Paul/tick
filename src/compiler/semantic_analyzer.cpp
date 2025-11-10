@@ -19,6 +19,10 @@ bool SemanticAnalyzer::analyze(Program* program) {
         analyze_signal_decl(program->signals[i]);
     }
     
+    for (size_t i = 0; i < program->classes.size(); i++) {
+        analyze_class_decl(program->classes[i]);
+    }
+    
     for (size_t i = 0; i < program->functions.size(); i++) {
         analyze_function_decl(program->functions[i]);
     }
@@ -81,6 +85,24 @@ void SemanticAnalyzer::analyze_function_decl(FunctionDecl* node) {
     }
     
     analyze_block(node->body);
+}
+
+void SemanticAnalyzer::analyze_class_decl(ClassDecl* node) {
+    if (_symbols.contains(node->name.c_str())) {
+        error("Class already declared");
+        return;
+    }
+    
+    Symbol* symbol = new Symbol(SymbolType::CLASS, node->name, String("class"));
+    _symbols.insert(node->name.c_str(), symbol);
+    
+    for (size_t i = 0; i < node->fields.size(); i++) {
+        analyze_var_decl(node->fields[i]);
+    }
+    
+    for (size_t i = 0; i < node->methods.size(); i++) {
+        analyze_function_decl(node->methods[i]);
+    }
 }
 
 void SemanticAnalyzer::analyze_statement(StmtNode* node) {
@@ -162,6 +184,16 @@ void SemanticAnalyzer::analyze_expression(ExprNode* node) {
             break;
         case AstNodeType::IDENTIFIER_EXPR:
             analyze_identifier(static_cast<IdentifierExpr*>(node));
+            break;
+        case AstNodeType::NEW_EXPR:
+            {
+                NewExpr* new_expr = static_cast<NewExpr*>(node);
+                for (size_t i = 0; i < new_expr->arguments.size(); i++) {
+                    analyze_expression(new_expr->arguments[i]);
+                }
+            }
+            break;
+        case AstNodeType::THIS_EXPR:
             break;
         default:
             break;

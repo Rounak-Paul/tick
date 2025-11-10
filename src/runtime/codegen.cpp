@@ -7,6 +7,10 @@ namespace Tick {
 CodeGenerator::CodeGenerator() : _current_code(nullptr), _next_local_index(0) {}
 
 void CodeGenerator::generate(Program* program) {
+    for (size_t i = 0; i < program->classes.size(); i++) {
+        generate_class(program->classes[i]);
+    }
+    
     for (size_t i = 0; i < program->functions.size(); i++) {
         generate_function(program->functions[i]);
     }
@@ -32,6 +36,11 @@ DynamicArray<Value>* CodeGenerator::get_constants() {
 
 StringPool* CodeGenerator::get_string_pool() {
     return &_string_pool;
+}
+
+ClassDecl* CodeGenerator::get_class(const char* name) {
+    ClassDecl** cls = _classes.find(name);
+    return cls ? *cls : nullptr;
 }
 
 void CodeGenerator::generate_function(FunctionDecl* func) {
@@ -60,6 +69,35 @@ void CodeGenerator::generate_process(ProcessDecl* proc) {
     emit(OpCode::HALT);
     
     _process_code.insert(proc->name.c_str(), _current_code);
+}
+
+void CodeGenerator::generate_class(ClassDecl* cls) {
+    int class_name_index = _string_pool.add(cls->name);
+    const char* persistent_key = _string_pool.get(class_name_index);
+    _classes.insert(persistent_key, cls);
+    
+    for (size_t i = 0; i < cls->methods.size(); i++) {
+        FunctionDecl* method = cls->methods[i];
+        _current_code = new DynamicArray<Instruction>();
+        _local_vars.insert("", 0);
+        _next_local_index = 0;
+        
+        _local_vars.insert("this", _next_local_index++);
+        
+        for (size_t j = 0; j < method->parameters.size(); j++) {
+            _local_vars.insert(method->parameters[j]->name.c_str(), _next_local_index++);
+        }
+        
+        generate_block(method->body);
+        
+        emit(OpCode::LOAD_CONST, add_constant(Value(0)));
+        emit(OpCode::RETURN);
+        
+        size_t name_len = cls->name.length() + method->name.length() + 2;
+        char* method_name = (char*)malloc(name_len);
+        snprintf(method_name, name_len, "%s.%s", cls->name.c_str(), method->name.c_str());
+        _function_code.insert(method_name, _current_code);
+    }
 }
 
 void CodeGenerator::generate_statement(StmtNode* stmt) {
@@ -178,6 +216,12 @@ void CodeGenerator::generate_expression(ExprNode* expr) {
         case AstNodeType::INDEX_EXPR:
             generate_index_expr(static_cast<IndexExpr*>(expr));
             break;
+        case AstNodeType::NEW_EXPR:
+            generate_new_expr(static_cast<NewExpr*>(expr));
+            break;
+        case AstNodeType::THIS_EXPR:
+            generate_this_expr();
+            break;
         case AstNodeType::IDENTIFIER_EXPR:
             generate_identifier(static_cast<IdentifierExpr*>(expr));
             break;
@@ -247,6 +291,18 @@ void CodeGenerator::generate_call_expr(CallExpr* node) {
                 return;
             }
         }
+        
+        generate_expression(member->object);
+        
+        for (size_t i = 0; i < node->arguments.size(); i++) {
+            generate_expression(node->arguments[i]);
+        }
+        
+        emit(OpCode::LOAD_CONST, add_constant(Value((int)(node->arguments.size() + 1))));
+        
+        int method_index = _string_pool.add(member->member);
+        emit(OpCode::CALL, method_index);
+        return;
     }
     
     for (size_t i = 0; i < node->arguments.size(); i++) {
@@ -275,7 +331,15 @@ void CodeGenerator::generate_member_expr(MemberExpr* node) {
         } else if (node->member == "execute") {
             int name_index = _string_pool.add(obj->name);
             emit(OpCode::EVENT_EXECUTE, name_index);
+        } else {
+            generate_expression(node->object);
+            int field_index = _string_pool.add(node->member);
+            emit(OpCode::GET_FIELD, field_index);
         }
+    } else {
+        generate_expression(node->object);
+        int field_index = _string_pool.add(node->member);
+        emit(OpCode::GET_FIELD, field_index);
     }
 }
 
@@ -335,6 +399,38 @@ void CodeGenerator::emit(OpCode opcode, int operand) {
 int CodeGenerator::add_constant(Value value) {
     _constants.push(value);
     return _constants.size() - 1;
+}
+
+void CodeGenerator::generate_new_expr(NewExpr* node) {
+    for (size_t i = 0; i < node->arguments.size(); i++) {
+        generate_expression(node->arguments[i]);
+    }
+    int class_name_index = _string_pool.add(node->class_name);
+    emit(OpCode::NEW_OBJECT, class_name_index);
+    
+    const char* class_name_key = _string_pool.get(class_name_index);
+    ClassDecl** cls_ptr = _classes.find(class_name_key);
+    if (cls_ptr) {
+        ClassDecl* cls = *cls_ptr;
+        for (size_t i = 0; i < cls->fields.size(); i++) {
+            VarDecl* field = cls->fields[i];
+            if (field->initializer) {
+                emit(OpCode::DUP);
+                generate_expression(field->initializer);
+                int field_name_index = _string_pool.add(field->name);
+                emit(OpCode::SET_FIELD, field_name_index);
+            }
+        }
+    } else {
+        fprintf(stderr, "Warning: Class '%s' not found during codegen\n", node->class_name.c_str());
+    }
+}
+
+void CodeGenerator::generate_this_expr() {
+    int* index = _local_vars.find("this");
+    if (index) {
+        emit(OpCode::LOAD_VAR, *index);
+    }
 }
 
 }

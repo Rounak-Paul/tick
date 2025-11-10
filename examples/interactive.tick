@@ -1,0 +1,32 @@
+func main() : int {
+    println("╔═══════════════════════════════════════╗");
+    println("║    Tick Interactive Demo              ║");
+    println("╚═══════════════════════════════════════╝");
+    println("");
+    
+    var name : string = input("Enter your name: ");
+    var age_str : string = input("Enter your age: ");
+    var age : int = str_to_int(age_str);
+    
+    var height_str : string = input("Enter your height in meters: ");
+    var height : float = str_to_float(height_str);
+    
+    var weight_str : string = input("Enter your weight in kg: ");
+    var weight : float = str_to_float(weight_str);
+    
+    var bmi : float = weight / (height * height);
+    var birth_year : int = 2025 - age;
+    
+    println("");
+    println("╔═══════════════════════════════════════╗");
+    println("║           Your Profile                ║");
+    println("╚═══════════════════════════════════════╝");
+    println(format("Name:        {}", name));
+    println(format("Age:         {}", age));
+    println(format("Birth Year:  {}", birth_year));
+    println(format("Height:      {} m", height));
+    println(format("Weight:      {} kg", weight));
+    println(format("BMI:         {}", bmi));
+    
+    return 0;
+}
