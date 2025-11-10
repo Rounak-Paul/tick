@@ -1,0 +1,70 @@
+event compute;
+event process_results;
+
+signal<int> task_result;
+signal<int> final_result;
+
+class Task {
+    int id = 0;
+    int value = 10;
+    
+    int compute_square() {
+        int result = this.value * this.value;
+        return result;
+    }
+    
+    int get_id() {
+        return this.id;
+    }
+}
+
+class Accumulator {
+    int total = 0;
+    
+    int add(int val) {
+        int new_total = this.total + val;
+        return new_total;
+    }
+    
+    int get_total() {
+        return this.total;
+    }
+}
+
+@compute
+process worker1 {
+    Task t = new Task();
+    int result = t.compute_square();
+    task_result.emit(result);
+}
+
+@compute
+process worker2 {
+    Task t = new Task();
+    int result = t.compute_square();
+    task_result.emit(result);
+}
+
+@process_results
+process aggregator {
+    int val1 = task_result.recv();
+    int val2 = task_result.recv();
+    
+    int sum = val1 + val2;
+    
+    final_result.emit(sum);
+}
+
+int main() {
+    println("Starting parallel computation with classes...");
+    
+    compute.execute();
+    
+    println("Processing results...");
+    process_results.execute();
+    
+    int result = final_result.recv();
+    println(format("Final result: {}", result));
+    
+    return 0;
+}

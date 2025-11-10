@@ -1,0 +1,83 @@
+event data_processing;
+event result_collection;
+
+signal<int> processing_queue;
+signal<int> results;
+
+class DataProcessor {
+    int multiplier = 2;
+    int input_value = 0;
+    
+    int process_value() {
+        int result = this.input_value * this.multiplier;
+        return result;
+    }
+    
+    int get_multiplier() {
+        return this.multiplier;
+    }
+}
+
+class ResultCollector {
+    int count = 0;
+    
+    int increment() {
+        int new_count = this.count + 1;
+        return new_count;
+    }
+}
+
+@data_processing
+process processor1 {
+    int data = processing_queue.recv();
+    
+    DataProcessor dp = new DataProcessor();
+    int processed = data * 2;
+    
+    results.emit(processed);
+}
+
+@data_processing
+process processor2 {
+    int data = processing_queue.recv();
+    
+    DataProcessor dp = new DataProcessor();
+    int processed = data * 2;
+    
+    results.emit(processed);
+}
+
+@data_processing
+process processor3 {
+    int data = processing_queue.recv();
+    
+    DataProcessor dp = new DataProcessor();
+    int processed = data * 2;
+    
+    results.emit(processed);
+}
+
+int main() {
+    println("=== Parallel Data Processing Pipeline ===");
+    
+    processing_queue.emit(10);
+    processing_queue.emit(20);
+    processing_queue.emit(30);
+    
+    println("Starting parallel processors...");
+    data_processing.execute();
+    
+    println("Collecting results...");
+    int r1 = results.recv();
+    int r2 = results.recv();
+    int r3 = results.recv();
+    
+    println(format("Result 1: {}", r1));
+    println(format("Result 2: {}", r2));
+    println(format("Result 3: {}", r3));
+    
+    int total = r1 + r2 + r3;
+    println(format("Total: {}", total));
+    
+    return 0;
+}

@@ -1,0 +1,86 @@
+event worker_event;
+event aggregator_event;
+
+signal<int> work_queue;
+signal<int> results_queue;
+
+class Worker {
+    int worker_id = 0;
+    int workload = 100;
+    
+    int do_work() {
+        int result = this.workload * this.worker_id;
+        return result;
+    }
+    
+    int get_id() {
+        return this.worker_id;
+    }
+}
+
+class Aggregator {
+    int sum = 0;
+    
+    int get_sum() {
+        return this.sum;
+    }
+}
+
+@worker_event
+process worker_process_1 {
+    Worker w = new Worker();
+    int result = w.do_work();
+    results_queue.emit(result);
+}
+
+@worker_event
+process worker_process_2 {
+    Worker w = new Worker();
+    int result = w.do_work();
+    results_queue.emit(result);
+}
+
+@aggregator_event
+process aggregator_process {
+    int val1 = results_queue.recv();
+    int val2 = results_queue.recv();
+    
+    Aggregator agg = new Aggregator();
+    int total = val1 + val2;
+    
+    work_queue.emit(total);
+}
+
+int main() {
+    println("╔═══════════════════════════════════════════════════════════════╗");
+    println("║  Tick: Classes + Parallel Programming Demonstration          ║");
+    println("╚═══════════════════════════════════════════════════════════════╝");
+    println("");
+    
+    println("Key Integration Patterns:");
+    println("-------------------------");
+    println("1. Classes instantiated in parallel processes");
+    println("2. Methods called within process blocks");
+    println("3. Results communicated via signals");
+    println("4. Event-driven class interactions");
+    println("");
+    
+    println("Executing parallel workers...");
+    worker_event.execute();
+    
+    println("Aggregating results...");
+    aggregator_event.execute();
+    
+    int final_result = work_queue.recv();
+    println(format("Final aggregated result: {}", final_result));
+    
+    println("");
+    println("Benefits of Class + Parallel Integration:");
+    println("-----------------------------------------");
+    println("✓ Encapsulation: State and behavior grouped in classes");
+    println("✓ Parallelism: Multiple instances process data concurrently");
+    println("✓ Communication: Signals enable inter-process messaging");
+    println("✓ Events: Coordinate execution of parallel class instances");
+    
+    return 0;
+}
