@@ -102,14 +102,26 @@ int main(int argc, char** argv) {
         }
     }
     
+    for (size_t i = 0; i < program->classes.size(); i++) {
+        ClassDecl* cls = program->classes[i];
+        for (size_t j = 0; j < cls->methods.size(); j++) {
+            FunctionDecl* method = cls->methods[j];
+            size_t name_len = cls->name.length() + method->name.length() + 2;
+            char* method_name = (char*)malloc(name_len);
+            snprintf(method_name, name_len, "%s.%s", cls->name.c_str(), method->name.c_str());
+            
+            DynamicArray<Instruction>* code = codegen.get_function_code(method_name);
+            if (code) {
+                runtime.register_user_function(method_name, code);
+            }
+        }
+    }
+    
     for (size_t i = 0; i < program->processes.size(); i++) {
         ProcessDecl* proc = program->processes[i];
         ProcessContext* ctx = new ProcessContext();
         DynamicArray<Instruction>* code = codegen.get_process_code(proc->name.c_str());
-        if (code) {
-            ctx->bytecode = code->data();
-            ctx->bytecode_size = code->size();
-        }
+        ctx->bytecode = code;
         ctx->runtime = &runtime;
         ctx->string_pool = codegen.get_string_pool();
         ctx->constants = codegen.get_constants();

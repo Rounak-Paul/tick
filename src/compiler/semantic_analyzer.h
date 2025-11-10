@@ -12,7 +12,8 @@ enum class SymbolType {
     FUNCTION,
     EVENT,
     SIGNAL,
-    PROCESS
+    PROCESS,
+    CLASS
 };
 
 struct Symbol {
@@ -40,6 +41,7 @@ private:
     void analyze_signal_decl(SignalDecl* node);
     void analyze_process_decl(ProcessDecl* node);
     void analyze_function_decl(FunctionDecl* node);
+    void analyze_class_decl(ClassDecl* node);
     
     void analyze_statement(StmtNode* node);
     void analyze_var_decl(VarDecl* node);

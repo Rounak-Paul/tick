@@ -1,0 +1,39 @@
+class Rectangle {
+    int width = 10;
+    int height = 20;
+    
+    int area() {
+        int w = this.width;
+        int h = this.height;
+        return w * h;
+    }
+    
+    int perimeter() {
+        int w = this.width;
+        int h = this.height;
+        int sum = w + h;
+        return sum + sum;
+    }
+}
+
+class Account {
+    int balance = 100;
+    
+    int get_balance() {
+        return this.balance;
+    }
+}
+
+int main() {
+    Rectangle rect = new Rectangle();
+    int area = rect.area();
+    int perim = rect.perimeter();
+    println(format("Rectangle area: {}", area));
+    println(format("Rectangle perimeter: {}", perim));
+    
+    Account acc = new Account();
+    int bal = acc.get_balance();
+    println(format("Account balance: {}", bal));
+    
+    return 0;
+}

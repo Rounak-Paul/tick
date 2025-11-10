@@ -84,7 +84,8 @@ Tick is designed with **parallelism as a first-class citizen**. Unlike tradition
 ✅ Type-safe signal communication  
 ✅ Concurrent processes  
 ✅ User-defined functions  
-✅ Rich type system: `int`, `bool`, `float`, `double`, `string`, arrays  
+✅ **Object-oriented programming with classes**  
+✅ Rich type system: `int`, `bool`, `float`, `double`, `string`, arrays, objects  
 ✅ Automatic type promotion in arithmetic  
 ✅ String formatting and terminal input  
 ✅ Strong typing  
@@ -482,7 +483,58 @@ int main() {
 }
 ```
 
-### Example 4: Complete Integration
+### Example 4: Object-Oriented Programming with Classes
+
+```tick
+class Rectangle {
+    int width = 0;
+    int height = 0;
+    
+    int area() {
+        int w = this.width;
+        int h = this.height;
+        return w * h;
+    }
+    
+    int perimeter() {
+        int w = this.width;
+        int h = this.height;
+        int sum = w + h;
+        return sum + sum;
+    }
+}
+
+class Account {
+    int balance = 100;
+    
+    int get_balance() {
+        return this.balance;
+    }
+}
+
+int main() {
+    Rectangle rect = new Rectangle();
+    int area = rect.area();
+    int perim = rect.perimeter();
+    println(format("Rectangle area: {}", area));
+    println(format("Rectangle perimeter: {}", perim));
+    
+    Account acc = new Account();
+    int bal = acc.get_balance();
+    println(format("Account balance: {}", bal));
+    
+    return 0;
+}
+```
+
+**Classes in Tick:**
+- Define classes with fields and methods
+- Create instances with `new ClassName()`
+- Access members with dot notation: `object.field` or `object.method()`
+- Use `this` keyword inside methods to reference current instance
+- All fields default to 0 if not initialized
+
+### Example 5: Complete Integration
 
 See `examples/complete.tick` for a full MapReduce-style example with:
 - Multiple parallel workers

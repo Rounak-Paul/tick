@@ -53,10 +53,7 @@ Value execute_program(const char* source) {
         ProcessDecl* proc = program->processes[i];
         ProcessContext* ctx = new ProcessContext();
         DynamicArray<Instruction>* code = codegen.get_process_code(proc->name.c_str());
-        if (code) {
-            ctx->bytecode = code->data();
-            ctx->bytecode_size = code->size();
-        }
+        ctx->bytecode = code;
         ctx->runtime = &runtime;
         ctx->string_pool = codegen.get_string_pool();
         ctx->constants = codegen.get_constants();

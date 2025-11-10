@@ -48,9 +48,16 @@ void Parser::advance() {
 
 bool Parser::is_type_keyword() {
     TokenType type = current_token().type;
-    return type == TokenType::INT || type == TokenType::BOOL || 
-           type == TokenType::FLOAT || type == TokenType::DOUBLE ||
-           type == TokenType::STRING_TYPE;
+    if (type == TokenType::INT || type == TokenType::BOOL || 
+        type == TokenType::FLOAT || type == TokenType::DOUBLE ||
+        type == TokenType::STRING_TYPE) {
+        return true;
+    }
+    if (type == TokenType::IDENTIFIER) {
+        Token next = peek_token(1);
+        return next.type == TokenType::IDENTIFIER || next.type == TokenType::LBRACKET;
+    }
+    return false;
 }
 
 Token Parser::parse_type() {
@@ -89,6 +96,9 @@ Program* Parser::parse() {
         }
         else if (check(TokenType::AT)) {
             program->processes.push(parse_process_decl());
+        }
+        else if (check(TokenType::CLASS)) {
+            program->classes.push(parse_class_decl());
         }
         else if (is_type_keyword()) {
             program->functions.push(parse_function_decl());
@@ -129,6 +139,51 @@ ProcessDecl* Parser::parse_process_decl() {
     BlockStmt* body = parse_block();
     
     return new ProcessDecl(event_name.lexeme, name.lexeme, body);
+}
+
+ClassDecl* Parser::parse_class_decl() {
+    consume(TokenType::CLASS, "Expected 'class'");
+    Token name = consume(TokenType::IDENTIFIER, "Expected class name");
+    consume(TokenType::LBRACE, "Expected '{' after class name");
+    
+    ClassDecl* cls = new ClassDecl(name.lexeme);
+    
+    while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
+        if (is_type_keyword()) {
+            Token type = parse_type();
+            Token member_name = consume(TokenType::IDENTIFIER, "Expected member name");
+            
+            if (check(TokenType::LPAREN)) {
+                advance();
+                FunctionDecl* method = new FunctionDecl(type.lexeme, member_name.lexeme, nullptr);
+                
+                if (!check(TokenType::RPAREN)) {
+                    do {
+                        Token param_type = parse_type();
+                        Token param_name = consume(TokenType::IDENTIFIER, "Expected parameter name");
+                        method->parameters.push(new Parameter(param_type.lexeme, param_name.lexeme));
+                    } while (match(TokenType::COMMA));
+                }
+                
+                consume(TokenType::RPAREN, "Expected ')' after parameters");
+                method->body = parse_block();
+                cls->methods.push(method);
+            } else {
+                ExprNode* initializer = nullptr;
+                if (match(TokenType::ASSIGN)) {
+                    initializer = parse_expression();
+                }
+                consume(TokenType::SEMICOLON, "Expected ';' after field declaration");
+                cls->fields.push(new VarDecl(type.lexeme, member_name.lexeme, initializer));
+            }
+        } else {
+            fprintf(stderr, "Expected type in class body\n");
+            exit(1);
+        }
+    }
+    
+    consume(TokenType::RBRACE, "Expected '}' after class body");
+    return cls;
 }
 
 FunctionDecl* Parser::parse_function_decl() {
@@ -475,6 +530,24 @@ ExprNode* Parser::parse_primary() {
     }
     if (match(TokenType::IDENTIFIER)) {
         return new IdentifierExpr(_tokens[_current - 1].lexeme);
+    }
+    if (match(TokenType::THIS)) {
+        return new ThisExpr();
+    }
+    if (match(TokenType::NEW)) {
+        Token class_name = consume(TokenType::IDENTIFIER, "Expected class name after 'new'");
+        consume(TokenType::LPAREN, "Expected '(' after class name");
+        
+        NewExpr* new_expr = new NewExpr(class_name.lexeme);
+        
+        if (!check(TokenType::RPAREN)) {
+            do {
+                new_expr->arguments.push(parse_expression());
+            } while (match(TokenType::COMMA));
+        }
+        
+        consume(TokenType::RPAREN, "Expected ')' after arguments");
+        return new_expr;
     }
     if (match(TokenType::LPAREN)) {
         ExprNode* expr = parse_expression();

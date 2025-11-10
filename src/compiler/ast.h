@@ -12,6 +12,7 @@ enum class AstNodeType {
     SIGNAL_DECL,
     PROCESS_DECL,
     FUNCTION_DECL,
+    CLASS_DECL,
     VAR_DECL,
     
     BLOCK_STMT,
@@ -28,6 +29,8 @@ enum class AstNodeType {
     MEMBER_EXPR,
     INDEX_EXPR,
     ARRAY_EXPR,
+    NEW_EXPR,
+    THIS_EXPR,
     IDENTIFIER_EXPR,
     INTEGER_LITERAL,
     FLOAT_LITERAL,
@@ -171,6 +174,24 @@ struct ArrayExpr : public ExprNode {
     }
 };
 
+struct NewExpr : public ExprNode {
+    String class_name;
+    DynamicArray<ExprNode*> arguments;
+    
+    NewExpr(const String& name) 
+        : ExprNode(AstNodeType::NEW_EXPR), class_name(name) {}
+    
+    ~NewExpr() {
+        for (size_t i = 0; i < arguments.size(); i++) {
+            delete arguments[i];
+        }
+    }
+};
+
+struct ThisExpr : public ExprNode {
+    ThisExpr() : ExprNode(AstNodeType::THIS_EXPR) {}
+};
+
 struct BlockStmt : public StmtNode {
     DynamicArray<StmtNode*> statements;
     
@@ -303,11 +324,30 @@ struct FunctionDecl : public AstNode {
     }
 };
 
+struct ClassDecl : public AstNode {
+    String name;
+    DynamicArray<VarDecl*> fields;
+    DynamicArray<FunctionDecl*> methods;
+    
+    ClassDecl(const String& n)
+        : AstNode(AstNodeType::CLASS_DECL), name(n) {}
+    
+    ~ClassDecl() {
+        for (size_t i = 0; i < fields.size(); i++) {
+            delete fields[i];
+        }
+        for (size_t i = 0; i < methods.size(); i++) {
+            delete methods[i];
+        }
+    }
+};
+
 struct Program : public AstNode {
     DynamicArray<EventDecl*> events;
     DynamicArray<SignalDecl*> signals;
     DynamicArray<ProcessDecl*> processes;
     DynamicArray<FunctionDecl*> functions;
+    DynamicArray<ClassDecl*> classes;
     
     Program() : AstNode(AstNodeType::PROGRAM) {}
     
@@ -316,6 +356,7 @@ struct Program : public AstNode {
         for (size_t i = 0; i < signals.size(); i++) delete signals[i];
         for (size_t i = 0; i < processes.size(); i++) delete processes[i];
         for (size_t i = 0; i < functions.size(); i++) delete functions[i];
+        for (size_t i = 0; i < classes.size(); i++) delete classes[i];
     }
 };
 

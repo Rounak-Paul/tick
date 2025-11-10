@@ -19,16 +19,19 @@ public:
     DynamicArray<Instruction>* get_process_code(const char* name);
     DynamicArray<Value>* get_constants();
     StringPool* get_string_pool();
+    ClassDecl* get_class(const char* name);
 
 private:
     HashMap<const char*, DynamicArray<Instruction>*> _function_code;
     HashMap<const char*, DynamicArray<Instruction>*> _process_code;
+    HashMap<const char*, ClassDecl*> _classes;
     DynamicArray<Instruction>* _current_code;
     DynamicArray<Value> _constants;
     StringPool _string_pool;
     HashMap<const char*, int> _local_vars;
     int _next_local_index;
     
+    void generate_class(ClassDecl* cls);
     void generate_function(FunctionDecl* func);
     void generate_process(ProcessDecl* proc);
     
@@ -46,6 +49,8 @@ private:
     void generate_call_expr(CallExpr* node);
     void generate_member_expr(MemberExpr* node);
     void generate_identifier(IdentifierExpr* node);
+    void generate_new_expr(NewExpr* node);
+    void generate_this_expr();
     void generate_integer_literal(IntegerLiteral* node);
     void generate_float_literal(FloatLiteral* node);
     void generate_double_literal(DoubleLiteral* node);

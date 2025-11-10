@@ -52,6 +52,9 @@ TokenType Lexer::check_keyword(const char* str, size_t length) {
     if (length == 5 && memcmp(str, "event", 5) == 0) return TokenType::EVENT;
     if (length == 6 && memcmp(str, "signal", 6) == 0) return TokenType::SIGNAL;
     if (length == 7 && memcmp(str, "process", 7) == 0) return TokenType::PROCESS;
+    if (length == 5 && memcmp(str, "class", 5) == 0) return TokenType::CLASS;
+    if (length == 3 && memcmp(str, "new", 3) == 0) return TokenType::NEW;
+    if (length == 4 && memcmp(str, "this", 4) == 0) return TokenType::THIS;
     if (length == 3 && memcmp(str, "int", 3) == 0) return TokenType::INT;
     if (length == 4 && memcmp(str, "bool", 4) == 0) return TokenType::BOOL;
     if (length == 5 && memcmp(str, "float", 5) == 0) return TokenType::FLOAT;

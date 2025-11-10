@@ -1,0 +1,43 @@
+class Point {
+    int x = 20;
+    int y = 0;
+    
+    int get_x() {
+        return this.x;
+    }
+    
+    int get_y() {
+        return this.y;
+    }
+    
+    int distance_from_origin() {
+        int dx = this.x * this.x;
+        int dy = this.y * this.y;
+        return dx + dy;
+    }
+}
+
+class Counter {
+    int value = 0;
+    
+    int increment() {
+        return this.value;
+    }
+    
+    int get_value() {
+        return this.value;
+    }
+}
+
+int main() {
+    Point p = new Point();
+    int x = p.get_x();
+    int y = p.get_y();
+    println(format("Point: ({}, {})", x, y));
+    
+    Counter c = new Counter();
+    int val = c.get_value();
+    println(format("Counter: {}", val));
+    
+    return 0;
+}

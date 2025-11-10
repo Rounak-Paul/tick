@@ -1,0 +1,14 @@
+class Test {
+    int value = 42;
+    
+    int get_value() {
+        return this.value;
+    }
+}
+
+int main() {
+    Test t = new Test();
+    int v = t.get_value();
+    println(format("Value: {}", v));
+    return 0;
+}
