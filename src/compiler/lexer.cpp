@@ -49,6 +49,8 @@ Token Lexer::make_token(TokenType type, const char* start, size_t length) {
 }
 
 TokenType Lexer::check_keyword(const char* str, size_t length) {
+    if (length == 3 && memcmp(str, "var", 3) == 0) return TokenType::VAR;
+    if (length == 4 && memcmp(str, "func", 4) == 0) return TokenType::FUNC;
     if (length == 5 && memcmp(str, "event", 5) == 0) return TokenType::EVENT;
     if (length == 6 && memcmp(str, "signal", 6) == 0) return TokenType::SIGNAL;
     if (length == 7 && memcmp(str, "process", 7) == 0) return TokenType::PROCESS;
@@ -218,6 +220,10 @@ DynamicArray<Token> Lexer::tokenize() {
         else if (c == ';') {
             advance();
             tokens.push(make_token(TokenType::SEMICOLON, ";", 1));
+        }
+        else if (c == ':') {
+            advance();
+            tokens.push(make_token(TokenType::COLON, ":", 1));
         }
         else if (c == '.') {
             advance();

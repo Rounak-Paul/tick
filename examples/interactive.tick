@@ -1,21 +1,21 @@
-int main() {
+func main() : int {
     println("╔═══════════════════════════════════════╗");
     println("║    Tick Interactive Demo              ║");
     println("╚═══════════════════════════════════════╝");
     println("");
     
-    string name = input("Enter your name: ");
-    string age_str = input("Enter your age: ");
-    int age = str_to_int(age_str);
+    var name : string = input("Enter your name: ");
+    var age_str : string = input("Enter your age: ");
+    var age : int = str_to_int(age_str);
     
-    string height_str = input("Enter your height in meters: ");
-    float height = str_to_float(height_str);
+    var height_str : string = input("Enter your height in meters: ");
+    var height : float = str_to_float(height_str);
     
-    string weight_str = input("Enter your weight in kg: ");
-    float weight = str_to_float(weight_str);
+    var weight_str : string = input("Enter your weight in kg: ");
+    var weight : float = str_to_float(weight_str);
     
-    float bmi = weight / (height * height);
-    int birth_year = 2025 - age;
+    var bmi : float = weight / (height * height);
+    var birth_year : int = 2025 - age;
     
     println("");
     println("╔═══════════════════════════════════════╗");

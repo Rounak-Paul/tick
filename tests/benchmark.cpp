@@ -77,21 +77,21 @@ void benchmark_arithmetic() {
     
     // Simple arithmetic without variable reassignment
     const char* source = R"(
-        int compute(int n) {
-            int a = n + 100;
-            int b = a * 2;
-            int c = b - 50;
-            int d = c / 3;
-            int e = d % 7;
+        func compute(n : int) : int {
+            var a : int = n + 100;
+            var b : int = a * 2;
+            var c : int = b - 50;
+            var d : int = c / 3;
+            var e : int = d % 7;
             return e;
         }
         
-        int main() {
-            int r1 = compute(10);
-            int r2 = compute(20);
-            int r3 = compute(30);
-            int r4 = compute(40);
-            int r5 = compute(50);
+        func main() : int {
+            var r1 : int = compute(10);
+            var r2 : int = compute(20);
+            var r3 : int = compute(30);
+            var r4 : int = compute(40);
+            var r5 : int = compute(50);
             return r1 + r2 + r3 + r4 + r5;
         }
     )";
@@ -108,23 +108,23 @@ void benchmark_function_calls() {
     printf("\n=== Function Call Benchmark ===\n");
     
     const char* source = R"(
-        int add(int a, int b) {
+        func add(a : int, b : int) : int {
             return a + b;
         }
         
-        int compute_chain(int n) {
-            int v1 = add(n, 1);
-            int v2 = add(v1, 2);
-            int v3 = add(v2, 3);
-            int v4 = add(v3, 4);
-            int v5 = add(v4, 5);
+        func compute_chain(n : int) : int {
+            var v1 : int = add(n, 1);
+            var v2 : int = add(v1, 2);
+            var v3 : int = add(v2, 3);
+            var v4 : int = add(v3, 4);
+            var v5 : int = add(v4, 5);
             return v5;
         }
         
-        int main() {
-            int r1 = compute_chain(10);
-            int r2 = compute_chain(20);
-            int r3 = compute_chain(30);
+        func main() : int {
+            var r1 : int = compute_chain(10);
+            var r2 : int = compute_chain(20);
+            var r3 : int = compute_chain(30);
             return r1 + r2 + r3;
         }
     )";
@@ -141,13 +141,13 @@ void benchmark_recursive_fibonacci() {
     printf("\n=== Recursive Fibonacci Benchmark ===\n");
     
     const char* source = R"(
-        int fib(int n) {
+        func fib(n : int) : int {
             if (n == 0) return 0;
             if (n == 1) return 1;
             return fib(n - 1) + fib(n - 2);
         }
         
-        int main() {
+        func main() : int {
             return fib(20);
         }
     )";
@@ -172,34 +172,34 @@ void benchmark_parallel_processing() {
         
         @compute
         process w1 {
-            int sum = 100;
+            var sum : int = 100;
             r1.emit(sum);
         }
         
         @compute
         process w2 {
-            int sum = 200;
+            var sum : int = 200;
             r2.emit(sum);
         }
         
         @compute
         process w3 {
-            int sum = 300;
+            var sum : int = 300;
             r3.emit(sum);
         }
         
         @compute
         process w4 {
-            int sum = 400;
+            var sum : int = 400;
             r4.emit(sum);
         }
         
-        int main() {
+        func main() : int {
             compute.execute();
-            int v1 = r1.recv();
-            int v2 = r2.recv();
-            int v3 = r3.recv();
-            int v4 = r4.recv();
+            var v1 : int = r1.recv();
+            var v2 : int = r2.recv();
+            var v3 : int = r3.recv();
+            var v4 : int = r4.recv();
             return v1 + v2 + v3 + v4;
         }
     )";
@@ -216,7 +216,7 @@ void benchmark_string_formatting() {
     printf("\n=== String Formatting Benchmark ===\n");
     
     const char* source = R"(
-        int main() {
+        func main() : int {
             println(format("Value 1: {}", 10));
             println(format("Value 2: {}", 20));
             println(format("Value 3: {}", 30));
@@ -245,37 +245,37 @@ void benchmark_compilation() {
         
         @compute
         process worker1 {
-            int a = 10;
-            int b = 20;
-            int sum = a + b;
+            var a : int = 10;
+            var b : int = 20;
+            var sum : int = a + b;
             result1.emit(sum);
         }
         
         @compute
         process worker2 {
-            int x = 5;
-            int y = 3;
-            int product = x * y;
+            var x : int = 5;
+            var y : int = 3;
+            var product : int = x * y;
             result2.emit(product);
         }
         
         @compute
         process combiner {
-            int val1 = result1.recv();
-            int val2 = result2.recv();
-            int combined = val1 + val2;
+            var val1 : int = result1.recv();
+            var val2 : int = result2.recv();
+            var combined : int = val1 + val2;
             final_result.emit(combined);
         }
         
-        int calculate(int n) {
-            int result = n * 2;
+        func calculate(n : int) : int {
+            var result : int = n * 2;
             return result;
         }
         
-        int main() {
+        func main() : int {
             compute.execute();
-            int final_value = final_result.recv();
-            int doubled = calculate(final_value);
+            var final_value : int = final_result.recv();
+            var doubled : int = calculate(final_value);
             return doubled;
         }
     )";

@@ -12,46 +12,46 @@ signal<int> s5;
 
 @compute1
 process p1 {
-  int x = 100;
+  var x : int = 100;
   s1.emit(x);
 }
 
 @compute2
 process p2 {
-  int val = s1.recv();
-  int y = val + 50;
+  var val : int = s1.recv();
+  var y : int = val + 50;
   s2.emit(y);
 }
 
 @compute3
 process p3 {
-  int val = s2.recv();
-  int z = val * 2;
+  var val : int = s2.recv();
+  var z : int = val * 2;
   s3.emit(z);
 }
 
 @compute4
 process p4 {
-  int val = s3.recv();
-  int w = val - 10;
+  var val : int = s3.recv();
+  var w : int = val - 10;
   s4.emit(w);
 }
 
 @compute5
 process p5 {
-  int val = s4.recv();
-  int result = val + 5;
+  var val : int = s4.recv();
+  var result : int = val + 5;
   s5.emit(result);
 }
 
-int main() {
+func main() : int {
   compute1.execute();
   compute2.execute();
   compute3.execute();
   compute4.execute();
   compute5.execute();
   
-  int final_result = s5.recv();
+  var final_result : int = s5.recv();
   
   return 0;
 }

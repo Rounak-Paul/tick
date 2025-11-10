@@ -1,4 +1,4 @@
-int main() {
+func main() : int {
     println("=== Tick String Features Demo ===");
     println("");
     

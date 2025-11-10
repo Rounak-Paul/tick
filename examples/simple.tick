@@ -1,4 +1,4 @@
-int main() {
-  int x = 42;
+func main() : int {
+  var x : int = 42;
   return x;
 }

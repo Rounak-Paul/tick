@@ -12,6 +12,8 @@ enum class TokenType {
     DOUBLE_LITERAL,
     STRING,
     
+    VAR,
+    FUNC,
     EVENT,
     SIGNAL,
     PROCESS,
@@ -41,6 +43,7 @@ enum class TokenType {
     RBRACKET,
     LANGLE,
     RANGLE,
+    COLON,
     COMMA,
     SEMICOLON,
     DOT,

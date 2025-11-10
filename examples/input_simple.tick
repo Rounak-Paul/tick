@@ -1,9 +1,9 @@
-int main() {
-    string name = input("What is your name? ");
+func main() : int {
+    var name : string = input("What is your name? ");
     println(format("Hello, {}!", name));
     
-    string age_str = input("How old are you? ");
-    int age = str_to_int(age_str);
+    var age_str : string = input("How old are you? ");
+    var age : int = str_to_int(age_str);
     println(format("In 10 years, you will be {} years old.", age + 10));
     
     return 0;

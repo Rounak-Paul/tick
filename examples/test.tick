@@ -1,35 +1,7 @@
-event e1;
-event e2;
-
-signal<int> int_sig1;
-signal<int> int_sig2;
-
-@e1
-process p1 {
-  int x = 10;
-  int y = 20;
-  int z = x + y;
-}
-
-@e1
-process p2 {
-  int a = 5;
-  int b = a * 2;
-}
-
-int some_func(int a) {
-  int x = a + 10;
-  return x;
-}
-
-@e2
-process p3 {
-  int a = 0;
-  int b = some_func(23);
-  int c = b + 100;
-}
-
-int main() {
-  int result = 42;
-  return result;
+func main() : int {
+    var x : int = 10;
+    var y : int = 20;
+    var result : int = x + y;
+    println(result);
+    return 0;
 }

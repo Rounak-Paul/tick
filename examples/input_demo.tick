@@ -1,14 +1,14 @@
-int main() {
+func main() : int {
     print("Enter your name: ");
-    string name = input();
+    var name : string = input();
     
     print("Enter your age: ");
-    string age_str = input();
-    int age = str_to_int(age_str);
+    var age_str : string = input();
+    var age : int = str_to_int(age_str);
     
     print("Enter a decimal number: ");
-    string num_str = input();
-    float num = str_to_float(num_str);
+    var num_str : string = input();
+    var num : float = str_to_float(num_str);
     
     println(format("Hello, {}!", name));
     println(format("You are {} years old.", age));

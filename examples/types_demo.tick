@@ -1,86 +1,33 @@
-int test_all_basic_types() {
-    bool b = true;
-    int i = 42;
-    float f = 3.14f;
-    double d = 2.718;
-    return 1;
-}
-
-int test_arrays() {
-    int[] arr1 = [1, 2, 3];
-    float[] arr2 = [1.1f, 2.2f, 3.3f];
-    double[] arr3 = [1.1, 2.2, 3.3];
-    bool[] arr4 = [true, false, true];
-    
-    int val1 = arr1[1];
-    float val2 = arr2[0];
-    double val3 = arr3[2];
-    bool val4 = arr4[1];
-    
-    return val1;
-}
-
-int test_arithmetic() {
-    float f1 = 10.0f;
-    float f2 = 3.0f;
-    float f3 = f1 + f2;
-    float f4 = f1 - f2;
-    float f5 = f1 * f2;
-    float f6 = f1 / f2;
-    
-    double d1 = 20.0;
-    double d2 = 4.0;
-    double d3 = d1 + d2;
-    double d4 = d1 - d2;
-    double d5 = d1 * d2;
-    double d6 = d1 / d2;
+func test_arithmetic() : int {
+    var f1 : float = 10.0;
+    var f2 : float = 3.0;
+    var f3 : float = f1 + f2;
+    var f4 : float = f1 - f2;
+    var f5 : float = f1 * f2;
+    var f6 : float = f1 / f2;
     
     return 1;
 }
 
-int test_comparisons() {
-    float x = 5.0f;
-    float y = 3.0f;
-    
-    bool b1 = x > y;
-    bool b2 = x < y;
-    bool b3 = x == x;
-    bool b4 = x != y;
-    bool b5 = x >= y;
-    bool b6 = x <= y;
-    
+func with_float_param(x : float) : int {
+    var y : float = x + 1.0;
     return 1;
 }
 
-int with_float_param(float x) {
-    float y = x + 1.0f;
-    return 1;
+func with_int_param(x : int) : int {
+    var y : int = x * 2;
+    return y;
 }
 
-int with_double_param(double x) {
-    double y = x * 2.0;
-    return 1;
-}
-
-int with_array_param(int[] arr) {
-    int val = arr[0];
-    return val;
-}
-
-int main() {
-    int r1 = test_all_basic_types();
-    int r2 = test_arrays();
-    int r3 = test_arithmetic();
-    int r4 = test_comparisons();
+func main() : int {
+    var r3 : int = test_arithmetic();
     
-    float my_float = 5.5f;
-    int r5 = with_float_param(my_float);
+    var my_float : float = 5.5;
+    var r5 : int = with_float_param(my_float);
     
-    double my_double = 10.5;
-    int r6 = with_double_param(my_double);
+    var my_int : int = 42;
+    var r6 : int = with_int_param(my_int);
     
-    int[] my_array = [100, 200, 300];
-    int r7 = with_array_param(my_array);
-    
+    println("Types demo completed");
     return 0;
 }

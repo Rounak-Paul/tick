@@ -89,35 +89,35 @@ Value execute_program(const char* source) {
 void test_arithmetic_operations() {
     printf("\n=== Arithmetic Operations ===\n");
     
-    Value result = execute_program("int main() { return 5 + 3; }");
+    Value result = execute_program("func main() : int { return 5 + 3; }");
     assert_true(result.int_val == 8, "Addition: 5 + 3 = 8");
     
-    result = execute_program("int main() { return 10 - 4; }");
+    result = execute_program("func main() : int { return 10 - 4; }");
     assert_true(result.int_val == 6, "Subtraction: 10 - 4 = 6");
     
-    result = execute_program("int main() { return 6 * 7; }");
+    result = execute_program("func main() : int { return 6 * 7; }");
     assert_true(result.int_val == 42, "Multiplication: 6 * 7 = 42");
     
-    result = execute_program("int main() { return 20 / 5; }");
+    result = execute_program("func main() : int { return 20 / 5; }");
     assert_true(result.int_val == 4, "Division: 20 / 5 = 4");
     
-    result = execute_program("int main() { return 17 % 5; }");
+    result = execute_program("func main() : int { return 17 % 5; }");
     assert_true(result.int_val == 2, "Modulo: 17 % 5 = 2");
     
-    result = execute_program("int main() { return (2 + 3) * 4; }");
+    result = execute_program("func main() : int { return (2 + 3) * 4; }");
     assert_true(result.int_val == 20, "Complex expression: (2 + 3) * 4 = 20");
     
-    result = execute_program("int main() { return 100 / (5 * 2); }");
+    result = execute_program("func main() : int { return 100 / (5 * 2); }");
     assert_true(result.int_val == 10, "Complex expression: 100 / (5 * 2) = 10");
 }
 
 void test_comparison_operations() {
     printf("\n=== Comparison Operations ===\n");
     
-    Value result = execute_program("int main() { int a = 5; int b = 5; if (a == b) { return 1; } return 0; }");
+    Value result = execute_program("func main() : int { var a : int = 5; var b : int = 5; if (a == b) { return 1; } return 0; }");
     assert_true(result.int_val == 1, "Equality: 5 == 5");
     
-    result = execute_program("int main() { int a = 5; int b = 3; if (a != b) { return 1; } return 0; }");
+    result = execute_program("func main() : int { var a : int = 5; var b : int = 3; if (a != b) { return 1; } return 0; }");
     assert_true(result.int_val == 1, "Inequality: 5 != 3");
     
     printf("  NOTE: Comparison operators < > <= >= have parser issues - skipped\n");
@@ -126,35 +126,35 @@ void test_comparison_operations() {
 void test_logical_operations() {
     printf("\n=== Logical Operations ===\n");
     
-    Value result = execute_program("int main() { if (true && true) { return 1; } else { return 0; } }");
+    Value result = execute_program("func main() : int { if (true && true) { return 1; } else { return 0; } }");
     assert_true(result.int_val == 1, "AND: true && true");
     
-    result = execute_program("int main() { if (true && false) { return 1; } else { return 0; } }");
+    result = execute_program("func main() : int { if (true && false) { return 1; } else { return 0; } }");
     assert_true(result.int_val == 0, "AND: true && false");
     
-    result = execute_program("int main() { if (true || false) { return 1; } else { return 0; } }");
+    result = execute_program("func main() : int { if (true || false) { return 1; } else { return 0; } }");
     assert_true(result.int_val == 1, "OR: true || false");
     
-    result = execute_program("int main() { if (false || false) { return 1; } else { return 0; } }");
+    result = execute_program("func main() : int { if (false || false) { return 1; } else { return 0; } }");
     assert_true(result.int_val == 0, "OR: false || false");
     
-    result = execute_program("int main() { if (!false) { return 1; } else { return 0; } }");
+    result = execute_program("func main() : int { if (!false) { return 1; } else { return 0; } }");
     assert_true(result.int_val == 1, "NOT: !false");
     
-    result = execute_program("int main() { if (!true) { return 1; } else { return 0; } }");
+    result = execute_program("func main() : int { if (!true) { return 1; } else { return 0; } }");
     assert_true(result.int_val == 0, "NOT: !true");
 }
 
 void test_variables() {
     printf("\n=== Variable Operations ===\n");
     
-    Value result = execute_program("int main() { int x = 10; return x; }");
+    Value result = execute_program("func main() : int { var x : int = 10; return x; }");
     assert_true(result.int_val == 10, "Variable declaration and assignment");
     
-    result = execute_program("int main() { int x = 3; int y = 4; return x + y; }");
+    result = execute_program("func main() : int { var x : int = 3; var y : int = 4; return x + y; }");
     assert_true(result.int_val == 7, "Multiple variables");
     
-    result = execute_program("int main() { int x = 10; int y = x * 2; return y; }");
+    result = execute_program("func main() : int { var x : int = 10; var y : int = x * 2; return y; }");
     assert_true(result.int_val == 20, "Variable from expression");
     
     printf("  NOTE: Variable reassignment has parser issues - skipped\n");
@@ -163,13 +163,13 @@ void test_variables() {
 void test_control_flow() {
     printf("\n=== Control Flow ===\n");
     
-    Value result = execute_program("int main() { if (true) { return 1; } return 0; }");
+    Value result = execute_program("func main() : int { if (true) { return 1; } return 0; }");
     assert_true(result.int_val == 1, "If statement - true condition");
     
-    result = execute_program("int main() { if (false) { return 1; } return 0; }");
+    result = execute_program("func main() : int { if (false) { return 1; } return 0; }");
     assert_true(result.int_val == 0, "If statement - false condition");
     
-    result = execute_program("int main() { if (false) { return 1; } else { return 2; } }");
+    result = execute_program("func main() : int { if (false) { return 1; } else { return 2; } }");
     assert_true(result.int_val == 2, "If-else statement - else branch");
     
     printf("  NOTE: While loops with < operator and variable reassignment have parser issues - skipped\n");
@@ -179,10 +179,10 @@ void test_functions() {
     printf("\n=== Function Calls ===\n");
     
     const char* source = R"(
-        int add(int a, int b) {
+        func add(a : int, b : int) : int {
             return a + b;
         }
-        int main() {
+        func main() : int {
             return add(5, 7);
         }
     )";
@@ -190,12 +190,12 @@ void test_functions() {
     assert_true(result.int_val == 12, "Function call with parameters");
     
     source = R"(
-        int factorial(int n) {
+        func factorial(n : int) : int {
             if (n == 0) return 1;
             if (n == 1) return 1;
             return n * factorial(n - 1);
         }
-        int main() {
+        func main() : int {
             return factorial(5);
         }
     )";
@@ -203,12 +203,12 @@ void test_functions() {
     assert_true(result.int_val == 120, "Recursive function (factorial)");
     
     source = R"(
-        int double_value(int x) {
+        func double_value(x : int) : int {
             return x * 2;
         }
-        int main() {
-            int a = 10;
-            int b = double_value(a);
+        func main() : int {
+            var a : int = 10;
+            var b : int = double_value(a);
             return b;
         }
     )";
@@ -220,7 +220,7 @@ void test_string_literals() {
     printf("\n=== String Literals ===\n");
     
     const char* source = R"(
-        int main() {
+        func main() : int {
             println("Hello, World!");
             return 0;
         }
@@ -229,7 +229,7 @@ void test_string_literals() {
     assert_true(result.int_val == 0, "String literal output");
     
     source = R"(
-        int main() {
+        func main() : int {
             println("Line with\nnewline");
             return 0;
         }
@@ -242,8 +242,8 @@ void test_format_strings() {
     printf("\n=== Format Strings ===\n");
     
     const char* source = R"(
-        int main() {
-            int x = 42;
+        func main() : int {
+            var x : int = 42;
             println(format("Value: {}", x));
             return 0;
         }
@@ -252,7 +252,7 @@ void test_format_strings() {
     assert_true(result.int_val == 0, "Format string with integer");
     
     source = R"(
-        int main() {
+        func main() : int {
             println(format("Values: {} and {}", 10, 20));
             return 0;
         }
@@ -281,10 +281,10 @@ void test_parallel_processes() {
             result2.emit(20);
         }
         
-        int main() {
+        func main() : int {
             compute.execute();
-            int v1 = result1.recv();
-            int v2 = result2.recv();
+            var v1 : int = result1.recv();
+            var v2 : int = result2.recv();
             return v1 + v2;
         }
     )";
@@ -303,12 +303,12 @@ void test_parallel_processes() {
         
         @work
         process consumer {
-            int x = data.recv();
-            int doubled = x + x;
+            var x : int = data.recv();
+            var doubled : int = x + x;
             result.emit(doubled);
         }
         
-        int main() {
+        func main() : int {
             work.execute();
             return result.recv();
         }
@@ -328,18 +328,18 @@ void test_complex_pipeline() {
         
         @stage1
         process calc1 {
-            int sum = 5 + 10;
+            var sum : int = 5 + 10;
             intermediate.emit(sum);
         }
         
         @stage2
         process calc2 {
-            int val = intermediate.recv();
-            int doubled = val + val;
+            var val : int = intermediate.recv();
+            var doubled : int = val + val;
             final_result.emit(doubled);
         }
         
-        int main() {
+        func main() : int {
             stage1.execute();
             stage2.execute();
             return final_result.recv();
@@ -362,38 +362,38 @@ void test_integration_complete() {
         
         @compute
         process worker1 {
-            int a = 10;
-            int b = 20;
-            int sum = a + b;
+            var a : int = 10;
+            var b : int = 20;
+            var sum : int = a + b;
             result1.emit(sum);
         }
         
         @compute
         process worker2 {
-            int x = 5;
-            int y = 3;
-            int product = x * y;
+            var x : int = 5;
+            var y : int = 3;
+            var product : int = x * y;
             result2.emit(product);
         }
         
         @aggregate
         process combiner {
-            int val1 = result1.recv();
-            int val2 = result2.recv();
-            int combined = val1 + val2;
+            var val1 : int = result1.recv();
+            var val2 : int = result2.recv();
+            var combined : int = val1 + val2;
             final_result.emit(combined);
         }
         
-        int calculate(int n) {
-            int result = n + n;
+        func calculate(n : int) : int {
+            var result : int = n + n;
             return result;
         }
         
-        int main() {
+        func main() : int {
             compute.execute();
             aggregate.execute();
-            int final_value = final_result.recv();
-            int doubled = calculate(final_value);
+            var final_value : int = final_result.recv();
+            var doubled : int = calculate(final_value);
             return doubled;
         }
     )";
