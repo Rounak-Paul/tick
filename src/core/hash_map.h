@@ -116,6 +116,15 @@ public:
     }
     
     size_t size() const { return _size; }
+    
+    template<typename Func>
+    void for_each(Func func) const {
+        for (size_t i = 0; i < _capacity; i++) {
+            if (_buckets[i].occupied) {
+                func(_buckets[i].key, _buckets[i].value);
+            }
+        }
+    }
 };
 
 template<typename V>
@@ -227,7 +236,7 @@ public:
     size_t size() const { return _size; }
     
     template<typename Func>
-    void for_each(Func func) {
+    void for_each(Func func) const {
         for (size_t i = 0; i < _capacity; i++) {
             if (_buckets[i].occupied) {
                 func(_buckets[i].key, _buckets[i].value);
