@@ -6,7 +6,7 @@
 
 namespace Tick {
 
-SignalQueue::SignalQueue() : _read_pos(0) {
+SignalQueue::SignalQueue() : _write_pos(0), _read_pos(0) {
     pthread_mutex_init(&_mutex, nullptr);
     pthread_cond_init(&_cond, nullptr);
 }
@@ -18,7 +18,14 @@ SignalQueue::~SignalQueue() {
 
 void SignalQueue::emit(Value value) {
     pthread_mutex_lock(&_mutex);
-    _queue.push(value);
+    
+    if (_write_pos >= _queue.size()) {
+        _queue.push(value);
+    } else {
+        _queue[_write_pos] = value;
+    }
+    _write_pos++;
+    
     pthread_cond_signal(&_cond);
     pthread_mutex_unlock(&_mutex);
 }
@@ -26,18 +33,25 @@ void SignalQueue::emit(Value value) {
 Value SignalQueue::recv() {
     pthread_mutex_lock(&_mutex);
     
-    while (_read_pos >= _queue.size()) {
+    while (_read_pos >= _write_pos) {
         pthread_cond_wait(&_cond, &_mutex);
     }
     
-    Value value = _queue[_read_pos++];
+    Value value = _queue[_read_pos];
+    _read_pos++;
+    
+    if (_read_pos == _write_pos) {
+        _read_pos = 0;
+        _write_pos = 0;
+    }
+    
     pthread_mutex_unlock(&_mutex);
     return value;
 }
 
 bool SignalQueue::has_value() {
     pthread_mutex_lock(&_mutex);
-    bool has = _read_pos < _queue.size();
+    bool has = _read_pos < _write_pos;
     pthread_mutex_unlock(&_mutex);
     return has;
 }

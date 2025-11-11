@@ -57,6 +57,8 @@ TokenType Lexer::check_keyword(const char* str, size_t length) {
     if (length == 5 && memcmp(str, "class", 5) == 0) return TokenType::CLASS;
     if (length == 3 && memcmp(str, "new", 3) == 0) return TokenType::NEW;
     if (length == 4 && memcmp(str, "this", 4) == 0) return TokenType::THIS;
+    if (length == 6 && memcmp(str, "import", 6) == 0) return TokenType::IMPORT;
+    if (length == 4 && memcmp(str, "from", 4) == 0) return TokenType::FROM;
     if (length == 3 && memcmp(str, "int", 3) == 0) return TokenType::INT;
     if (length == 4 && memcmp(str, "bool", 4) == 0) return TokenType::BOOL;
     if (length == 5 && memcmp(str, "float", 5) == 0) return TokenType::FLOAT;
@@ -201,7 +203,7 @@ DynamicArray<Token> Lexer::tokenize() {
                 advance();
                 tokens.push(make_token(TokenType::LTE, "<=", 2));
             } else {
-                tokens.push(make_token(TokenType::LANGLE, "<", 1));
+                tokens.push(make_token(TokenType::LT, "<", 1));
             }
         }
         else if (c == '>') {
@@ -210,7 +212,7 @@ DynamicArray<Token> Lexer::tokenize() {
                 advance();
                 tokens.push(make_token(TokenType::GTE, ">=", 2));
             } else {
-                tokens.push(make_token(TokenType::RANGLE, ">", 1));
+                tokens.push(make_token(TokenType::GT, ">", 1));
             }
         }
         else if (c == ',') {

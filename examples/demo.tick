@@ -1,0 +1,386 @@
+from math_lib import *;
+from signals_lib import *;
+
+signal<int> local_signal;
+event local_event;
+
+class Counter {
+    var count: int;
+    
+    func increment(): int {
+        count = count + 1;
+        return count;
+    }
+    
+    func decrement(): int {
+        count = count - 1;
+        return count;
+    }
+    
+    func get(): int {
+        return count;
+    }
+    
+    func reset(): int {
+        count = 0;
+        return count;
+    }
+}
+
+class Calculator {
+    var last_result: int;
+    
+    func calc_add(a: int, b: int): int {
+        last_result = a + b;
+        return last_result;
+    }
+    
+    func calc_subtract(a: int, b: int): int {
+        last_result = a - b;
+        return last_result;
+    }
+    
+    func calc_multiply(a: int, b: int): int {
+        last_result = a * b;
+        return last_result;
+    }
+    
+    func get_result(): int {
+        return last_result;
+    }
+}
+
+@local_event process local_worker {
+    var result: int = fibonacci(8);
+    local_signal.emit(result);
+}
+
+func demo_variables(): int {
+    print("=== Variables & Assignments ===\n");
+    var x: int = 10;
+    print("x = ");
+    print(x);
+    print("\n");
+    
+    x = 25;
+    print("x = ");
+    print(x);
+    print("\n");
+    
+    var y: int = x + 15;
+    print("y = x + 15 = ");
+    print(y);
+    print("\n\n");
+    
+    return 0;
+}
+
+func demo_control_flow(): int {
+    print("=== Control Flow ===\n");
+    
+    var value: int = 15;
+    if (value > 10) {
+        print("value > 10: true\n");
+    } else {
+        print("value > 10: false\n");
+    }
+    
+    if (value < 10) {
+        print("value < 10: true\n");
+    } else {
+        print("value < 10: false\n");
+    }
+    
+    print("While loop countdown:\n");
+    var count: int = 5;
+    while (count > 0) {
+        print("  ");
+        print(count);
+        print("\n");
+        count = count - 1;
+    }
+    print("\n");
+    
+    return 0;
+}
+
+func demo_comparison_operators(): int {
+    print("=== Comparison Operators ===\n");
+    var a: int = 10;
+    var b: int = 20;
+    var c: int = 10;
+    
+    print("a = 10, b = 20, c = 10\n");
+    
+    if (a < b) {
+        print("a < b: true\n");
+    }
+    
+    if (a > b) {
+        print("a > b: true\n");
+    } else {
+        print("a > b: false\n");
+    }
+    
+    if (a == c) {
+        print("a == c: true\n");
+    }
+    
+    if (a != b) {
+        print("a != b: true\n");
+    }
+    
+    if (a <= c) {
+        print("a <= c: true\n");
+    }
+    
+    if (b >= 20) {
+        print("b >= 20: true\n");
+    }
+    print("\n");
+    
+    return 0;
+}
+
+func demo_imported_functions(): int {
+    print("=== Imported Functions (from math_lib.tick) ===\n");
+    
+    print("add(7, 3) = ");
+    print(add(7, 3));
+    print("\n");
+    
+    print("multiply(6, 4) = ");
+    print(multiply(6, 4));
+    print("\n");
+    
+    print("factorial(6) = ");
+    print(factorial(6));
+    print("\n");
+    
+    print("fibonacci(12) = ");
+    print(fibonacci(12));
+    print("\n");
+    
+    print("power(2, 10) = ");
+    print(power(2, 10));
+    print("\n\n");
+    
+    return 0;
+}
+
+func demo_classes(): int {
+    print("=== Classes ===\n");
+    
+    print("Counter class:\n");
+    var counter: Counter = new Counter();
+    counter.count = 0;
+    
+    print("  Initial: ");
+    print(counter.get());
+    print("\n");
+    
+    counter.increment();
+    print("  After increment: ");
+    print(counter.get());
+    print("\n");
+    
+    counter.increment();
+    counter.increment();
+    print("  After 2 more increments: ");
+    print(counter.get());
+    print("\n");
+    
+    counter.decrement();
+    print("  After decrement: ");
+    print(counter.get());
+    print("\n");
+    
+    counter.reset();
+    print("  After reset: ");
+    print(counter.get());
+    print("\n\n");
+    
+    print("Calculator class:\n");
+    var calc: Calculator = new Calculator();
+    calc.last_result = 0;
+    
+    print("  calc_add(10, 5) = ");
+    print(calc.calc_add(10, 5));
+    print("\n");
+    
+    print("  calc_multiply(3, 7) = ");
+    print(calc.calc_multiply(3, 7));
+    print("\n");
+    
+    print("  calc_subtract(20, 8) = ");
+    print(calc.calc_subtract(20, 8));
+    print("\n");
+    
+    print("  get_result() = ");
+    print(calc.get_result());
+    print("\n\n");
+    
+    return 0;
+}
+
+func demo_nested_loops(): int {
+    print("=== Nested Loops ===\n");
+    print("3x3 multiplication table:\n");
+    
+    var row: int = 1;
+    while (row <= 3) {
+        var col: int = 1;
+        while (col <= 3) {
+            var product: int = row * col;
+            if (product < 10) {
+                print("  ");
+            } else {
+                print(" ");
+            }
+            print(product);
+            col = col + 1;
+        }
+        print("\n");
+        row = row + 1;
+    }
+    print("\n");
+    
+    return 0;
+}
+
+func demo_signals(): int {
+    print("=== Signals ===\n");
+    
+    print("Local signal test:\n");
+    local_signal.emit(42);
+    var received: int = local_signal.recv();
+    print("  Sent 42, received: ");
+    print(received);
+    print("\n");
+    
+    local_signal.emit(99);
+    var received2: int = local_signal.recv();
+    print("  Sent 99, received: ");
+    print(received2);
+    print("\n");
+    
+    local_signal.emit(123);
+    var received3: int = local_signal.recv();
+    print("  Sent 123, received: ");
+    print(received3);
+    print("\n\n");
+    
+    return 0;
+}
+
+func demo_local_parallel(): int {
+    print("=== Local Parallel Execution ===\n");
+    print("Starting local worker (fibonacci 8)...\n");
+    
+    local_event.execute();
+    
+    var result: int = local_signal.recv();
+    print("Result: ");
+    print(result);
+    print("\n\n");
+    
+    return 0;
+}
+
+func demo_imported_parallel(): int {
+    print("=== Imported Parallel Execution (from signals_lib.tick) ===\n");
+    print("Starting imported workers (sum and product)...\n");
+    
+    shared_event.execute();
+    
+    var result1: int = shared_signal.recv();
+    var result2: int = shared_signal.recv();
+    
+    print("Result 1 (sum 1..10): ");
+    print(result1);
+    print("\n");
+    
+    print("Result 2 (product 1..5): ");
+    print(result2);
+    print("\n\n");
+    
+    return 0;
+}
+
+func demo_recursion(): int {
+    print("=== Recursion ===\n");
+    
+    print("Factorial sequence:\n");
+    var i: int = 1;
+    while (i <= 7) {
+        print("  factorial(");
+        print(i);
+        print(") = ");
+        print(factorial(i));
+        print("\n");
+        i = i + 1;
+    }
+    
+    print("\nFibonacci sequence:\n");
+    var j: int = 0;
+    while (j <= 10) {
+        print("  fibonacci(");
+        print(j);
+        print(") = ");
+        print(fibonacci(j));
+        print("\n");
+        j = j + 1;
+    }
+    print("\n");
+    
+    return 0;
+}
+
+func demo_arithmetic(): int {
+    print("=== Arithmetic Operations ===\n");
+    var a: int = 20;
+    var b: int = 7;
+    
+    print("a = 20, b = 7\n");
+    print("a + b = ");
+    print(a + b);
+    print("\n");
+    
+    print("a - b = ");
+    print(a - b);
+    print("\n");
+    
+    print("a * b = ");
+    print(a * b);
+    print("\n");
+    
+    print("a / b = ");
+    print(a / b);
+    print("\n\n");
+    
+    return 0;
+}
+
+func main(): int {
+    print("================================================================================\n");
+    print("                    TICK LANGUAGE COMPLETE DEMO\n");
+    print("================================================================================\n");
+    print("\n");
+    
+    demo_variables();
+    demo_arithmetic();
+    demo_control_flow();
+    demo_comparison_operators();
+    demo_imported_functions();
+    demo_classes();
+    demo_nested_loops();
+    demo_recursion();
+    demo_signals();
+    demo_local_parallel();
+    
+    print("================================================================================\n");
+    print("                         ALL FEATURES TESTED\n");
+    print("================================================================================\n");
+    
+    return 0;
+}

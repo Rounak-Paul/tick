@@ -20,6 +20,8 @@ enum class TokenType {
     CLASS,
     NEW,
     THIS,
+    IMPORT,
+    FROM,
     INT,
     BOOL,
     FLOAT,

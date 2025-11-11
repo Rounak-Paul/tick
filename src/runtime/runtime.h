@@ -70,6 +70,7 @@ private:
     DynamicArray<Value> _queue;
     pthread_mutex_t _mutex;
     pthread_cond_t _cond;
+    size_t _write_pos;
     size_t _read_pos;
 };
 

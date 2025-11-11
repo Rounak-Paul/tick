@@ -4,9 +4,11 @@
 #include "../src/runtime/builtins.h"
 #include "../src/compiler/lexer.h"
 #include "../src/compiler/parser.h"
+#include "../src/runtime/string_pool.h"
 #include <cstdio>
 #include <sys/time.h>
 #include <unistd.h>
+#include <cstdlib>
 
 using namespace Tick;
 
@@ -16,311 +18,367 @@ double get_time() {
     return tv.tv_sec + tv.tv_usec / 1000000.0;
 }
 
-Value execute_program(const char* source) {
+double run_python(const char* script) {
+    char cmd[1024];
+    snprintf(cmd, sizeof(cmd), "python3 -c '%s' 2>/dev/null", script);
+    
+    double start = get_time();
+    int result = system(cmd);
+    double end = get_time();
+    
+    if (result != 0) return -1.0;
+    return end - start;
+}
+
+Value execute_tick(const char* source) {
+    static DynamicArray<HashMap<String, DynamicArray<Instruction>*>*> all_function_codes;
+    
     Lexer lexer(source);
     DynamicArray<Token> tokens = lexer.tokenize();
     Parser parser(tokens);
     Program* program = parser.parse();
+    if (!program) return Value(0);
     
     Runtime runtime;
     Builtins::register_all(&runtime);
-    
-    for (size_t i = 0; i < program->events.size(); i++) {
-        runtime.register_event(program->events[i]->name.c_str());
-    }
-    
-    for (size_t i = 0; i < program->signals.size(); i++) {
-        runtime.register_signal(program->signals[i]->name.c_str());
-    }
-    
     CodeGenerator codegen;
     codegen.generate(program);
     
-    runtime.set_string_pool(codegen.get_string_pool());
-    runtime.set_constants(codegen.get_constants());
+    StringPool* sp = codegen.get_string_pool();
+    DynamicArray<Value>* constants = codegen.get_constants();
+    
+    for (size_t i = 0; i < program->events.size(); i++) {
+        int idx = sp->add(program->events[i]->name);
+        runtime.register_event(sp->get(idx));
+    }
+    
+    for (size_t i = 0; i < program->signals.size(); i++) {
+        int idx = sp->add(program->signals[i]->name);
+        runtime.register_signal(sp->get(idx));
+    }
+    
+    runtime.set_string_pool(sp);
+    runtime.set_constants(constants);
+    
+    HashMap<String, DynamicArray<Instruction>*>* function_codes = new HashMap<String, DynamicArray<Instruction>*>();
+    all_function_codes.push(function_codes);
     
     for (size_t i = 0; i < program->functions.size(); i++) {
-        FunctionDecl* func = program->functions[i];
-        if (strcmp(func->name.c_str(), "main") != 0) {
-            DynamicArray<Instruction>* code = codegen.get_function_code(func->name.c_str());
+        if (strcmp(program->functions[i]->name.c_str(), "main") != 0) {
+            DynamicArray<Instruction>* code = codegen.get_function_code(program->functions[i]->name.c_str());
             if (code) {
-                runtime.register_user_function(func->name.c_str(), code);
+                function_codes->insert(String(program->functions[i]->name.c_str()), code);
             }
         }
     }
     
+    function_codes->for_each([&](const String& name, DynamicArray<Instruction>* code) {
+        runtime.register_user_function(name.c_str(), code);
+    });
+    
     for (size_t i = 0; i < program->processes.size(); i++) {
         ProcessDecl* proc = program->processes[i];
-        ProcessContext* ctx = new ProcessContext();
         DynamicArray<Instruction>* code = codegen.get_process_code(proc->name.c_str());
-        ctx->bytecode = code;
-        ctx->runtime = &runtime;
-        ctx->string_pool = codegen.get_string_pool();
-        ctx->constants = codegen.get_constants();
-        runtime.register_process(proc->event_name.c_str(), ctx);
+        if (code) {
+            ProcessContext* ctx = new ProcessContext();
+            ctx->bytecode = code;
+            ctx->runtime = &runtime;
+            ctx->string_pool = sp;
+            ctx->constants = constants;
+            runtime.register_process(proc->event_name.c_str(), ctx);
+        }
     }
     
-    Interpreter interpreter(&runtime, codegen.get_string_pool());
+    Interpreter interpreter(&runtime, sp);
     DynamicArray<Instruction>* main_code = codegen.get_function_code("main");
     Value result = Value(0);
-    
-    if (main_code) {
-        result = interpreter.execute(main_code, codegen.get_constants());
-    }
-    
+    if (main_code) result = interpreter.execute(main_code, constants);
     delete program;
     return result;
 }
 
-void benchmark_arithmetic() {
-    printf("\n=== Arithmetic Benchmark ===\n");
-    
-    // Simple arithmetic without variable reassignment
-    const char* source = R"(
-        func compute(n : int) : int {
-            var a : int = n + 100;
-            var b : int = a * 2;
-            var c : int = b - 50;
-            var d : int = c / 3;
-            var e : int = d % 7;
-            return e;
-        }
-        
-        func main() : int {
-            var r1 : int = compute(10);
-            var r2 : int = compute(20);
-            var r3 : int = compute(30);
-            var r4 : int = compute(40);
-            var r5 : int = compute(50);
-            return r1 + r2 + r3 + r4 + r5;
-        }
-    )";
-    
-    double start = get_time();
-    Value result = execute_program(source);
-    double end = get_time();
-    
-    printf("  Multiple arithmetic operations: %.6f seconds\n", end - start);
-    printf("  Result: %d\n", result.int_val);
+int c_fib(int n) {
+    if (n <= 1) return n;
+    return c_fib(n - 1) + c_fib(n - 2);
 }
 
-void benchmark_function_calls() {
-    printf("\n=== Function Call Benchmark ===\n");
-    
-    const char* source = R"(
-        func add(a : int, b : int) : int {
-            return a + b;
-        }
-        
-        func compute_chain(n : int) : int {
-            var v1 : int = add(n, 1);
-            var v2 : int = add(v1, 2);
-            var v3 : int = add(v2, 3);
-            var v4 : int = add(v3, 4);
-            var v5 : int = add(v4, 5);
-            return v5;
-        }
-        
-        func main() : int {
-            var r1 : int = compute_chain(10);
-            var r2 : int = compute_chain(20);
-            var r3 : int = compute_chain(30);
-            return r1 + r2 + r3;
-        }
-    )";
-    
-    double start = get_time();
-    Value result = execute_program(source);
-    double end = get_time();
-    
-    printf("  Function call chain: %.6f seconds\n", end - start);
-    printf("  Result: %d\n", result.int_val);
+int c_factorial(int n) {
+    if (n <= 1) return 1;
+    return n * c_factorial(n - 1);
 }
 
-void benchmark_recursive_fibonacci() {
-    printf("\n=== Recursive Fibonacci Benchmark ===\n");
-    
-    const char* source = R"(
-        func fib(n : int) : int {
-            if (n == 0) return 0;
-            if (n == 1) return 1;
-            return fib(n - 1) + fib(n - 2);
-        }
-        
-        func main() : int {
-            return fib(20);
-        }
-    )";
-    
-    double start = get_time();
-    Value result = execute_program(source);
-    double end = get_time();
-    
-    printf("  fib(20): %.6f seconds\n", end - start);
-    printf("  Result: %d\n", result.int_val);
+int c_sum_range(int start, int end) {
+    int sum = 0;
+    for (int i = start; i <= end; i++) sum += i;
+    return sum;
 }
 
-void benchmark_parallel_processing() {
-    printf("\n=== Parallel Processing Benchmark ===\n");
+void bench_fib() {
+    printf("\n=== Fibonacci(35) - Heavy Recursion ===\n");
+    const char* src = "func fib(n: int): int { if (n <= 1) { return n; } return fib(n - 1) + fib(n - 2); } func main(): int { return fib(35); }";
     
-    const char* source = R"(
-        event compute;
-        signal<int> r1;
-        signal<int> r2;
-        signal<int> r3;
-        signal<int> r4;
-        
-        @compute
-        process w1 {
-            var sum : int = 100;
-            r1.emit(sum);
-        }
-        
-        @compute
-        process w2 {
-            var sum : int = 200;
-            r2.emit(sum);
-        }
-        
-        @compute
-        process w3 {
-            var sum : int = 300;
-            r3.emit(sum);
-        }
-        
-        @compute
-        process w4 {
-            var sum : int = 400;
-            r4.emit(sum);
-        }
-        
-        func main() : int {
-            compute.execute();
-            var v1 : int = r1.recv();
-            var v2 : int = r2.recv();
-            var v3 : int = r3.recv();
-            var v4 : int = r4.recv();
-            return v1 + v2 + v3 + v4;
-        }
-    )";
+    double ts = get_time();
+    Value tr = execute_tick(src);
+    double te = get_time();
     
-    double start = get_time();
-    Value result = execute_program(source);
-    double end = get_time();
+    double cs = get_time();
+    int cr = c_fib(35);
+    double ce = get_time();
     
-    printf("  4 parallel workers: %.6f seconds\n", end - start);
-    printf("  Result: %d\n", result.int_val);
+    printf("  C:      %.6f s (result: %d)\n", ce - cs, cr);
+    printf("  Tick:   %.6f s (result: %d)\n", te - ts, tr.int_val);
+    
+    const char* py_script = "def fib(n):\\n    if n <= 1: return n\\n    return fib(n-1) + fib(n-2)\\nfib(35)";
+    double py_time = run_python(py_script);
+    if (py_time > 0) {
+        printf("  Python: %.6f s\n", py_time);
+        printf("  Tick vs C: %.2fx slower\n", (te - ts) / (ce - cs));
+        printf("  Tick vs Python: %.2fx faster\n", py_time / (te - ts));
+    } else {
+        printf("  Overhead: %.2fx\n", (te - ts) / (ce - cs));
+    }
 }
 
-void benchmark_string_formatting() {
-    printf("\n=== String Formatting Benchmark ===\n");
+void bench_factorial() {
+    printf("\n=== Factorial(25) - Deep Recursion ===\n");
+    const char* src = "func factorial(n: int): int { if (n <= 1) { return 1; } return n * factorial(n - 1); } func main(): int { return factorial(25); }";
     
-    const char* source = R"(
-        func main() : int {
-            println(format("Value 1: {}", 10));
-            println(format("Value 2: {}", 20));
-            println(format("Value 3: {}", 30));
-            println(format("Value 4: {}", 40));
-            println(format("Value 5: {}", 50));
-            return 5;
+    double ts = get_time();
+    Value tr = execute_tick(src);
+    double te = get_time();
+    
+    double cs = get_time();
+    int cr = c_factorial(25);
+    double ce = get_time();
+    
+    printf("  C:      %.6f s (result: %d)\n", ce - cs, cr);
+    printf("  Tick:   %.6f s (result: %d)\n", te - ts, tr.int_val);
+    
+    const char* py_script = "def factorial(n):\\n    if n <= 1: return 1\\n    return n * factorial(n-1)\\nfactorial(25)";
+    double py_time = run_python(py_script);
+    if (py_time > 0) {
+        printf("  Python: %.6f s\n", py_time);
+        if (ce - cs > 0) {
+            printf("  Tick vs C: %.2fx slower\n", (te - ts) / (ce - cs));
         }
-    )";
-    
-    double start = get_time();
-    Value result = execute_program(source);
-    double end = get_time();
-    
-    printf("  5 format operations: %.6f seconds\n", end - start);
-    printf("  Result: %d\n", result.int_val);
+        printf("  Tick vs Python: %.2fx faster\n", py_time / (te - ts));
+    } else if (ce - cs > 0) {
+        printf("  Overhead: %.2fx\n", (te - ts) / (ce - cs));
+    } else {
+        printf("  Overhead: N/A (C too fast)\n");
+    }
 }
 
-void benchmark_compilation() {
-    printf("\n=== Compilation Benchmark ===\n");
+void bench_sum() {
+    printf("\n=== Sum 1 to 5000000 - Heavy Loop ===\n");
+    const char* src = "func sum_range(start: int, end: int): int { var sum: int = 0; var i: int = start; while (i <= end) { sum = sum + i; i = i + 1; } return sum; } func main(): int { return sum_range(1, 5000000); }";
     
-    const char* source = R"(
+    double ts = get_time();
+    Value tr = execute_tick(src);
+    double te = get_time();
+    
+    double cs = get_time();
+    int cr = c_sum_range(1, 5000000);
+    double ce = get_time();
+    
+    printf("  C:      %.6f s (result: %d)\n", ce - cs, cr);
+    printf("  Tick:   %.6f s (result: %d)\n", te - ts, tr.int_val);
+    
+    const char* py_script = "sum(range(1, 5000001))";
+    double py_time = run_python(py_script);
+    if (py_time > 0) {
+        printf("  Python: %.6f s\n", py_time);
+        if (ce - cs > 0) {
+            printf("  Tick vs C: %.2fx slower\n", (te - ts) / (ce - cs));
+        }
+        printf("  Tick vs Python: %.2fx faster\n", py_time / (te - ts));
+    } else if (ce - cs > 0) {
+        printf("  Overhead: %.2fx\n", (te - ts) / (ce - cs));
+    } else {
+        printf("  Overhead: N/A (C too fast)\n");
+    }
+}
+
+void bench_nested() {
+    printf("\n=== Nested Loops (3000x3000) - Heavy Iteration ===\n");
+    const char* src = "func nested(): int { var sum: int = 0; var i: int = 0; while (i < 3000) { var j: int = 0; while (j < 3000) { sum = sum + 1; j = j + 1; } i = i + 1; } return sum; } func main(): int { return nested(); }";
+    
+    double ts = get_time();
+    Value tr = execute_tick(src);
+    double te = get_time();
+    
+    double cs = get_time();
+    int cr = 0;
+    for (int i = 0; i < 3000; i++) {
+        for (int j = 0; j < 3000; j++) cr++;
+    }
+    double ce = get_time();
+    
+    printf("  C:      %.6f s (result: %d)\n", ce - cs, cr);
+    printf("  Tick:   %.6f s (result: %d)\n", te - ts, tr.int_val);
+    
+    const char* py_script = "sum = 0\\nfor i in range(3000):\\n    for j in range(3000):\\n        sum += 1";
+    double py_time = run_python(py_script);
+    if (py_time > 0) {
+        printf("  Python: %.6f s\n", py_time);
+        if (ce - cs > 0) {
+            printf("  Tick vs C: %.2fx slower\n", (te - ts) / (ce - cs));
+        }
+        printf("  Tick vs Python: %.2fx faster\n", py_time / (te - ts));
+    } else if (ce - cs > 0) {
+        printf("  Overhead: %.2fx\n", (te - ts) / (ce - cs));
+    } else {
+        printf("  Overhead: N/A (C too fast)\n");
+    }
+}
+
+void bench_parallel_workers() {
+    printf("\n=== Parallel Workers - Signal Communication ===\n");
+    const char* src = R"(
         event compute;
         signal<int> result1;
         signal<int> result2;
-        signal<int> final_result;
+        signal<int> result3;
+        signal<int> result4;
         
-        @compute
-        process worker1 {
-            var a : int = 10;
-            var b : int = 20;
-            var sum : int = a + b;
+        @compute process worker1 {
+            var sum: int = 0;
+            var i: int = 0;
+            while (i < 25000) {
+                sum = sum + i;
+                i = i + 1;
+            }
             result1.emit(sum);
         }
         
-        @compute
-        process worker2 {
-            var x : int = 5;
-            var y : int = 3;
-            var product : int = x * y;
-            result2.emit(product);
+        @compute process worker2 {
+            var sum: int = 0;
+            var i: int = 25000;
+            while (i < 50000) {
+                sum = sum + i;
+                i = i + 1;
+            }
+            result2.emit(sum);
         }
         
-        @compute
-        process combiner {
-            var val1 : int = result1.recv();
-            var val2 : int = result2.recv();
-            var combined : int = val1 + val2;
-            final_result.emit(combined);
+        @compute process worker3 {
+            var sum: int = 0;
+            var i: int = 50000;
+            while (i < 75000) {
+                sum = sum + i;
+                i = i + 1;
+            }
+            result3.emit(sum);
         }
         
-        func calculate(n : int) : int {
-            var result : int = n * 2;
-            return result;
+        @compute process worker4 {
+            var sum: int = 0;
+            var i: int = 75000;
+            while (i < 100000) {
+                sum = sum + i;
+                i = i + 1;
+            }
+            result4.emit(sum);
         }
         
-        func main() : int {
+        func main(): int {
             compute.execute();
-            var final_value : int = final_result.recv();
-            var doubled : int = calculate(final_value);
-            return doubled;
+            var r1: int = result1.recv();
+            var r2: int = result2.recv();
+            var r3: int = result3.recv();
+            var r4: int = result4.recv();
+            return r1 + r2 + r3 + r4;
         }
     )";
     
-    double start = get_time();
+    double ts = get_time();
+    Value tr = execute_tick(src);
+    double te = get_time();
     
-    Lexer lexer(source);
-    double lex_end = get_time();
-    printf("  Lexing: %.6f seconds\n", lex_end - start);
+    double cs = get_time();
+    int cr = 0;
+    for (int i = 0; i < 100000; i++) cr += i;
+    double ce = get_time();
     
-    DynamicArray<Token> tokens = lexer.tokenize();
-    Parser parser(tokens);
-    double parse_end = get_time();
-    printf("  Parsing: %.6f seconds\n", parse_end - lex_end);
+    printf("  C Sequential:    %.6f s (result: %d)\n", ce - cs, cr);
+    printf("  Tick Parallel:   %.6f s (result: %d)\n", te - ts, tr.int_val);
     
-    Program* program = parser.parse();
-    CodeGenerator codegen;
-    double codegen_start = get_time();
-    codegen.generate(program);
-    double codegen_end = get_time();
-    printf("  Code generation: %.6f seconds\n", codegen_end - codegen_start);
+    const char* py_script = "sum(range(100000))";
+    double py_time = run_python(py_script);
+    if (py_time > 0) {
+        printf("  Python Sequential: %.6f s\n", py_time);
+        printf("  Tick Parallel vs Python: %.2fx faster\n", py_time / (te - ts));
+    }
+}
+
+void bench_parallel_pipeline() {
+    printf("\n=== Parallel Pipeline - Event Chaining ===\n");
+    const char* src = R"(
+        event stage1;
+        event stage2;
+        event stage3;
+        signal<int> s1;
+        signal<int> s2;
+        signal<int> s3;
+        
+        @stage1 process gen {
+            var i: int = 0;
+            while (i < 5000) {
+                s1.emit(i);
+                i = i + 1;
+            }
+        }
+        
+        @stage2 process process_data {
+            var sum: int = 0;
+            var i: int = 0;
+            while (i < 5000) {
+                var val: int = s1.recv();
+                sum = sum + val;
+                i = i + 1;
+            }
+            s2.emit(sum);
+        }
+        
+        @stage3 process aggregate {
+            var result: int = s2.recv();
+            s3.emit(result);
+        }
+        
+        func main(): int {
+            stage1.execute();
+            stage2.execute();
+            stage3.execute();
+            return s3.recv();
+        }
+    )";
     
-    printf("  Total compilation: %.6f seconds\n", codegen_end - start);
+    double ts = get_time();
+    Value tr = execute_tick(src);
+    double te = get_time();
     
-    delete program;
+    printf("  Tick Pipeline: %.6f s (result: %d)\n", te - ts, tr.int_val);
+    printf("  [Native parallel event-driven architecture]\n");
 }
 
 int main() {
     printf("╔════════════════════════════════════════════════════════════════╗\n");
-    printf("║            Tick Language - Performance Benchmarks              ║\n");
+    printf("║         Tick vs C Performance Benchmark                        ║\n");
     printf("╚════════════════════════════════════════════════════════════════╝\n");
+    printf("\nSystem: %d CPU cores\n", (int)sysconf(_SC_NPROCESSORS_ONLN));
     
-    int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
-    printf("\nSystem: %d CPU cores\n", num_cores);
+    printf("\n--- Sequential Performance Tests ---\n");
+    bench_fib();
+    bench_factorial();
+    bench_sum();
+    bench_nested();
     
-    benchmark_compilation();
-    benchmark_arithmetic();
-    benchmark_function_calls();
-    benchmark_recursive_fibonacci();
-    benchmark_parallel_processing();
-    benchmark_string_formatting();
+    printf("\n--- Parallel Processing Tests ---\n");
+    bench_parallel_workers();
+    bench_parallel_pipeline();
     
     printf("\n╔════════════════════════════════════════════════════════════════╗\n");
     printf("║                      Benchmark Complete                        ║\n");
     printf("╚════════════════════════════════════════════════════════════════╝\n");
-    
     return 0;
 }

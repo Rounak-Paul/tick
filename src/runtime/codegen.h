@@ -30,6 +30,7 @@ private:
     StringPool _string_pool;
     HashMap<const char*, int> _local_vars;
     int _next_local_index;
+    ClassDecl* _current_class;
     
     void generate_class(ClassDecl* cls);
     void generate_function(FunctionDecl* func);
@@ -46,6 +47,7 @@ private:
     void generate_expression(ExprNode* expr);
     void generate_binary_expr(BinaryExpr* node);
     void generate_unary_expr(UnaryExpr* node);
+    void generate_assign_expr(AssignExpr* node);
     void generate_call_expr(CallExpr* node);
     void generate_member_expr(MemberExpr* node);
     void generate_identifier(IdentifierExpr* node);

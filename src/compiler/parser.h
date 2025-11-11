@@ -23,6 +23,7 @@ private:
     Token consume(TokenType type, const char* message);
     void advance();
     
+    ImportDecl* parse_import_decl();
     EventDecl* parse_event_decl();
     SignalDecl* parse_signal_decl();
     ProcessDecl* parse_process_decl();
@@ -39,6 +40,7 @@ private:
     BlockStmt* parse_block();
     
     ExprNode* parse_expression();
+    ExprNode* parse_assignment();
     ExprNode* parse_logical_or();
     ExprNode* parse_logical_and();
     ExprNode* parse_equality();

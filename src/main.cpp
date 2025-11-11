@@ -1,6 +1,7 @@
 #include "compiler/lexer.h"
 #include "compiler/parser.h"
 #include "compiler/semantic_analyzer.h"
+#include "compiler/module_loader.h"
 #include "runtime/runtime.h"
 #include "runtime/codegen.h"
 #include "runtime/interpreter.h"
@@ -56,6 +57,7 @@ int main(int argc, char** argv) {
                                                  cached_strings, constants);
     
     Program* program = nullptr;
+    ModuleLoader module_loader;
     
     if (!used_cache) {
         char* source = read_file(argv[1]);
@@ -76,6 +78,8 @@ int main(int argc, char** argv) {
         }
         
         SemanticAnalyzer analyzer;
+        analyzer.set_module_loader(&module_loader);
+        analyzer.set_current_file_path(argv[1]);
         if (!analyzer.analyze(program)) {
             fprintf(stderr, "Error: Semantic analysis failed\n");
             delete program;
@@ -84,12 +88,10 @@ int main(int argc, char** argv) {
         }
         
         for (size_t i = 0; i < program->events.size(); i++) {
-            runtime.register_event(program->events[i]->name.c_str());
             events.push(String(program->events[i]->name.c_str()));
         }
         
         for (size_t i = 0; i < program->signals.size(); i++) {
-            runtime.register_signal(program->signals[i]->name.c_str());
             signals.push(String(program->signals[i]->name.c_str()));
         }
         
@@ -104,6 +106,16 @@ int main(int argc, char** argv) {
         const DynamicArray<String>& pool_strings = gen_pool->get_strings();
         for (size_t i = 0; i < pool_strings.size(); i++) {
             string_pool.add(pool_strings[i]);
+        }
+        
+        for (size_t i = 0; i < events.size(); i++) {
+            int idx = string_pool.add(events[i]);
+            runtime.register_event(string_pool.get(idx));
+        }
+        
+        for (size_t i = 0; i < signals.size(); i++) {
+            int idx = string_pool.add(signals[i]);
+            runtime.register_signal(string_pool.get(idx));
         }
         
         DynamicArray<Value>* gen_constants = codegen->get_constants();
@@ -171,11 +183,13 @@ int main(int argc, char** argv) {
         string_pool.load_from_array(cached_strings);
         
         for (size_t i = 0; i < events.size(); i++) {
-            runtime.register_event(events[i].c_str());
+            int idx = string_pool.add(events[i]);
+            runtime.register_event(string_pool.get(idx));
         }
         
         for (size_t i = 0; i < signals.size(); i++) {
-            runtime.register_signal(signals[i].c_str());
+            int idx = string_pool.add(signals[i]);
+            runtime.register_signal(string_pool.get(idx));
         }
     }
     

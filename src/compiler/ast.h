@@ -8,6 +8,7 @@ namespace Tick {
 
 enum class AstNodeType {
     PROGRAM,
+    IMPORT_DECL,
     EVENT_DECL,
     SIGNAL_DECL,
     PROCESS_DECL,
@@ -25,6 +26,7 @@ enum class AstNodeType {
     
     BINARY_EXPR,
     UNARY_EXPR,
+    ASSIGN_EXPR,
     CALL_EXPR,
     MEMBER_EXPR,
     INDEX_EXPR,
@@ -119,6 +121,19 @@ struct UnaryExpr : public ExprNode {
     
     ~UnaryExpr() {
         delete operand;
+    }
+};
+
+struct AssignExpr : public ExprNode {
+    ExprNode* target;
+    ExprNode* value;
+    
+    AssignExpr(ExprNode* t, ExprNode* v)
+        : ExprNode(AstNodeType::ASSIGN_EXPR), target(t), value(v) {}
+    
+    ~AssignExpr() {
+        delete target;
+        delete value;
     }
 };
 
@@ -271,6 +286,15 @@ struct BreakStmt : public StmtNode {
     BreakStmt() : StmtNode(AstNodeType::BREAK_STMT) {}
 };
 
+struct ImportDecl : public AstNode {
+    String module_path;
+    DynamicArray<String> imported_names;
+    bool import_all;
+    
+    ImportDecl(const String& path) 
+        : AstNode(AstNodeType::IMPORT_DECL), module_path(path), import_all(true) {}
+};
+
 struct EventDecl : public AstNode {
     String name;
     
@@ -343,6 +367,7 @@ struct ClassDecl : public AstNode {
 };
 
 struct Program : public AstNode {
+    DynamicArray<ImportDecl*> imports;
     DynamicArray<EventDecl*> events;
     DynamicArray<SignalDecl*> signals;
     DynamicArray<ProcessDecl*> processes;
@@ -352,11 +377,24 @@ struct Program : public AstNode {
     Program() : AstNode(AstNodeType::PROGRAM) {}
     
     ~Program() {
-        for (size_t i = 0; i < events.size(); i++) delete events[i];
-        for (size_t i = 0; i < signals.size(); i++) delete signals[i];
-        for (size_t i = 0; i < processes.size(); i++) delete processes[i];
-        for (size_t i = 0; i < functions.size(); i++) delete functions[i];
-        for (size_t i = 0; i < classes.size(); i++) delete classes[i];
+        for (size_t i = 0; i < imports.size(); i++) {
+            if (imports[i]) delete imports[i];
+        }
+        for (size_t i = 0; i < events.size(); i++) {
+            if (events[i]) delete events[i];
+        }
+        for (size_t i = 0; i < signals.size(); i++) {
+            if (signals[i]) delete signals[i];
+        }
+        for (size_t i = 0; i < processes.size(); i++) {
+            if (processes[i]) delete processes[i];
+        }
+        for (size_t i = 0; i < functions.size(); i++) {
+            if (functions[i]) delete functions[i];
+        }
+        for (size_t i = 0; i < classes.size(); i++) {
+            if (classes[i]) delete classes[i];
+        }
     }
 };
 

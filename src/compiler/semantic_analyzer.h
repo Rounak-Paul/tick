@@ -2,6 +2,7 @@
 #define TICK_SEMANTIC_ANALYZER_H
 
 #include "ast.h"
+#include "module_loader.h"
 #include "../core/hash_map.h"
 #include "../core/string.h"
 
@@ -30,13 +31,18 @@ class SemanticAnalyzer {
 public:
     SemanticAnalyzer();
     bool analyze(Program* program);
+    void set_module_loader(ModuleLoader* loader);
+    void set_current_file_path(const char* path);
 
 private:
     HashMap<const char*, Symbol*> _symbols;
     bool _has_errors;
+    ModuleLoader* _module_loader;
+    const char* _current_file_path;
     
     void error(const char* message);
     
+    void analyze_import_decl(ImportDecl* node, Program* program);
     void analyze_event_decl(EventDecl* node);
     void analyze_signal_decl(SignalDecl* node);
     void analyze_process_decl(ProcessDecl* node);
@@ -54,6 +60,7 @@ private:
     void analyze_expression(ExprNode* node);
     void analyze_binary_expr(BinaryExpr* node);
     void analyze_unary_expr(UnaryExpr* node);
+    void analyze_assign_expr(AssignExpr* node);
     void analyze_call_expr(CallExpr* node);
     void analyze_member_expr(MemberExpr* node);
     void analyze_identifier(IdentifierExpr* node);

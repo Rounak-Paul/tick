@@ -92,7 +92,10 @@ Program* Parser::parse() {
     Program* program = new Program();
     
     while (!check(TokenType::END_OF_FILE)) {
-        if (check(TokenType::EVENT)) {
+        if (check(TokenType::IMPORT) || check(TokenType::FROM)) {
+            program->imports.push(parse_import_decl());
+        }
+        else if (check(TokenType::EVENT)) {
             program->events.push(parse_event_decl());
         }
         else if (check(TokenType::SIGNAL)) {
@@ -116,6 +119,40 @@ Program* Parser::parse() {
     return program;
 }
 
+ImportDecl* Parser::parse_import_decl() {
+    if (check(TokenType::FROM)) {
+        advance();
+        Token module = consume(TokenType::IDENTIFIER, "Expected module name");
+        consume(TokenType::IMPORT, "Expected 'import'");
+        
+        ImportDecl* import_decl = new ImportDecl(module.lexeme);
+        import_decl->import_all = false;
+        
+        if (check(TokenType::STAR)) {
+            advance();
+            import_decl->import_all = true;
+        } else {
+            Token name = consume(TokenType::IDENTIFIER, "Expected identifier");
+            import_decl->imported_names.push(name.lexeme);
+            
+            while (check(TokenType::COMMA)) {
+                advance();
+                Token next_name = consume(TokenType::IDENTIFIER, "Expected identifier");
+                import_decl->imported_names.push(next_name.lexeme);
+            }
+        }
+        
+        consume(TokenType::SEMICOLON, "Expected ';' after import");
+        return import_decl;
+    } else {
+        advance();
+        Token module = consume(TokenType::IDENTIFIER, "Expected module name");
+        consume(TokenType::SEMICOLON, "Expected ';' after import");
+        
+        return new ImportDecl(module.lexeme);
+    }
+}
+
 EventDecl* Parser::parse_event_decl() {
     consume(TokenType::EVENT, "Expected 'event'");
     Token name = consume(TokenType::IDENTIFIER, "Expected event name");
@@ -126,9 +163,9 @@ EventDecl* Parser::parse_event_decl() {
 
 SignalDecl* Parser::parse_signal_decl() {
     consume(TokenType::SIGNAL, "Expected 'signal'");
-    consume(TokenType::LANGLE, "Expected '<'");
+    consume(TokenType::LT, "Expected '<'");
     Token type = parse_type();
-    consume(TokenType::RANGLE, "Expected '>'");
+    consume(TokenType::GT, "Expected '>'");
     Token name = consume(TokenType::IDENTIFIER, "Expected signal name");
     consume(TokenType::SEMICOLON, "Expected ';' after signal declaration");
     
@@ -326,7 +363,18 @@ StmtNode* Parser::parse_expr_stmt() {
 }
 
 ExprNode* Parser::parse_expression() {
-    return parse_logical_or();
+    return parse_assignment();
+}
+
+ExprNode* Parser::parse_assignment() {
+    ExprNode* expr = parse_logical_or();
+    
+    if (match(TokenType::ASSIGN)) {
+        ExprNode* value = parse_assignment();
+        return new AssignExpr(expr, value);
+    }
+    
+    return expr;
 }
 
 ExprNode* Parser::parse_logical_or() {

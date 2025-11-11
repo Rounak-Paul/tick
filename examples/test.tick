@@ -1,7 +1,0 @@
-func main() : int {
-    var x : int = 10;
-    var y : int = 20;
-    var result : int = x + y;
-    println(result);
-    return 0;
-}

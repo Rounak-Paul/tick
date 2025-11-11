@@ -14,7 +14,6 @@ void Builtins::set_runtime(Runtime* runtime) {
 void Builtins::register_all(Runtime* runtime) {
     _runtime = runtime;
     runtime->register_function("print", builtin_print);
-    runtime->register_function("println", builtin_println);
     runtime->register_function("input", builtin_input);
     runtime->register_function("format", builtin_format);
     runtime->register_function("str_to_int", builtin_str_to_int);
@@ -42,12 +41,6 @@ Value Builtins::builtin_print(DynamicArray<Value>& args) {
     }
     
     fflush(stdout);
-    return Value(0);
-}
-
-Value Builtins::builtin_println(DynamicArray<Value>& args) {
-    builtin_print(args);
-    printf("\n");
     return Value(0);
 }
 

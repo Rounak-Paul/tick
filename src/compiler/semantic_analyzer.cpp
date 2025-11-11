@@ -1,9 +1,18 @@
 #include "semantic_analyzer.h"
 #include <cstdio>
+#include <cstring>
 
 namespace Tick {
 
-SemanticAnalyzer::SemanticAnalyzer() : _has_errors(false) {}
+SemanticAnalyzer::SemanticAnalyzer() : _has_errors(false), _module_loader(nullptr), _current_file_path(nullptr) {}
+
+void SemanticAnalyzer::set_module_loader(ModuleLoader* loader) {
+    _module_loader = loader;
+}
+
+void SemanticAnalyzer::set_current_file_path(const char* path) {
+    _current_file_path = path;
+}
 
 void SemanticAnalyzer::error(const char* message) {
     fprintf(stderr, "Semantic error: %s\n", message);
@@ -11,6 +20,10 @@ void SemanticAnalyzer::error(const char* message) {
 }
 
 bool SemanticAnalyzer::analyze(Program* program) {
+    for (size_t i = 0; i < program->imports.size(); i++) {
+        analyze_import_decl(program->imports[i], program);
+    }
+    
     for (size_t i = 0; i < program->events.size(); i++) {
         analyze_event_decl(program->events[i]);
     }
@@ -32,6 +45,79 @@ bool SemanticAnalyzer::analyze(Program* program) {
     }
     
     return !_has_errors;
+}
+
+void SemanticAnalyzer::analyze_import_decl(ImportDecl* node, Program* program) {
+    if (!_module_loader) {
+        error("Module loader not set");
+        return;
+    }
+    
+    if (!_current_file_path) {
+        error("Current file path not set");
+        return;
+    }
+    
+    Program* imported_module = _module_loader->load_module(node->module_path.c_str(), _current_file_path);
+    if (!imported_module) {
+        char err_msg[256];
+        snprintf(err_msg, sizeof(err_msg), "Failed to load module '%s'", node->module_path.c_str());
+        error(err_msg);
+        return;
+    }
+    
+    if (node->import_all) {
+        for (size_t i = 0; i < imported_module->functions.size(); i++) {
+            program->functions.push(imported_module->functions[i]);
+            imported_module->functions[i] = nullptr;
+        }
+        
+        for (size_t i = 0; i < imported_module->classes.size(); i++) {
+            program->classes.push(imported_module->classes[i]);
+            imported_module->classes[i] = nullptr;
+        }
+        
+        for (size_t i = 0; i < imported_module->events.size(); i++) {
+            program->events.push(imported_module->events[i]);
+            imported_module->events[i] = nullptr;
+        }
+        
+        for (size_t i = 0; i < imported_module->signals.size(); i++) {
+            program->signals.push(imported_module->signals[i]);
+            imported_module->signals[i] = nullptr;
+        }
+    } else if (node->imported_names.size() > 0) {
+        for (size_t i = 0; i < node->imported_names.size(); i++) {
+            const char* name = node->imported_names[i].c_str();
+            bool found = false;
+            
+            for (size_t j = 0; j < imported_module->functions.size(); j++) {
+                if (imported_module->functions[j] && strcmp(imported_module->functions[j]->name.c_str(), name) == 0) {
+                    program->functions.push(imported_module->functions[j]);
+                    imported_module->functions[j] = nullptr;
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                for (size_t j = 0; j < imported_module->classes.size(); j++) {
+                    if (imported_module->classes[j] && strcmp(imported_module->classes[j]->name.c_str(), name) == 0) {
+                        program->classes.push(imported_module->classes[j]);
+                        imported_module->classes[j] = nullptr;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!found) {
+                char err_msg[256];
+                snprintf(err_msg, sizeof(err_msg), "Name '%s' not found in module '%s'", name, node->module_path.c_str());
+                error(err_msg);
+            }
+        }
+    }
 }
 
 void SemanticAnalyzer::analyze_event_decl(EventDecl* node) {
@@ -176,6 +262,9 @@ void SemanticAnalyzer::analyze_expression(ExprNode* node) {
         case AstNodeType::UNARY_EXPR:
             analyze_unary_expr(static_cast<UnaryExpr*>(node));
             break;
+        case AstNodeType::ASSIGN_EXPR:
+            analyze_assign_expr(static_cast<AssignExpr*>(node));
+            break;
         case AstNodeType::CALL_EXPR:
             analyze_call_expr(static_cast<CallExpr*>(node));
             break;
@@ -207,6 +296,11 @@ void SemanticAnalyzer::analyze_binary_expr(BinaryExpr* node) {
 
 void SemanticAnalyzer::analyze_unary_expr(UnaryExpr* node) {
     analyze_expression(node->operand);
+}
+
+void SemanticAnalyzer::analyze_assign_expr(AssignExpr* node) {
+    analyze_expression(node->target);
+    analyze_expression(node->value);
 }
 
 void SemanticAnalyzer::analyze_call_expr(CallExpr* node) {

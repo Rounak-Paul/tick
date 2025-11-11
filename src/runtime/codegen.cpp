@@ -4,7 +4,7 @@
 
 namespace Tick {
 
-CodeGenerator::CodeGenerator() : _current_code(nullptr), _next_local_index(0) {}
+CodeGenerator::CodeGenerator() : _current_code(nullptr), _next_local_index(0), _current_class(nullptr) {}
 
 void CodeGenerator::generate(Program* program) {
     for (size_t i = 0; i < program->classes.size(); i++) {
@@ -81,6 +81,7 @@ void CodeGenerator::generate_class(ClassDecl* cls) {
         _current_code = new DynamicArray<Instruction>();
         _local_vars.insert("", 0);
         _next_local_index = 0;
+        _current_class = cls;
         
         _local_vars.insert("this", _next_local_index++);
         
@@ -92,6 +93,8 @@ void CodeGenerator::generate_class(ClassDecl* cls) {
         
         emit(OpCode::LOAD_CONST, add_constant(Value(0)));
         emit(OpCode::RETURN);
+        
+        _current_class = nullptr;
         
         size_t name_len = cls->name.length() + method->name.length() + 2;
         char* method_name = (char*)malloc(name_len);
@@ -231,6 +234,9 @@ void CodeGenerator::generate_expression(ExprNode* expr) {
         case AstNodeType::UNARY_EXPR:
             generate_unary_expr(static_cast<UnaryExpr*>(expr));
             break;
+        case AstNodeType::ASSIGN_EXPR:
+            generate_assign_expr(static_cast<AssignExpr*>(expr));
+            break;
         case AstNodeType::CALL_EXPR:
             generate_call_expr(static_cast<CallExpr*>(expr));
             break;
@@ -266,6 +272,49 @@ void CodeGenerator::generate_unary_expr(UnaryExpr* node) {
     
     if (node->op == "-") emit(OpCode::NEG);
     else if (node->op == "!") emit(OpCode::NOT);
+}
+
+void CodeGenerator::generate_assign_expr(AssignExpr* node) {
+    if (node->target->type == AstNodeType::IDENTIFIER_EXPR) {
+        IdentifierExpr* ident = static_cast<IdentifierExpr*>(node->target);
+        
+        int* index = _local_vars.find(ident->name.c_str());
+        if (index) {
+            generate_expression(node->value);
+            emit(OpCode::STORE_VAR, *index);
+        } else if (_current_class) {
+            for (size_t i = 0; i < _current_class->fields.size(); i++) {
+                if (_current_class->fields[i]->name == ident->name) {
+                    emit(OpCode::LOAD_VAR, 0);
+                    generate_expression(node->value);
+                    int field_index = _string_pool.add(ident->name);
+                    emit(OpCode::SET_FIELD, field_index);
+                    return;
+                }
+            }
+            generate_expression(node->value);
+            int name_index = _string_pool.add(ident->name);
+            emit(OpCode::STORE_GLOBAL, name_index);
+        } else {
+            generate_expression(node->value);
+            int name_index = _string_pool.add(ident->name);
+            emit(OpCode::STORE_GLOBAL, name_index);
+        }
+    }
+    else if (node->target->type == AstNodeType::MEMBER_EXPR) {
+        MemberExpr* member = static_cast<MemberExpr*>(node->target);
+        generate_expression(member->object);
+        generate_expression(node->value);
+        int field_index = _string_pool.add(member->member);
+        emit(OpCode::SET_FIELD, field_index);
+    }
+    else if (node->target->type == AstNodeType::INDEX_EXPR) {
+        IndexExpr* index = static_cast<IndexExpr*>(node->target);
+        generate_expression(index->array);
+        generate_expression(index->index);
+        generate_expression(node->value);
+        emit(OpCode::ARRAY_STORE);
+    }
 }
 
 void CodeGenerator::generate_call_expr(CallExpr* node) {
@@ -347,6 +396,17 @@ void CodeGenerator::generate_identifier(IdentifierExpr* node) {
     int* index = _local_vars.find(node->name.c_str());
     if (index) {
         emit(OpCode::LOAD_VAR, *index);
+    } else if (_current_class) {
+        for (size_t i = 0; i < _current_class->fields.size(); i++) {
+            if (_current_class->fields[i]->name == node->name) {
+                emit(OpCode::LOAD_VAR, 0);
+                int field_index = _string_pool.add(node->name);
+                emit(OpCode::GET_FIELD, field_index);
+                return;
+            }
+        }
+        int name_index = _string_pool.add(node->name);
+        emit(OpCode::LOAD_GLOBAL, name_index);
     } else {
         int name_index = _string_pool.add(node->name);
         emit(OpCode::LOAD_GLOBAL, name_index);

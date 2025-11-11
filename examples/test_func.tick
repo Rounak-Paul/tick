@@ -1,8 +1,0 @@
-func test() : int {
-    return 99;
-}
-
-func main() : int {
-    var x : int = test();
-    return x;
-}

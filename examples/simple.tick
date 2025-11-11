@@ -1,4 +1,0 @@
-func main() : int {
-  var x : int = 42;
-  return x;
-}
