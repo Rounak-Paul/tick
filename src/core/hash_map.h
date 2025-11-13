@@ -115,6 +115,21 @@ public:
         return false;
     }
     
+    void remove(const K& key) {
+        size_t index = hash(key);
+        size_t start = index;
+        
+        while (_buckets[index].occupied) {
+            if (keys_equal(_buckets[index].key, key)) {
+                _buckets[index].occupied = false;
+                _size--;
+                return;
+            }
+            index = (index + 1) % _capacity;
+            if (index == start) break;
+        }
+    }
+    
     size_t size() const { return _size; }
     
     template<typename Func>
@@ -231,6 +246,21 @@ public:
             if (index == start) break;
         }
         return false;
+    }
+    
+    void remove(const char* key) {
+        size_t index = hash(key);
+        size_t start = index;
+        
+        while (_buckets[index].occupied) {
+            if (keys_equal(_buckets[index].key, key)) {
+                _buckets[index].occupied = false;
+                _size--;
+                return;
+            }
+            index = (index + 1) % _capacity;
+            if (index == start) break;
+        }
     }
     
     size_t size() const { return _size; }

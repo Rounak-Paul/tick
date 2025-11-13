@@ -34,6 +34,7 @@ private:
     StmtNode* parse_var_decl();
     StmtNode* parse_if_stmt();
     StmtNode* parse_while_stmt();
+    StmtNode* parse_for_stmt();
     StmtNode* parse_return_stmt();
     StmtNode* parse_break_stmt();
     StmtNode* parse_expr_stmt();

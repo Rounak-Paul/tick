@@ -95,6 +95,9 @@ Program* Parser::parse() {
         if (check(TokenType::IMPORT) || check(TokenType::FROM)) {
             program->imports.push(parse_import_decl());
         }
+        else if (check(TokenType::VAR) || check(TokenType::CONST)) {
+            program->globals.push((VarDecl*)parse_var_decl());
+        }
         else if (check(TokenType::EVENT)) {
             program->events.push(parse_event_decl());
         }
@@ -163,13 +166,23 @@ EventDecl* Parser::parse_event_decl() {
 
 SignalDecl* Parser::parse_signal_decl() {
     consume(TokenType::SIGNAL, "Expected 'signal'");
-    consume(TokenType::LT, "Expected '<'");
-    Token type = parse_type();
-    consume(TokenType::GT, "Expected '>'");
     Token name = consume(TokenType::IDENTIFIER, "Expected signal name");
+    
+    int array_size = 0;
+    if (check(TokenType::LBRACKET)) {
+        advance();
+        if (!check(TokenType::RBRACKET)) {
+            Token size_token = consume(TokenType::INTEGER, "Expected array size");
+            array_size = atoi(size_token.lexeme.c_str());
+        }
+        consume(TokenType::RBRACKET, "Expected ']'");
+    }
+    
+    consume(TokenType::COLON, "Expected ':'");
+    Token type = parse_type();
     consume(TokenType::SEMICOLON, "Expected ';' after signal declaration");
     
-    return new SignalDecl(type.lexeme, name.lexeme);
+    return new SignalDecl(type.lexeme, name.lexeme, array_size);
 }
 
 ProcessDecl* Parser::parse_process_decl() {
@@ -276,7 +289,7 @@ BlockStmt* Parser::parse_block() {
 }
 
 StmtNode* Parser::parse_statement() {
-    if (check(TokenType::VAR)) {
+    if (check(TokenType::VAR) || check(TokenType::CONST)) {
         return parse_var_decl();
     }
     if (check(TokenType::IF)) {
@@ -284,6 +297,9 @@ StmtNode* Parser::parse_statement() {
     }
     if (check(TokenType::WHILE)) {
         return parse_while_stmt();
+    }
+    if (check(TokenType::FOR)) {
+        return parse_for_stmt();
     }
     if (check(TokenType::RETURN)) {
         return parse_return_stmt();
@@ -298,18 +314,28 @@ StmtNode* Parser::parse_statement() {
 }
 
 StmtNode* Parser::parse_var_decl() {
-    advance();
-    Token name = consume(TokenType::IDENTIFIER, "Expected variable name after 'var'");
+    bool is_const = false;
+    if (check(TokenType::CONST)) {
+        is_const = true;
+        advance();
+    } else {
+        advance();
+    }
+    
+    Token name = consume(TokenType::IDENTIFIER, "Expected variable name after 'var' or 'const'");
     consume(TokenType::COLON, "Expected ':' after variable name");
     Token type = parse_type();
     
     ExprNode* initializer = nullptr;
     if (match(TokenType::ASSIGN)) {
         initializer = parse_expression();
+    } else if (is_const) {
+        fprintf(stderr, "Error: const variables must be initialized\n");
+        exit(1);
     }
     
     consume(TokenType::SEMICOLON, "Expected ';' after variable declaration");
-    return new VarDecl(type.lexeme, name.lexeme, initializer);
+    return new VarDecl(type.lexeme, name.lexeme, initializer, is_const);
 }
 
 StmtNode* Parser::parse_if_stmt() {
@@ -336,6 +362,36 @@ StmtNode* Parser::parse_while_stmt() {
     StmtNode* body = parse_statement();
     
     return new WhileStmt(condition, body);
+}
+
+StmtNode* Parser::parse_for_stmt() {
+    consume(TokenType::FOR, "Expected 'for'");
+    consume(TokenType::LPAREN, "Expected '(' after 'for'");
+    
+    StmtNode* initializer = nullptr;
+    if (check(TokenType::VAR)) {
+        initializer = parse_var_decl();
+    } else if (!check(TokenType::SEMICOLON)) {
+        initializer = parse_expr_stmt();
+    } else {
+        advance();
+    }
+    
+    ExprNode* condition = nullptr;
+    if (!check(TokenType::SEMICOLON)) {
+        condition = parse_expression();
+    }
+    consume(TokenType::SEMICOLON, "Expected ';' after for condition");
+    
+    ExprNode* increment = nullptr;
+    if (!check(TokenType::RPAREN)) {
+        increment = parse_expression();
+    }
+    consume(TokenType::RPAREN, "Expected ')' after for clauses");
+    
+    StmtNode* body = parse_statement();
+    
+    return new ForStmt(initializer, condition, increment, body);
 }
 
 StmtNode* Parser::parse_return_stmt() {
@@ -372,6 +428,31 @@ ExprNode* Parser::parse_assignment() {
     if (match(TokenType::ASSIGN)) {
         ExprNode* value = parse_assignment();
         return new AssignExpr(expr, value);
+    }
+    
+    if (match(TokenType::PLUS_ASSIGN)) {
+        ExprNode* value = parse_assignment();
+        return new CompoundAssignExpr(expr, String("+"), value);
+    }
+    
+    if (match(TokenType::MINUS_ASSIGN)) {
+        ExprNode* value = parse_assignment();
+        return new CompoundAssignExpr(expr, String("-"), value);
+    }
+    
+    if (match(TokenType::STAR_ASSIGN)) {
+        ExprNode* value = parse_assignment();
+        return new CompoundAssignExpr(expr, String("*"), value);
+    }
+    
+    if (match(TokenType::SLASH_ASSIGN)) {
+        ExprNode* value = parse_assignment();
+        return new CompoundAssignExpr(expr, String("/"), value);
+    }
+    
+    if (match(TokenType::PERCENT_ASSIGN)) {
+        ExprNode* value = parse_assignment();
+        return new CompoundAssignExpr(expr, String("%"), value);
     }
     
     return expr;
@@ -455,6 +536,16 @@ ExprNode* Parser::parse_unary() {
         String op = _tokens[_current - 1].lexeme;
         ExprNode* operand = parse_unary();
         return new UnaryExpr(op, operand);
+    }
+    
+    if (match(TokenType::INCREMENT)) {
+        ExprNode* operand = parse_unary();
+        return new UnaryExpr(String("++"), operand);
+    }
+    
+    if (match(TokenType::DECREMENT)) {
+        ExprNode* operand = parse_unary();
+        return new UnaryExpr(String("--"), operand);
     }
     
     return parse_call();
@@ -601,21 +692,6 @@ ExprNode* Parser::parse_primary() {
     }
     if (match(TokenType::THIS)) {
         return new ThisExpr();
-    }
-    if (match(TokenType::NEW)) {
-        Token class_name = consume(TokenType::IDENTIFIER, "Expected class name after 'new'");
-        consume(TokenType::LPAREN, "Expected '(' after class name");
-        
-        NewExpr* new_expr = new NewExpr(class_name.lexeme);
-        
-        if (!check(TokenType::RPAREN)) {
-            do {
-                new_expr->arguments.push(parse_expression());
-            } while (match(TokenType::COMMA));
-        }
-        
-        consume(TokenType::RPAREN, "Expected ')' after arguments");
-        return new_expr;
     }
     if (match(TokenType::LPAREN)) {
         ExprNode* expr = parse_expression();

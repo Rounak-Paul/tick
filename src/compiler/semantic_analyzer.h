@@ -53,6 +53,7 @@ private:
     void analyze_var_decl(VarDecl* node);
     void analyze_if_stmt(IfStmt* node);
     void analyze_while_stmt(WhileStmt* node);
+    void analyze_for_stmt(ForStmt* node);
     void analyze_return_stmt(ReturnStmt* node);
     void analyze_expr_stmt(ExprStmt* node);
     void analyze_block(BlockStmt* node);

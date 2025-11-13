@@ -18,7 +18,7 @@ enum class TokenType {
     SIGNAL,
     PROCESS,
     CLASS,
-    NEW,
+    CONST,
     THIS,
     IMPORT,
     FROM,
@@ -56,6 +56,14 @@ enum class TokenType {
     STAR,
     SLASH,
     PERCENT,
+    INCREMENT,
+    DECREMENT,
+    
+    PLUS_ASSIGN,
+    MINUS_ASSIGN,
+    STAR_ASSIGN,
+    SLASH_ASSIGN,
+    PERCENT_ASSIGN,
     
     EQ,
     NEQ,

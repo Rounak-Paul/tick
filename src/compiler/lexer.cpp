@@ -55,7 +55,7 @@ TokenType Lexer::check_keyword(const char* str, size_t length) {
     if (length == 6 && memcmp(str, "signal", 6) == 0) return TokenType::SIGNAL;
     if (length == 7 && memcmp(str, "process", 7) == 0) return TokenType::PROCESS;
     if (length == 5 && memcmp(str, "class", 5) == 0) return TokenType::CLASS;
-    if (length == 3 && memcmp(str, "new", 3) == 0) return TokenType::NEW;
+    if (length == 5 && memcmp(str, "const", 5) == 0) return TokenType::CONST;
     if (length == 4 && memcmp(str, "this", 4) == 0) return TokenType::THIS;
     if (length == 6 && memcmp(str, "import", 6) == 0) return TokenType::IMPORT;
     if (length == 4 && memcmp(str, "from", 4) == 0) return TokenType::FROM;
@@ -251,23 +251,54 @@ DynamicArray<Token> Lexer::tokenize() {
         }
         else if (c == '+') {
             advance();
-            tokens.push(make_token(TokenType::PLUS, "+", 1));
+            if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::PLUS_ASSIGN, "+=", 2));
+            } else if (current_char() == '+') {
+                advance();
+                tokens.push(make_token(TokenType::INCREMENT, "++", 2));
+            } else {
+                tokens.push(make_token(TokenType::PLUS, "+", 1));
+            }
         }
         else if (c == '-') {
             advance();
-            tokens.push(make_token(TokenType::MINUS, "-", 1));
+            if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::MINUS_ASSIGN, "-=", 2));
+            } else if (current_char() == '-') {
+                advance();
+                tokens.push(make_token(TokenType::DECREMENT, "--", 2));
+            } else {
+                tokens.push(make_token(TokenType::MINUS, "-", 1));
+            }
         }
         else if (c == '*') {
             advance();
-            tokens.push(make_token(TokenType::STAR, "*", 1));
+            if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::STAR_ASSIGN, "*=", 2));
+            } else {
+                tokens.push(make_token(TokenType::STAR, "*", 1));
+            }
         }
         else if (c == '/') {
             advance();
-            tokens.push(make_token(TokenType::SLASH, "/", 1));
+            if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::SLASH_ASSIGN, "/=", 2));
+            } else {
+                tokens.push(make_token(TokenType::SLASH, "/", 1));
+            }
         }
         else if (c == '%') {
             advance();
-            tokens.push(make_token(TokenType::PERCENT, "%", 1));
+            if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::PERCENT_ASSIGN, "%=", 2));
+            } else {
+                tokens.push(make_token(TokenType::PERCENT, "%", 1));
+            }
         }
         else if (c == '&' && peek_char() == '&') {
             advance();

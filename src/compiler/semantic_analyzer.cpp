@@ -24,6 +24,15 @@ bool SemanticAnalyzer::analyze(Program* program) {
         analyze_import_decl(program->imports[i], program);
     }
     
+    for (size_t i = 0; i < program->globals.size(); i++) {
+        VarDecl* var = program->globals[i];
+        if (_symbols.contains(var->name.c_str())) {
+            error("Duplicate global variable");
+        } else {
+            _symbols.insert(var->name.c_str(), new Symbol(SymbolType::VARIABLE, var->name, var->type_name));
+        }
+    }
+    
     for (size_t i = 0; i < program->events.size(); i++) {
         analyze_event_decl(program->events[i]);
     }
@@ -171,6 +180,10 @@ void SemanticAnalyzer::analyze_function_decl(FunctionDecl* node) {
     }
     
     analyze_block(node->body);
+    
+    for (size_t i = 0; i < node->parameters.size(); i++) {
+        _symbols.remove(node->parameters[i]->name.c_str());
+    }
 }
 
 void SemanticAnalyzer::analyze_class_decl(ClassDecl* node) {
@@ -187,7 +200,34 @@ void SemanticAnalyzer::analyze_class_decl(ClassDecl* node) {
     }
     
     for (size_t i = 0; i < node->methods.size(); i++) {
-        analyze_function_decl(node->methods[i]);
+        FunctionDecl* method = node->methods[i];
+        char qualified_name_buf[256];
+        snprintf(qualified_name_buf, sizeof(qualified_name_buf), "%s_%s", node->name.c_str(), method->name.c_str());
+        
+        char* qualified_name = strdup(qualified_name_buf);
+        
+        if (_symbols.contains(qualified_name)) {
+            error("Method already declared");
+            free(qualified_name);
+            return;
+        }
+        
+        Symbol* method_sym = new Symbol(SymbolType::FUNCTION, String(qualified_name), method->return_type);
+        _symbols.insert(qualified_name, method_sym);
+        
+        for (size_t j = 0; j < method->parameters.size(); j++) {
+            Parameter* param = method->parameters[j];
+            Symbol* param_sym = new Symbol(SymbolType::VARIABLE, param->name, param->type_name);
+            _symbols.insert(param->name.c_str(), param_sym);
+        }
+        
+        if (method->body) {
+            analyze_block(method->body);
+        }
+        
+        for (size_t j = 0; j < method->parameters.size(); j++) {
+            _symbols.remove(method->parameters[j]->name.c_str());
+        }
     }
 }
 
@@ -201,6 +241,9 @@ void SemanticAnalyzer::analyze_statement(StmtNode* node) {
             break;
         case AstNodeType::WHILE_STMT:
             analyze_while_stmt(static_cast<WhileStmt*>(node));
+            break;
+        case AstNodeType::FOR_STMT:
+            analyze_for_stmt(static_cast<ForStmt*>(node));
             break;
         case AstNodeType::RETURN_STMT:
             analyze_return_stmt(static_cast<ReturnStmt*>(node));
@@ -235,6 +278,19 @@ void SemanticAnalyzer::analyze_if_stmt(IfStmt* node) {
 
 void SemanticAnalyzer::analyze_while_stmt(WhileStmt* node) {
     analyze_expression(node->condition);
+    analyze_statement(node->body);
+}
+
+void SemanticAnalyzer::analyze_for_stmt(ForStmt* node) {
+    if (node->initializer) {
+        analyze_statement(node->initializer);
+    }
+    if (node->condition) {
+        analyze_expression(node->condition);
+    }
+    if (node->increment) {
+        analyze_expression(node->increment);
+    }
     analyze_statement(node->body);
 }
 

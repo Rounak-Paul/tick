@@ -27,6 +27,7 @@ enum class AstNodeType {
     BINARY_EXPR,
     UNARY_EXPR,
     ASSIGN_EXPR,
+    COMPOUND_ASSIGN_EXPR,
     CALL_EXPR,
     MEMBER_EXPR,
     INDEX_EXPR,
@@ -137,6 +138,20 @@ struct AssignExpr : public ExprNode {
     }
 };
 
+struct CompoundAssignExpr : public ExprNode {
+    ExprNode* target;
+    String op;
+    ExprNode* value;
+    
+    CompoundAssignExpr(ExprNode* t, const String& o, ExprNode* v)
+        : ExprNode(AstNodeType::COMPOUND_ASSIGN_EXPR), target(t), op(o), value(v) {}
+    
+    ~CompoundAssignExpr() {
+        delete target;
+        delete value;
+    }
+};
+
 struct CallExpr : public ExprNode {
     ExprNode* callee;
     DynamicArray<ExprNode*> arguments;
@@ -234,9 +249,10 @@ struct VarDecl : public StmtNode {
     String type_name;
     String name;
     ExprNode* initializer;
+    bool is_const;
     
-    VarDecl(const String& type, const String& n, ExprNode* init)
-        : StmtNode(AstNodeType::VAR_DECL), type_name(type), name(n), initializer(init) {}
+    VarDecl(const String& type, const String& n, ExprNode* init, bool const_flag = false)
+        : StmtNode(AstNodeType::VAR_DECL), type_name(type), name(n), initializer(init), is_const(const_flag) {}
     
     ~VarDecl() {
         if (initializer) delete initializer;
@@ -286,6 +302,23 @@ struct BreakStmt : public StmtNode {
     BreakStmt() : StmtNode(AstNodeType::BREAK_STMT) {}
 };
 
+struct ForStmt : public StmtNode {
+    StmtNode* initializer;
+    ExprNode* condition;
+    ExprNode* increment;
+    StmtNode* body;
+    
+    ForStmt(StmtNode* init, ExprNode* cond, ExprNode* incr, StmtNode* b)
+        : StmtNode(AstNodeType::FOR_STMT), initializer(init), condition(cond), increment(incr), body(b) {}
+    
+    ~ForStmt() {
+        if (initializer) delete initializer;
+        if (condition) delete condition;
+        if (increment) delete increment;
+        delete body;
+    }
+};
+
 struct ImportDecl : public AstNode {
     String module_path;
     DynamicArray<String> imported_names;
@@ -305,9 +338,10 @@ struct EventDecl : public AstNode {
 struct SignalDecl : public AstNode {
     String type_param;
     String name;
+    int array_size;
     
-    SignalDecl(const String& type, const String& n)
-        : AstNode(AstNodeType::SIGNAL_DECL), type_param(type), name(n) {}
+    SignalDecl(const String& type, const String& n, int size = 0)
+        : AstNode(AstNodeType::SIGNAL_DECL), type_param(type), name(n), array_size(size) {}
 };
 
 struct ProcessDecl : public AstNode {
@@ -368,6 +402,7 @@ struct ClassDecl : public AstNode {
 
 struct Program : public AstNode {
     DynamicArray<ImportDecl*> imports;
+    DynamicArray<VarDecl*> globals;
     DynamicArray<EventDecl*> events;
     DynamicArray<SignalDecl*> signals;
     DynamicArray<ProcessDecl*> processes;
@@ -379,6 +414,9 @@ struct Program : public AstNode {
     ~Program() {
         for (size_t i = 0; i < imports.size(); i++) {
             if (imports[i]) delete imports[i];
+        }
+        for (size_t i = 0; i < globals.size(); i++) {
+            if (globals[i]) delete globals[i];
         }
         for (size_t i = 0; i < events.size(); i++) {
             if (events[i]) delete events[i];
