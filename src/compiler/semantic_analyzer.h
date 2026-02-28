@@ -67,6 +67,8 @@ private:
     void analyze_process_decl(ProcessDecl* node);
     void analyze_function_decl(FunctionDecl* node);
     void analyze_class_decl(ClassDecl* node);
+    void analyze_interface_decl(InterfaceDecl* node);
+    void analyze_extern_func_decl(ExternFuncDecl* node);
 
     void analyze_statement(StmtNode* node);
     void analyze_var_decl(VarDecl* node);
@@ -78,6 +80,8 @@ private:
     void analyze_block(BlockStmt* node);
     void analyze_defer_stmt(DeferStmt* node);
     void analyze_switch_stmt(SwitchStmt* node);
+    void analyze_try_catch_stmt(TryCatchStmt* node);
+    void analyze_throw_stmt(ThrowStmt* node);
 
     void analyze_expression(ExprNode* node);
     void analyze_binary_expr(BinaryExpr* node);

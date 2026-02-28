@@ -1,0 +1,194 @@
+@dataclass
+class Vec2 {
+    var x : f64;
+    var y : f64;
+}
+
+@dataclass
+class Color {
+    var r : u8;
+    var g : u8;
+    var b : u8;
+    var a : u8;
+}
+
+@dataclass
+class Nested {
+    var pos : Vec2;
+    var col : Color;
+}
+
+func make_vec(x : f64, y : f64) : Vec2 {
+    var v : Vec2;
+    v.x = x;
+    v.y = y;
+    return v;
+}
+
+func add_vec(a : Vec2, b : Vec2) : Vec2 {
+    var result : Vec2;
+    result.x = a.x + b.x;
+    result.y = a.y + b.y;
+    return result;
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Dataclass Test ===");
+
+    var v : Vec2;
+    v.x = 3.0;
+    v.y = 4.0;
+    if (v.x == 3.0 && v.y == 4.0) {
+        println("PASS: dataclass field assignment");
+        pass = pass + 1;
+    } else {
+        println("FAIL: dataclass field assignment");
+        fail = fail + 1;
+    }
+
+    var c : Color;
+    c.r = 255;
+    c.g = 128;
+    c.b = 0;
+    c.a = 255;
+    if (c.r == 255 && c.g == 128 && c.b == 0 && c.a == 255) {
+        println("PASS: u8 dataclass fields");
+        pass = pass + 1;
+    } else {
+        println("FAIL: u8 dataclass fields");
+        fail = fail + 1;
+    }
+
+    var v2 : Vec2;
+    v2.x = 0.0;
+    v2.y = 0.0;
+    if (v2.x == 0.0 && v2.y == 0.0) {
+        println("PASS: dataclass zero init");
+        pass = pass + 1;
+    } else {
+        println("FAIL: dataclass zero init");
+        fail = fail + 1;
+    }
+
+    var v3 : Vec2;
+    v3.x = v.x + 1.0;
+    v3.y = v.y + 1.0;
+    if (v3.x == 4.0 && v3.y == 5.0) {
+        println("PASS: dataclass field expressions");
+        pass = pass + 1;
+    } else {
+        println("FAIL: dataclass field expressions");
+        fail = fail + 1;
+    }
+
+    var v4 : Vec2;
+    v4.x = 10.0;
+    v4.y = 20.0;
+    var sum : f64 = v4.x + v4.y;
+    if (sum == 30.0) {
+        println("PASS: dataclass field in expression");
+        pass = pass + 1;
+    } else {
+        println("FAIL: dataclass field in expression");
+        fail = fail + 1;
+    }
+
+    var a : Vec2;
+    a.x = 10.0;
+    a.y = 20.0;
+    var b : Vec2;
+    b.x = 5.0;
+    b.y = 3.0;
+    var r : Vec2 = add_vec(a, b);
+    if (r.x == 15.0 && r.y == 23.0) {
+        println("PASS: dataclass param and return");
+        pass = pass + 1;
+    } else {
+        println("FAIL: dataclass param and return");
+        fail = fail + 1;
+    }
+
+    var d : Vec2 = make_vec(7.0, 8.0);
+    if (d.x == 7.0 && d.y == 8.0) {
+        println("PASS: dataclass factory function");
+        pass = pass + 1;
+    } else {
+        println("FAIL: dataclass factory function");
+        fail = fail + 1;
+    }
+
+    var s : u64 = sizeof(Vec2);
+    if (s == 16) {
+        println("PASS: sizeof dataclass");
+        pass = pass + 1;
+    } else {
+        println("FAIL: sizeof dataclass");
+        fail = fail + 1;
+    }
+
+    var p : ptr = addr(a);
+    if (p != null) {
+        println("PASS: addr of dataclass");
+        pass = pass + 1;
+    } else {
+        println("FAIL: addr of dataclass");
+        fail = fail + 1;
+    }
+
+    var cp : Vec2 = a;
+    cp.x = 999.0;
+    if (a.x == 10.0 && cp.x == 999.0) {
+        println("PASS: dataclass value copy");
+        pass = pass + 1;
+    } else {
+        println("FAIL: dataclass value copy");
+        fail = fail + 1;
+    }
+
+    var e1 : Vec2;
+    e1.x = 1.0;
+    e1.y = 2.0;
+    var e2 : Vec2;
+    e2.x = 3.0;
+    e2.y = 4.0;
+    var e3 : Vec2;
+    e3.x = 5.0;
+    e3.y = 6.0;
+    var arr : Vec2[] = [e1, e2, e3];
+    if (arr[0].x == 1.0 && arr[0].y == 2.0) {
+        println("PASS: dataclass array element 0");
+        pass = pass + 1;
+    } else {
+        println("FAIL: dataclass array element 0");
+        fail = fail + 1;
+    }
+    if (arr[1].y == 4.0) {
+        println("PASS: dataclass array element 1");
+        pass = pass + 1;
+    } else {
+        println("FAIL: dataclass array element 1");
+        fail = fail + 1;
+    }
+    if (arr[2].x == 5.0) {
+        println("PASS: dataclass array element 2");
+        pass = pass + 1;
+    } else {
+        println("FAIL: dataclass array element 2");
+        fail = fail + 1;
+    }
+    if (arr.length == 3) {
+        println("PASS: dataclass array length");
+        pass = pass + 1;
+    } else {
+        println("FAIL: dataclass array length");
+        fail = fail + 1;
+    }
+
+    println("");
+    println("Passed: " + to_str(pass));
+    println("Failed: " + to_str(fail));
+    return fail;
+}

@@ -20,6 +20,8 @@ StmtNode* Compiler::_defer_scopes[MAX_DEFER_SCOPES][MAX_DEFERS_PER_SCOPE] = {};
 int Compiler::_defer_counts[MAX_DEFER_SCOPES] = {};
 int Compiler::_defer_depth = -1;
 String Compiler::_expected_type;
+RaiiEntry Compiler::_raii_scopes[MAX_DEFER_SCOPES][MAX_RAII_PER_SCOPE] = {};
+int Compiler::_raii_counts[MAX_DEFER_SCOPES] = {};
 
 bool Compiler::is_string_type(ExprNode* expr, Program* program) {
     return infer_expr_type(expr, program) == "str";
@@ -33,6 +35,7 @@ void Compiler::push_defer_scope() {
     _defer_depth++;
     if (_defer_depth < MAX_DEFER_SCOPES) {
         _defer_counts[_defer_depth] = 0;
+        _raii_counts[_defer_depth] = 0;
     }
 }
 
@@ -44,6 +47,7 @@ void Compiler::pop_defer_scope() {
 
 void Compiler::generate_deferred(CodeBuffer& buf, int indent, Program* program) {
     if (_defer_depth < 0) return;
+    generate_raii_cleanup(buf, indent, program);
     int count = _defer_counts[_defer_depth];
     for (int i = count - 1; i >= 0; i--) {
         generate_statement(buf, _defer_scopes[_defer_depth][i], indent, program);
@@ -52,11 +56,67 @@ void Compiler::generate_deferred(CodeBuffer& buf, int indent, Program* program) 
 
 void Compiler::generate_all_deferred(CodeBuffer& buf, int indent, Program* program) {
     for (int s = _defer_depth; s >= 0; s--) {
+        int rc = _raii_counts[s];
+        for (int i = rc - 1; i >= 0; i--) {
+            RaiiEntry& entry = _raii_scopes[s][i];
+            for (int t = 0; t < indent; t++) buf.append("    ");
+            buf.append("if (%s) %s_dtor(%s);\n", entry.var_name.c_str(), entry.class_name.c_str(), entry.var_name.c_str());
+        }
         int count = _defer_counts[s];
         for (int i = count - 1; i >= 0; i--) {
             generate_statement(buf, _defer_scopes[s][i], indent, program);
         }
     }
+}
+
+void Compiler::generate_raii_cleanup(CodeBuffer& buf, int indent, Program* program) {
+    if (_defer_depth < 0) return;
+    int rc = _raii_counts[_defer_depth];
+    for (int i = rc - 1; i >= 0; i--) {
+        RaiiEntry& entry = _raii_scopes[_defer_depth][i];
+        for (int t = 0; t < indent; t++) buf.append("    ");
+        buf.append("if (%s) %s_dtor(%s);\n", entry.var_name.c_str(), entry.class_name.c_str(), entry.var_name.c_str());
+    }
+}
+
+void Compiler::generate_all_raii_cleanup(CodeBuffer& buf, int indent, Program* program) {
+    for (int s = _defer_depth; s >= 0; s--) {
+        int rc = _raii_counts[s];
+        for (int i = rc - 1; i >= 0; i--) {
+            RaiiEntry& entry = _raii_scopes[s][i];
+            for (int t = 0; t < indent; t++) buf.append("    ");
+            buf.append("if (%s) %s_dtor(%s);\n", entry.var_name.c_str(), entry.class_name.c_str(), entry.var_name.c_str());
+        }
+    }
+}
+
+bool Compiler::class_has_destructor(const String& class_name, Program* program) {
+    for (size_t i = 0; i < program->methods.size(); i++) {
+        if (program->methods[i]->class_name == class_name && program->methods[i]->is_destructor) {
+            return true;
+        }
+    }
+    return false;
+}
+
+ClassDecl* Compiler::find_class(const String& name, Program* program) {
+    for (size_t i = 0; i < program->classes.size(); i++) {
+        if (program->classes[i]->name == name) return program->classes[i];
+    }
+    return nullptr;
+}
+
+FunctionDecl* Compiler::find_method(const String& class_name, const String& method_name, Program* program) {
+    for (size_t i = 0; i < program->methods.size(); i++) {
+        if (program->methods[i]->class_name == class_name && program->methods[i]->name == method_name) {
+            return program->methods[i];
+        }
+    }
+    ClassDecl* cls = find_class(class_name, program);
+    if (cls && !cls->base_class.empty()) {
+        return find_method(cls->base_class, method_name, program);
+    }
+    return nullptr;
 }
 
 CodeBuffer::CodeBuffer() : pos(0), capacity(1048576) {
@@ -141,9 +201,17 @@ String Compiler::lookup_var_type(const String& name, Program* program) {
         }
     }
     if (_current_class) {
-        for (size_t i = 0; i < _current_class->fields.size(); i++) {
-            if (_current_class->fields[i]->name == name) {
-                return _current_class->fields[i]->type_name;
+        ClassDecl* cls = _current_class;
+        for (int depth = 0; depth < 32 && cls; depth++) {
+            for (size_t i = 0; i < cls->fields.size(); i++) {
+                if (cls->fields[i]->name == name) {
+                    return cls->fields[i]->type_name;
+                }
+            }
+            if (!cls->base_class.empty()) {
+                cls = find_class(cls->base_class, program);
+            } else {
+                cls = nullptr;
             }
         }
     }
@@ -163,6 +231,12 @@ String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
         case AstNodeType::DOUBLE_LITERAL: return String("f64");
         case AstNodeType::BOOL_LITERAL: return String("b8");
         case AstNodeType::STRING_LITERAL: return String("str");
+        case AstNodeType::NULL_LITERAL: return String("ptr");
+        case AstNodeType::CAST_EXPR: {
+            CastExpr* ce = static_cast<CastExpr*>(expr);
+            return ce->target_type;
+        }
+        case AstNodeType::SIZEOF_EXPR: return String("u64");
         case AstNodeType::IDENTIFIER_EXPR: {
             IdentifierExpr* id = static_cast<IdentifierExpr*>(expr);
             String vt = lookup_var_type(id->name, program);
@@ -188,14 +262,21 @@ String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
                 return String("i32");
             }
             String obj_type = infer_expr_type(me->object, program);
-            for (size_t i = 0; i < program->classes.size(); i++) {
-                if (program->classes[i]->name == obj_type) {
-                    for (size_t j = 0; j < program->classes[i]->fields.size(); j++) {
-                        if (program->classes[i]->fields[j]->name == me->member) {
-                            return program->classes[i]->fields[j]->type_name;
+            String search_type = obj_type;
+            for (int depth = 0; depth < 32 && !search_type.empty(); depth++) {
+                for (size_t i = 0; i < program->classes.size(); i++) {
+                    if (program->classes[i]->name == search_type) {
+                        for (size_t j = 0; j < program->classes[i]->fields.size(); j++) {
+                            if (program->classes[i]->fields[j]->name == me->member) {
+                                return program->classes[i]->fields[j]->type_name;
+                            }
                         }
+                        search_type = program->classes[i]->base_class;
+                        goto next_member_depth;
                     }
                 }
+                break;
+                next_member_depth:;
             }
             for (size_t i = 0; i < program->unions.size(); i++) {
                 if (program->unions[i]->name == obj_type) {
@@ -231,9 +312,15 @@ String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
                     return String("f64");
                 }
                 if (id->name == "abs") return String("i32");
+                if (id->name == "addr") return String("ptr");
                 for (size_t i = 0; i < program->functions.size(); i++) {
                     if (program->functions[i]->name == id->name) {
                         return program->functions[i]->return_type;
+                    }
+                }
+                for (size_t i = 0; i < program->extern_functions.size(); i++) {
+                    if (program->extern_functions[i]->name == id->name) {
+                        return program->extern_functions[i]->return_type;
                     }
                 }
             }
@@ -297,6 +384,7 @@ void Compiler::tick_type_to_c_type(const String& tick_type, Program* program, ch
     if (tick_type == "f64") { snprintf(out, out_size, "double"); return; }
     if (tick_type == "b8") { snprintf(out, out_size, "bool"); return; }
     if (tick_type == "str") { snprintf(out, out_size, "char*"); return; }
+    if (tick_type == "ptr") { snprintf(out, out_size, "void*"); return; }
 
     if (tick_type.length() > 2 && tick_type[tick_type.length() - 2] == '[' && tick_type[tick_type.length() - 1] == ']') {
         String base_type(tick_type.c_str(), tick_type.length() - 2);
@@ -309,7 +397,11 @@ void Compiler::tick_type_to_c_type(const String& tick_type, Program* program, ch
     if (program) {
         for (size_t i = 0; i < program->classes.size(); i++) {
             if (program->classes[i]->name == tick_type) {
-                snprintf(out, out_size, "%s*", tick_type.c_str());
+                if (program->classes[i]->is_dataclass) {
+                    snprintf(out, out_size, "%s", tick_type.c_str());
+                } else {
+                    snprintf(out, out_size, "%s*", tick_type.c_str());
+                }
                 return;
             }
         }
@@ -381,7 +473,14 @@ bool Compiler::compile_to_native(const char* source_file, const char* output_fil
 
     write_to_file(temp_c, c_code.c_str());
 
-    bool success = invoke_gcc(temp_c, output_file);
+    char extra_flags[2048] = {0};
+    size_t flags_offset = 0;
+    for (size_t i = 0; i < program->link_flags.size(); i++) {
+        int written = snprintf(extra_flags + flags_offset, sizeof(extra_flags) - flags_offset, "%s ", program->link_flags[i].c_str());
+        if (written > 0) flags_offset += written;
+    }
+
+    bool success = invoke_gcc(temp_c, output_file, extra_flags);
 
     if (success && !keep_c) {
         remove(temp_c);
@@ -406,7 +505,12 @@ String Compiler::generate_c_code(Program* program) {
     buf.append("#include <stdbool.h>\n");
     buf.append("#include <stdint.h>\n");
     buf.append("#include <math.h>\n");
+    buf.append("#include <setjmp.h>\n");
     buf.append("#include \"runtime/tick_runtime.h\"\n\n");
+
+    buf.append("static jmp_buf _tick_try_stack[64];\n");
+    buf.append("static const char* _tick_try_msg[64];\n");
+    buf.append("static int _tick_try_depth = 0;\n\n");
 
     for (size_t i = 0; i < program->globals.size(); i++) {
         VarDecl* var = program->globals[i];
@@ -450,7 +554,31 @@ String Compiler::generate_c_code(Program* program) {
 
     for (size_t i = 0; i < program->classes.size(); i++) {
         ClassDecl* cls = program->classes[i];
+        if (cls->is_dataclass) continue;
         buf.append("typedef struct %s {\n", cls->name.c_str());
+        if (!cls->base_class.empty()) {
+            ClassDecl* base = find_class(cls->base_class, program);
+            while (base) {
+                ClassDecl* root = base;
+                DynamicArray<ClassDecl*> chain;
+                chain.push(root);
+                while (!root->base_class.empty()) {
+                    root = find_class(root->base_class, program);
+                    if (!root) break;
+                    chain.push(root);
+                }
+                for (size_t ci = chain.size(); ci > 0; ci--) {
+                    ClassDecl* ancestor = chain[ci - 1];
+                    for (size_t j = 0; j < ancestor->fields.size(); j++) {
+                        VarDecl* field = ancestor->fields[j];
+                        char field_type[128];
+                        tick_type_to_c_type(field->type_name, program, field_type, sizeof(field_type));
+                        buf.append("    %s %s;\n", field_type, field->name.c_str());
+                    }
+                }
+                break;
+            }
+        }
         for (size_t j = 0; j < cls->fields.size(); j++) {
             VarDecl* field = cls->fields[j];
             char field_type[128];
@@ -458,6 +586,19 @@ String Compiler::generate_c_code(Program* program) {
             buf.append("    %s %s;\n", field_type, field->name.c_str());
         }
         buf.append("} %s;\n\n", cls->name.c_str());
+    }
+
+    for (size_t i = 0; i < program->classes.size(); i++) {
+        ClassDecl* dc = program->classes[i];
+        if (!dc->is_dataclass) continue;
+        buf.append("typedef struct %s {\n", dc->name.c_str());
+        for (size_t j = 0; j < dc->fields.size(); j++) {
+            VarDecl* field = dc->fields[j];
+            char field_type[128];
+            tick_type_to_c_type(field->type_name, program, field_type, sizeof(field_type));
+            buf.append("    %s %s;\n", field_type, field->name.c_str());
+        }
+        buf.append("} %s;\n\n", dc->name.c_str());
     }
 
     for (size_t i = 0; i < program->unions.size(); i++) {
@@ -481,6 +622,21 @@ String Compiler::generate_c_code(Program* program) {
         }
         buf.append("} %s;\n\n", ud->name.c_str());
     }
+
+    for (size_t i = 0; i < program->extern_functions.size(); i++) {
+        ExternFuncDecl* ef = program->extern_functions[i];
+        char ret_type[128];
+        tick_type_to_c_type(ef->return_type, program, ret_type, sizeof(ret_type));
+        buf.append("%s %s(", ret_type, ef->name.c_str());
+        for (size_t j = 0; j < ef->parameters.size(); j++) {
+            if (j > 0) buf.append(", ");
+            char param_type[128];
+            tick_type_to_c_type(ef->parameters[j]->type_name, program, param_type, sizeof(param_type));
+            buf.append("%s %s", param_type, ef->parameters[j]->name.c_str());
+        }
+        buf.append(");\n");
+    }
+    if (program->extern_functions.size() > 0) buf.append("\n");
 
     for (size_t i = 0; i < program->signals.size(); i++) {
         SignalDecl* sig = program->signals[i];
@@ -519,7 +675,8 @@ String Compiler::generate_c_code(Program* program) {
         FunctionDecl* method = program->methods[i];
         char ret_type[128];
         tick_type_to_c_type(method->return_type, program, ret_type, sizeof(ret_type));
-        buf.append("%s %s_%s(%s* self", ret_type, method->class_name.c_str(), method->name.c_str(), method->class_name.c_str());
+        const char* method_c_name = method->is_destructor ? "dtor" : method->name.c_str();
+        buf.append("%s %s_%s(%s* self", ret_type, method->class_name.c_str(), method_c_name, method->class_name.c_str());
         for (size_t k = 0; k < method->parameters.size(); k++) {
             char param_type[128];
             tick_type_to_c_type(method->parameters[k]->type_name, program, param_type, sizeof(param_type));
@@ -549,7 +706,8 @@ String Compiler::generate_c_code(Program* program) {
         }
         char ret_type[128];
         tick_type_to_c_type(method->return_type, program, ret_type, sizeof(ret_type));
-        buf.append("%s %s_%s(%s* self", ret_type, method->class_name.c_str(), method->name.c_str(), method->class_name.c_str());
+        const char* method_c_name = method->is_destructor ? "dtor" : method->name.c_str();
+        buf.append("%s %s_%s(%s* self", ret_type, method->class_name.c_str(), method_c_name, method->class_name.c_str());
         for (size_t k = 0; k < method->parameters.size(); k++) {
             char param_type[128];
             tick_type_to_c_type(method->parameters[k]->type_name, program, param_type, sizeof(param_type));
@@ -563,6 +721,12 @@ String Compiler::generate_c_code(Program* program) {
         if (method->body) {
             for (size_t k = 0; k < method->body->statements.size(); k++) {
                 generate_statement(buf, method->body->statements[k], 1, program);
+            }
+        }
+
+        if (method->is_destructor && cls && !cls->base_class.empty()) {
+            if (class_has_destructor(cls->base_class, program)) {
+                buf.append("    %s_dtor((%s*)self);\n", cls->base_class.c_str(), cls->base_class.c_str());
             }
         }
 
@@ -606,6 +770,7 @@ void Compiler::generate_function(CodeBuffer& buf, FunctionDecl* func, Program* p
     push_defer_scope();
 
     if (func->name == "main") {
+        buf.append("    tick_gc_init();\n");
         for (size_t i = 0; i < program->globals.size(); i++) {
             VarDecl* var = program->globals[i];
             bool is_arr = var->type_name.length() > 2 &&
@@ -670,6 +835,10 @@ void Compiler::generate_function(CodeBuffer& buf, FunctionDecl* func, Program* p
 
     generate_deferred(buf, 1, program);
     pop_defer_scope();
+
+    if (func->name == "main") {
+        buf.append("    tick_gc_cleanup();\n");
+    }
 
     buf.append("}\n\n");
 }
@@ -740,15 +909,27 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
                     for (size_t ui = 0; ui < program->unions.size(); ui++) {
                         if (program->unions[ui]->name == decl->type_name) { is_union_type = true; break; }
                     }
+                    bool is_class_type = false;
+                    for (size_t ci = 0; ci < program->classes.size(); ci++) {
+                        if (program->classes[ci]->name == decl->type_name) { is_class_type = true; break; }
+                    }
                     if (decl->type_name == "str") {
                         buf.append(" = NULL");
-                    } else if (is_union_type) {
+                    } else if (decl->type_name == "ptr") {
+                        buf.append(" = NULL");
+                    } else if (is_union_type || is_class_type) {
                         buf.append(" = {0}");
                     } else {
                         buf.append(" = 0");
                     }
                 }
                 buf.append(";\n");
+                if (class_has_destructor(decl->type_name, program) && _defer_depth >= 0 &&
+                    _raii_counts[_defer_depth] < MAX_RAII_PER_SCOPE) {
+                    _raii_scopes[_defer_depth][_raii_counts[_defer_depth]].var_name = decl->name;
+                    _raii_scopes[_defer_depth][_raii_counts[_defer_depth]].class_name = decl->type_name;
+                    _raii_counts[_defer_depth]++;
+                }
             }
             break;
         }
@@ -966,6 +1147,69 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
             break;
         }
 
+        case AstNodeType::TRY_CATCH_STMT: {
+            TryCatchStmt* tc = static_cast<TryCatchStmt*>(stmt);
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("_tick_try_depth++;\n");
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("if (setjmp(_tick_try_stack[_tick_try_depth - 1]) == 0) {\n");
+            push_defer_scope();
+            if (tc->try_body) {
+                for (size_t i = 0; i < tc->try_body->statements.size(); i++) {
+                    generate_statement(buf, tc->try_body->statements[i], indent + 1, program);
+                }
+            }
+            generate_deferred(buf, indent + 1, program);
+            pop_defer_scope();
+            for (int i = 0; i < indent + 1; i++) buf.append("    ");
+            buf.append("_tick_try_depth--;\n");
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("} else {\n");
+            for (int i = 0; i < indent + 1; i++) buf.append("    ");
+            buf.append("_tick_try_depth--;\n");
+            for (int i = 0; i < indent + 1; i++) buf.append("    ");
+            {
+                char catch_c_type[128];
+                tick_type_to_c_type(String(tc->catch_type), program, catch_c_type, sizeof(catch_c_type));
+                buf.append("%s %s = (%s)_tick_try_msg[_tick_try_depth];\n",
+                    catch_c_type, tc->catch_var.c_str(), catch_c_type);
+            }
+            push_defer_scope();
+            if (tc->catch_body) {
+                for (size_t i = 0; i < tc->catch_body->statements.size(); i++) {
+                    generate_statement(buf, tc->catch_body->statements[i], indent + 1, program);
+                }
+            }
+            generate_deferred(buf, indent + 1, program);
+            pop_defer_scope();
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("}\n");
+            break;
+        }
+
+        case AstNodeType::THROW_STMT: {
+            ThrowStmt* ts = static_cast<ThrowStmt*>(stmt);
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("if (_tick_try_depth > 0) {\n");
+            for (int i = 0; i < indent + 1; i++) buf.append("    ");
+            buf.append("_tick_try_msg[_tick_try_depth - 1] = ");
+            generate_expression(buf, ts->value, program);
+            buf.append(";\n");
+            for (int i = 0; i < indent + 1; i++) buf.append("    ");
+            buf.append("longjmp(_tick_try_stack[_tick_try_depth - 1], 1);\n");
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("} else {\n");
+            for (int i = 0; i < indent + 1; i++) buf.append("    ");
+            buf.append("fprintf(stderr, \"Unhandled exception: %%s\\n\", ");
+            generate_expression(buf, ts->value, program);
+            buf.append(");\n");
+            for (int i = 0; i < indent + 1; i++) buf.append("    ");
+            buf.append("exit(1);\n");
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("}\n");
+            break;
+        }
+
         default:
             break;
     }
@@ -1035,6 +1279,29 @@ void Compiler::generate_expression(CodeBuffer& buf, ExprNode* expr, Program* pro
         case AstNodeType::BOOL_LITERAL: {
             BoolLiteral* lit = static_cast<BoolLiteral*>(expr);
             buf.append("%s", lit->value ? "true" : "false");
+            break;
+        }
+
+        case AstNodeType::NULL_LITERAL: {
+            buf.append("NULL");
+            break;
+        }
+
+        case AstNodeType::CAST_EXPR: {
+            CastExpr* ce = static_cast<CastExpr*>(expr);
+            char c_type[128];
+            tick_type_to_c_type(ce->target_type, program, c_type, sizeof(c_type));
+            buf.append("(%s)(", c_type);
+            generate_expression(buf, ce->expression, program);
+            buf.append(")");
+            break;
+        }
+
+        case AstNodeType::SIZEOF_EXPR: {
+            SizeofExpr* se = static_cast<SizeofExpr*>(expr);
+            char c_type[128];
+            tick_type_to_c_type(se->target_type, program, c_type, sizeof(c_type));
+            buf.append("sizeof(%s)", c_type);
             break;
         }
 
@@ -1337,13 +1604,29 @@ void Compiler::generate_expression(CodeBuffer& buf, ExprNode* expr, Program* pro
                         }
 
                         if (obj_class) {
-                            buf.append("%s_%s(", obj_class->name.c_str(), member->member.c_str());
-                            generate_expression(buf, member->object, program);
-                            for (size_t i = 0; i < call->arguments.size(); i++) {
-                                buf.append(", ");
-                                generate_expression(buf, call->arguments[i], program);
+                            FunctionDecl* resolved = find_method(obj_class->name, member->member, program);
+                            if (resolved) {
+                                buf.append("%s_%s(", resolved->class_name.c_str(), resolved->name.c_str());
+                                if (resolved->class_name == obj_class->name) {
+                                    generate_expression(buf, member->object, program);
+                                } else {
+                                    buf.append("(%s*)", resolved->class_name.c_str());
+                                    generate_expression(buf, member->object, program);
+                                }
+                                for (size_t i = 0; i < call->arguments.size(); i++) {
+                                    buf.append(", ");
+                                    generate_expression(buf, call->arguments[i], program);
+                                }
+                                buf.append(")");
+                            } else {
+                                buf.append("%s_%s(", obj_class->name.c_str(), member->member.c_str());
+                                generate_expression(buf, member->object, program);
+                                for (size_t i = 0; i < call->arguments.size(); i++) {
+                                    buf.append(", ");
+                                    generate_expression(buf, call->arguments[i], program);
+                                }
+                                buf.append(")");
                             }
-                            buf.append(")");
                         } else {
                             generate_expression(buf, call->callee, program);
                             buf.append("(");
@@ -1374,18 +1657,16 @@ void Compiler::generate_expression(CodeBuffer& buf, ExprNode* expr, Program* pro
                     }
                 }
 
-                if (matching_class) {
-                    buf.append("({%s* __obj = malloc(sizeof(%s)); ",
+                if (matching_class && !matching_class->is_dataclass) {
+                    buf.append("({%s* __obj = (%s*)tick_gc_alloc(sizeof(%s)); memset(__obj, 0, sizeof(%s)); ",
+                        matching_class->name.c_str(), matching_class->name.c_str(),
                         matching_class->name.c_str(), matching_class->name.c_str());
-
-                    for (size_t i = 0; i < matching_class->fields.size(); i++) {
-                        buf.append("__obj->%s = 0; ", matching_class->fields[i]->name.c_str());
-                    }
 
                     FunctionDecl* constructor = nullptr;
                     for (size_t i = 0; i < program->methods.size(); i++) {
                         if (program->methods[i]->class_name == matching_class->name &&
-                            program->methods[i]->name == matching_class->name) {
+                            program->methods[i]->name == matching_class->name &&
+                            !program->methods[i]->is_destructor) {
                             constructor = program->methods[i];
                             break;
                         }
@@ -1415,11 +1696,20 @@ void Compiler::generate_expression(CodeBuffer& buf, ExprNode* expr, Program* pro
                     }
                     buf.append(")");
                 } else if (ident->name == "free") {
-                    buf.append("free(");
+                    buf.append("tick_gc_free(");
                     if (call->arguments.size() > 0) {
                         generate_expression(buf, call->arguments[0], program);
                     }
                     buf.append(")");
+                } else if (ident->name == "gc_collect") {
+                    buf.append("tick_gc_collect()");
+                } else if (ident->name == "gc_cleanup") {
+                    buf.append("tick_gc_cleanup()");
+                } else if (ident->name == "addr") {
+                    buf.append("(void*)&");
+                    if (call->arguments.size() > 0) {
+                        generate_expression(buf, call->arguments[0], program);
+                    }
                 } else if (ident->name == "str_concat") {
                     buf.append("tick_str_concat(");
                     for (size_t i = 0; i < call->arguments.size(); i++) {
@@ -1595,6 +1885,13 @@ void Compiler::generate_expression(CodeBuffer& buf, ExprNode* expr, Program* pro
                 for (size_t i = 0; i < program->unions.size(); i++) {
                     if (program->unions[i]->name == obj_type) { use_dot = true; break; }
                 }
+                if (!use_dot) {
+                    for (size_t i = 0; i < program->classes.size(); i++) {
+                        if (program->classes[i]->name == obj_type && program->classes[i]->is_dataclass) {
+                            use_dot = true; break;
+                        }
+                    }
+                }
                 if (!use_dot && member->object->type == AstNodeType::MEMBER_EXPR) {
                     MemberExpr* inner = static_cast<MemberExpr*>(member->object);
                     String inner_obj_type = infer_expr_type(inner->object, program);
@@ -1639,7 +1936,7 @@ void Compiler::write_to_file(const char* filename, const char* content) {
     }
 }
 
-bool Compiler::invoke_gcc(const char* c_file, const char* output_file) {
+bool Compiler::invoke_gcc(const char* c_file, const char* output_file, const char* extra_flags) {
     char cmd[2048];
     char exe_path[1024];
     char runtime_path[1024];
@@ -1678,8 +1975,8 @@ bool Compiler::invoke_gcc(const char* c_file, const char* output_file) {
     char include_path[1024];
     snprintf(include_path, sizeof(include_path), "-I%s/../src", exe_path);
 
-    snprintf(cmd, sizeof(cmd), "gcc -O2 -o %s %s %s -pthread -lm %s",
-        output_file, c_file, runtime_path, include_path);
+    snprintf(cmd, sizeof(cmd), "gcc -O2 -o %s %s %s -pthread -lm %s %s",
+        output_file, c_file, runtime_path, include_path, extra_flags ? extra_flags : "");
 
     int result = system(cmd);
     return result == 0;

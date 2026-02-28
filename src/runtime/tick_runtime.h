@@ -63,4 +63,17 @@ bool tick_file_exists(const char* path);
 void* tick_array_push(void* arr, int32_t* len, int32_t* cap, int32_t elem_size);
 void tick_array_pop(int32_t* len);
 
+#define TICK_GC_MAX_OBJECTS 65536
+
+typedef struct {
+    void* ptrs[TICK_GC_MAX_OBJECTS];
+    int count;
+} TickGC;
+
+void tick_gc_init(void);
+void* tick_gc_alloc(size_t size);
+void tick_gc_free(void* ptr);
+void tick_gc_collect(void);
+void tick_gc_cleanup(void);
+
 #endif

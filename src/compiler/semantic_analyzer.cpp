@@ -111,6 +111,33 @@ bool SemanticAnalyzer::types_compatible(const String& expected, const String& ac
     }
     if (expected == "b8" && actual == "b8") return true;
     if (expected == "str" && actual == "str") return true;
+    if (expected == "ptr" && actual == "ptr") return true;
+    if (expected == "ptr" && actual == "null") return true;
+    if (actual == "null" && expected == "ptr") return true;
+    if (actual == "null" && expected == "str") return true;
+    if (actual == "null") {
+        if (_program) {
+            for (size_t i = 0; i < _program->classes.size(); i++) {
+                if (_program->classes[i]->name == expected) return true;
+            }
+        }
+        return false;
+    }
+    if (expected == "ptr" || actual == "ptr") return true;
+    if (_program) {
+        String base = actual;
+        for (int depth = 0; depth < 32; depth++) {
+            for (size_t i = 0; i < _program->classes.size(); i++) {
+                if (_program->classes[i]->name == base && !_program->classes[i]->base_class.empty()) {
+                    base = _program->classes[i]->base_class;
+                    if (base == expected) return true;
+                    goto next_depth;
+                }
+            }
+            break;
+            next_depth:;
+        }
+    }
     return false;
 }
 
@@ -128,7 +155,9 @@ bool SemanticAnalyzer::is_builtin_function(const String& name) {
            name == "file_open" || name == "file_read" ||
            name == "file_write" || name == "file_close" ||
            name == "file_exists" ||
-           name == "free" || name == "array_length";
+           name == "free" || name == "array_length" ||
+           name == "gc_collect" || name == "gc_cleanup" ||
+           name == "addr" || name == "sizeof";
 }
 
 String SemanticAnalyzer::infer_type(ExprNode* node) {
@@ -139,6 +168,12 @@ String SemanticAnalyzer::infer_type(ExprNode* node) {
         case AstNodeType::DOUBLE_LITERAL: return String("f64");
         case AstNodeType::BOOL_LITERAL: return String("b8");
         case AstNodeType::STRING_LITERAL: return String("str");
+        case AstNodeType::NULL_LITERAL: return String("null");
+        case AstNodeType::CAST_EXPR: {
+            CastExpr* ce = static_cast<CastExpr*>(node);
+            return ce->target_type;
+        }
+        case AstNodeType::SIZEOF_EXPR: return String("u64");
         case AstNodeType::IDENTIFIER_EXPR: {
             IdentifierExpr* id = static_cast<IdentifierExpr*>(node);
             Symbol** sym = _symbols.find(id->name.c_str());
@@ -183,6 +218,8 @@ String SemanticAnalyzer::infer_type(ExprNode* node) {
                 if (id->name == "parse") return String("");
                 if (id->name == "str_char_at") return String("u8");
                 if (id->name == "file_exists") return String("b8");
+                if (id->name == "addr") return String("ptr");
+                if (id->name == "sizeof") return String("u64");
                 if (id->name == "sqrt" || id->name == "pow" ||
                     id->name == "sin" || id->name == "cos" ||
                     id->name == "tan" || id->name == "floor" ||
@@ -327,6 +364,10 @@ bool SemanticAnalyzer::analyze(Program* program) {
             new Symbol(SymbolType::CLASS, program->unions[i]->name, String("union")));
     }
 
+    for (size_t i = 0; i < program->interfaces.size(); i++) {
+        analyze_interface_decl(program->interfaces[i]);
+    }
+
     for (size_t i = 0; i < program->classes.size(); i++) {
         Symbol* sym = new Symbol(SymbolType::CLASS, program->classes[i]->name, String("class"));
         _symbols.insert(program->classes[i]->name.c_str(), sym);
@@ -367,6 +408,10 @@ bool SemanticAnalyzer::analyze(Program* program) {
         _symbols.insert(program->functions[i]->name.c_str(),
             new Symbol(SymbolType::FUNCTION, program->functions[i]->name,
                        program->functions[i]->return_type, pc));
+    }
+
+    for (size_t i = 0; i < program->extern_functions.size(); i++) {
+        analyze_extern_func_decl(program->extern_functions[i]);
     }
 
     for (size_t i = 0; i < program->classes.size(); i++) {
@@ -527,6 +572,55 @@ void SemanticAnalyzer::analyze_function_decl(FunctionDecl* node) {
 }
 
 void SemanticAnalyzer::analyze_class_decl(ClassDecl* node) {
+    if (!node->base_class.empty()) {
+        bool found = false;
+        for (size_t i = 0; i < _program->classes.size(); i++) {
+            if (_program->classes[i]->name == node->base_class) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            char msg[256];
+            snprintf(msg, sizeof(msg), "Base class '%s' not found for class '%s'",
+                node->base_class.c_str(), node->name.c_str());
+            error(node->line, msg);
+        }
+    }
+
+    for (size_t i = 0; i < node->interfaces.size(); i++) {
+        bool found = false;
+        for (size_t j = 0; j < _program->interfaces.size(); j++) {
+            if (_program->interfaces[j]->name == node->interfaces[i]) {
+                found = true;
+                InterfaceDecl* iface = _program->interfaces[j];
+                for (size_t k = 0; k < iface->methods.size(); k++) {
+                    bool has_method = false;
+                    for (size_t m = 0; m < _program->methods.size(); m++) {
+                        if (_program->methods[m]->class_name == node->name &&
+                            _program->methods[m]->name == iface->methods[k]->name) {
+                            has_method = true;
+                            break;
+                        }
+                    }
+                    if (!has_method) {
+                        char msg[256];
+                        snprintf(msg, sizeof(msg), "Class '%s' does not implement method '%s' from interface '%s'",
+                            node->name.c_str(), iface->methods[k]->name.c_str(), iface->name.c_str());
+                        error(node->line, msg);
+                    }
+                }
+                break;
+            }
+        }
+        if (!found) {
+            char msg[256];
+            snprintf(msg, sizeof(msg), "Interface '%s' not found for class '%s'",
+                node->interfaces[i].c_str(), node->name.c_str());
+            error(node->line, msg);
+        }
+    }
+
     push_scope();
 
     for (size_t i = 0; i < node->fields.size(); i++) {
@@ -591,6 +685,12 @@ void SemanticAnalyzer::analyze_statement(StmtNode* node) {
             break;
         case AstNodeType::SWITCH_STMT:
             analyze_switch_stmt(static_cast<SwitchStmt*>(node));
+            break;
+        case AstNodeType::TRY_CATCH_STMT:
+            analyze_try_catch_stmt(static_cast<TryCatchStmt*>(node));
+            break;
+        case AstNodeType::THROW_STMT:
+            analyze_throw_stmt(static_cast<ThrowStmt*>(node));
             break;
         case AstNodeType::BREAK_STMT:
             if (_loop_depth == 0) {
@@ -791,7 +891,14 @@ void SemanticAnalyzer::analyze_expression(ExprNode* node) {
         case AstNodeType::DOUBLE_LITERAL:
         case AstNodeType::BOOL_LITERAL:
         case AstNodeType::STRING_LITERAL:
+        case AstNodeType::NULL_LITERAL:
+        case AstNodeType::SIZEOF_EXPR:
             break;
+        case AstNodeType::CAST_EXPR: {
+            CastExpr* ce = static_cast<CastExpr*>(node);
+            analyze_expression(ce->expression);
+            break;
+        }
         default:
             break;
     }
@@ -929,6 +1036,43 @@ void SemanticAnalyzer::analyze_identifier(IdentifierExpr* node) {
         char msg[256];
         snprintf(msg, sizeof(msg), "Use of undeclared identifier '%s'", node->name.c_str());
         error(node->line, msg);
+    }
+}
+
+void SemanticAnalyzer::analyze_interface_decl(InterfaceDecl* node) {
+    _symbols.insert(node->name.c_str(),
+        new Symbol(SymbolType::CLASS, node->name, String("interface")));
+}
+
+void SemanticAnalyzer::analyze_extern_func_decl(ExternFuncDecl* node) {
+    int pc = (int)node->parameters.size();
+    _symbols.insert(node->name.c_str(),
+        new Symbol(SymbolType::FUNCTION, node->name, node->return_type, pc));
+}
+
+void SemanticAnalyzer::analyze_try_catch_stmt(TryCatchStmt* node) {
+    push_scope();
+    if (node->try_body) {
+        for (size_t i = 0; i < node->try_body->statements.size(); i++) {
+            analyze_statement(node->try_body->statements[i]);
+        }
+    }
+    pop_scope();
+
+    push_scope();
+    declare_in_scope(node->catch_var.c_str(),
+        new Symbol(SymbolType::VARIABLE, node->catch_var, node->catch_type));
+    if (node->catch_body) {
+        for (size_t i = 0; i < node->catch_body->statements.size(); i++) {
+            analyze_statement(node->catch_body->statements[i]);
+        }
+    }
+    pop_scope();
+}
+
+void SemanticAnalyzer::analyze_throw_stmt(ThrowStmt* node) {
+    if (node->value) {
+        analyze_expression(node->value);
     }
 }
 

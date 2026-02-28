@@ -1,0 +1,91 @@
+func main() : i32 {
+    var a : i32 = 255;
+    var b : i32 = 15;
+
+    var and_result : i32 = a & b;
+    if (and_result != 15) {
+        println(and_result);
+        return 1;
+    }
+
+    var or_result : i32 = a | b;
+    if (or_result != 255) {
+        println(or_result);
+        return 1;
+    }
+
+    var xor_result : i32 = a ^ b;
+    if (xor_result != 240) {
+        println(xor_result);
+        return 1;
+    }
+
+    var not_result : i32 = ~0;
+    if (not_result != -1) {
+        println(not_result);
+        return 1;
+    }
+
+    var lshift : i32 = 1 << 4;
+    if (lshift != 16) {
+        println(lshift);
+        return 1;
+    }
+
+    var rshift : i32 = 256 >> 3;
+    if (rshift != 32) {
+        println(rshift);
+        return 1;
+    }
+
+    var x : i32 = 5;
+    x &= 3;
+    if (x != 1) {
+        println(x);
+        return 1;
+    }
+
+    x = 5;
+    x |= 2;
+    if (x != 7) {
+        println(x);
+        return 1;
+    }
+
+    x = 7;
+    x ^= 3;
+    if (x != 4) {
+        println(x);
+        return 1;
+    }
+
+    x = 1;
+    x <<= 3;
+    if (x != 8) {
+        println(x);
+        return 1;
+    }
+
+    x = 64;
+    x >>= 2;
+    if (x != 16) {
+        println(x);
+        return 1;
+    }
+
+    var flags : i32 = 0;
+    flags = flags | (1 << 0);
+    flags = flags | (1 << 2);
+    if ((flags & (1 << 0)) == 0) {
+        return 1;
+    }
+    if ((flags & (1 << 1)) != 0) {
+        return 1;
+    }
+    if ((flags & (1 << 2)) == 0) {
+        return 1;
+    }
+
+    println("PASS: bitwise");
+    return 0;
+}

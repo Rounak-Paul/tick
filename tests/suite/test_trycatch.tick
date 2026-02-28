@@ -1,0 +1,57 @@
+func risky(should_throw : b8) : i32 {
+    if (should_throw) {
+        throw "something went wrong";
+    }
+    return 42;
+}
+
+func main() : i32 {
+    var result : i32 = 0;
+
+    try {
+        result = risky(false);
+    } catch (e : str) {
+        return 1;
+    }
+    if (result != 42) {
+        return 1;
+    }
+
+    var caught : b8 = false;
+    var msg : str = "";
+    try {
+        risky(true);
+    } catch (e : str) {
+        caught = true;
+        msg = e;
+    }
+    if (!caught) {
+        return 1;
+    }
+    if (msg != "something went wrong") {
+        return 1;
+    }
+
+    var outer_caught : b8 = false;
+    try {
+        try {
+            throw "inner";
+        } catch (e : str) {
+            if (e != "inner") {
+                return 1;
+            }
+            throw "outer";
+        }
+    } catch (e : str) {
+        if (e != "outer") {
+            return 1;
+        }
+        outer_caught = true;
+    }
+    if (!outer_caught) {
+        return 1;
+    }
+
+    println("PASS: trycatch");
+    return 0;
+}

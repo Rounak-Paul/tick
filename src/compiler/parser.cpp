@@ -54,7 +54,7 @@ bool Parser::is_type_keyword() {
         type == TokenType::I32 || type == TokenType::I64 ||
         type == TokenType::F32 || type == TokenType::F64 ||
         type == TokenType::B8 || type == TokenType::STR ||
-        type == TokenType::VOID_TYPE) {
+        type == TokenType::VOID_TYPE || type == TokenType::PTR) {
         return true;
     }
     if (type == TokenType::IDENTIFIER) {
@@ -72,7 +72,8 @@ Token Parser::parse_type() {
         type == TokenType::I32 || type == TokenType::I64 ||
         type == TokenType::F32 || type == TokenType::F64 ||
         type == TokenType::B8 || type == TokenType::STR ||
-        type == TokenType::VOID_TYPE || type == TokenType::IDENTIFIER) {
+        type == TokenType::VOID_TYPE || type == TokenType::PTR ||
+        type == TokenType::IDENTIFIER) {
         Token type_token = current_token();
         advance();
         
@@ -112,6 +113,10 @@ Program* Parser::parse() {
         else if (check(TokenType::SIGNAL)) {
             program->signals.push(parse_signal_decl());
         }
+        else if (check(TokenType::DATACLASS)) {
+            advance();
+            parse_class_decl(program, true);
+        }
         else if (check(TokenType::AT)) {
             program->processes.push(parse_process_decl());
         }
@@ -126,6 +131,18 @@ Program* Parser::parse() {
         }
         else if (check(TokenType::UNION)) {
             program->unions.push(parse_union_decl());
+        }
+        else if (check(TokenType::INTERFACE)) {
+            parse_interface_decl(program);
+        }
+        else if (check(TokenType::EXTERN)) {
+            program->extern_functions.push(parse_extern_func_decl());
+        }
+        else if (check(TokenType::LINK)) {
+            advance();
+            Token flag = consume(TokenType::STRING, "Expected string after 'link'");
+            consume(TokenType::SEMICOLON, "Expected ';' after link directive");
+            program->link_flags.push(flag.lexeme);
         }
         else {
             fprintf(stderr, "Parse error at line %d: Unexpected token at top level\n", current_token().line);
@@ -222,14 +239,35 @@ ProcessDecl* Parser::parse_process_decl() {
     return decl;
 }
 
-void Parser::parse_class_decl(Program* program) {
+void Parser::parse_class_decl(Program* program, bool is_dataclass) {
     int ln = current_token().line;
     consume(TokenType::CLASS, "Expected 'class'");
     Token name = consume(TokenType::IDENTIFIER, "Expected class name");
-    consume(TokenType::LBRACE, "Expected '{' after class name");
+    
+    String base_class;
+    DynamicArray<String> iface_list;
+    
+    if (!is_dataclass && match(TokenType::COLON)) {
+        Token base = consume(TokenType::IDENTIFIER, "Expected base class name after ':'");
+        base_class = base.lexeme;
+    }
+    
+    if (!is_dataclass && match(TokenType::IMPLEMENTS)) {
+        do {
+            Token iface = consume(TokenType::IDENTIFIER, "Expected interface name");
+            iface_list.push(iface.lexeme);
+        } while (match(TokenType::COMMA));
+    }
+    
+    consume(TokenType::LBRACE, "Expected '{' after class declaration");
     
     ClassDecl* cls = new ClassDecl(name.lexeme);
     cls->line = ln;
+    cls->base_class = base_class;
+    cls->is_dataclass = is_dataclass;
+    for (size_t i = 0; i < iface_list.size(); i++) {
+        cls->interfaces.push(iface_list[i]);
+    }
     
     while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
         if (check(TokenType::VAR)) {
@@ -247,15 +285,22 @@ void Parser::parse_class_decl(Program* program) {
             VarDecl* field = new VarDecl(type.lexeme, field_name.lexeme, initializer);
             field->line = fln;
             cls->fields.push(field);
-        } else if (check(TokenType::FUNC)) {
+        } else if (!is_dataclass && check(TokenType::FUNC)) {
             int mln = current_token().line;
             advance();
+            
+            bool is_dtor = false;
+            if (match(TokenType::TILDE)) {
+                is_dtor = true;
+            }
+            
             Token method_name = consume(TokenType::IDENTIFIER, "Expected method name after 'func'");
             consume(TokenType::LPAREN, "Expected '(' after method name");
             
             FunctionDecl* method = new FunctionDecl("", method_name.lexeme, nullptr);
             method->line = mln;
             method->class_name = name.lexeme;
+            method->is_destructor = is_dtor;
             
             if (!check(TokenType::RPAREN)) {
                 do {
@@ -353,6 +398,12 @@ StmtNode* Parser::parse_statement() {
     }
     if (check(TokenType::SWITCH)) {
         return parse_switch_stmt();
+    }
+    if (check(TokenType::TRY)) {
+        return parse_try_catch_stmt();
+    }
+    if (check(TokenType::THROW)) {
+        return parse_throw_stmt();
     }
     if (check(TokenType::LBRACE)) {
         return parse_block();
@@ -660,6 +711,41 @@ ExprNode* Parser::parse_assignment() {
         return node;
     }
     
+    if (match(TokenType::AMPERSAND_ASSIGN)) {
+        ExprNode* value = parse_assignment();
+        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String("&"), value);
+        node->line = ln;
+        return node;
+    }
+    
+    if (match(TokenType::PIPE_ASSIGN)) {
+        ExprNode* value = parse_assignment();
+        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String("|"), value);
+        node->line = ln;
+        return node;
+    }
+    
+    if (match(TokenType::CARET_ASSIGN)) {
+        ExprNode* value = parse_assignment();
+        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String("^"), value);
+        node->line = ln;
+        return node;
+    }
+    
+    if (match(TokenType::LSHIFT_ASSIGN)) {
+        ExprNode* value = parse_assignment();
+        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String("<<"), value);
+        node->line = ln;
+        return node;
+    }
+    
+    if (match(TokenType::RSHIFT_ASSIGN)) {
+        ExprNode* value = parse_assignment();
+        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String(">>"), value);
+        node->line = ln;
+        return node;
+    }
+    
     return expr;
 }
 
@@ -679,12 +765,12 @@ ExprNode* Parser::parse_logical_or() {
 }
 
 ExprNode* Parser::parse_logical_and() {
-    ExprNode* expr = parse_equality();
+    ExprNode* expr = parse_bitwise_or();
     
     while (match(TokenType::AND)) {
         int ln = _tokens[_current - 1].line;
         String op("&&");
-        ExprNode* right = parse_equality();
+        ExprNode* right = parse_bitwise_or();
         BinaryExpr* node = new BinaryExpr(expr, op, right);
         node->line = ln;
         expr = node;
@@ -709,13 +795,13 @@ ExprNode* Parser::parse_equality() {
 }
 
 ExprNode* Parser::parse_comparison() {
-    ExprNode* expr = parse_term();
+    ExprNode* expr = parse_shift();
     
     while (match(TokenType::LT) || match(TokenType::GT) || 
            match(TokenType::LTE) || match(TokenType::GTE)) {
         int ln = _tokens[_current - 1].line;
         String op = _tokens[_current - 1].lexeme;
-        ExprNode* right = parse_term();
+        ExprNode* right = parse_shift();
         BinaryExpr* node = new BinaryExpr(expr, op, right);
         node->line = ln;
         expr = node;
@@ -755,7 +841,7 @@ ExprNode* Parser::parse_factor() {
 }
 
 ExprNode* Parser::parse_unary() {
-    if (match(TokenType::NOT) || match(TokenType::MINUS)) {
+    if (match(TokenType::NOT) || match(TokenType::MINUS) || match(TokenType::TILDE)) {
         int ln = _tokens[_current - 1].line;
         String op = _tokens[_current - 1].lexeme;
         ExprNode* operand = parse_unary();
@@ -842,6 +928,29 @@ ExprNode* Parser::parse_primary() {
     }
     if (match(TokenType::FALSE)) {
         BoolLiteral* node = new BoolLiteral(false);
+        node->line = ln;
+        return node;
+    }
+    if (match(TokenType::NULL_LIT)) {
+        NullLiteral* node = new NullLiteral();
+        node->line = ln;
+        return node;
+    }
+    if (match(TokenType::CAST)) {
+        consume(TokenType::LPAREN, "Expected '(' after 'cast'");
+        ExprNode* expr = parse_expression();
+        consume(TokenType::COMMA, "Expected ',' after cast expression");
+        Token target = parse_type();
+        consume(TokenType::RPAREN, "Expected ')' after cast type");
+        CastExpr* node = new CastExpr(expr, target.lexeme);
+        node->line = ln;
+        return node;
+    }
+    if (match(TokenType::SIZEOF)) {
+        consume(TokenType::LPAREN, "Expected '(' after 'sizeof'");
+        Token target = parse_type();
+        consume(TokenType::RPAREN, "Expected ')' after sizeof type");
+        SizeofExpr* node = new SizeofExpr(target.lexeme);
         node->line = ln;
         return node;
     }
@@ -970,6 +1079,157 @@ ExprNode* Parser::parse_primary() {
     
     fprintf(stderr, "Parse error at line %d: Unexpected token in expression\n", ln);
     exit(1);
+}
+
+ExprNode* Parser::parse_bitwise_or() {
+    ExprNode* expr = parse_bitwise_xor();
+    
+    while (match(TokenType::PIPE)) {
+        int ln = _tokens[_current - 1].line;
+        ExprNode* right = parse_bitwise_xor();
+        BinaryExpr* node = new BinaryExpr(expr, String("|"), right);
+        node->line = ln;
+        expr = node;
+    }
+    
+    return expr;
+}
+
+ExprNode* Parser::parse_bitwise_xor() {
+    ExprNode* expr = parse_bitwise_and();
+    
+    while (match(TokenType::CARET)) {
+        int ln = _tokens[_current - 1].line;
+        ExprNode* right = parse_bitwise_and();
+        BinaryExpr* node = new BinaryExpr(expr, String("^"), right);
+        node->line = ln;
+        expr = node;
+    }
+    
+    return expr;
+}
+
+ExprNode* Parser::parse_bitwise_and() {
+    ExprNode* expr = parse_equality();
+    
+    while (match(TokenType::AMPERSAND)) {
+        int ln = _tokens[_current - 1].line;
+        ExprNode* right = parse_equality();
+        BinaryExpr* node = new BinaryExpr(expr, String("&"), right);
+        node->line = ln;
+        expr = node;
+    }
+    
+    return expr;
+}
+
+ExprNode* Parser::parse_shift() {
+    ExprNode* expr = parse_term();
+    
+    while (match(TokenType::LSHIFT) || match(TokenType::RSHIFT)) {
+        int ln = _tokens[_current - 1].line;
+        String op = _tokens[_current - 1].lexeme;
+        ExprNode* right = parse_term();
+        BinaryExpr* node = new BinaryExpr(expr, op, right);
+        node->line = ln;
+        expr = node;
+    }
+    
+    return expr;
+}
+
+ExternFuncDecl* Parser::parse_extern_func_decl() {
+    int ln = current_token().line;
+    consume(TokenType::EXTERN, "Expected 'extern'");
+    consume(TokenType::FUNC, "Expected 'func' after 'extern'");
+    Token name = consume(TokenType::IDENTIFIER, "Expected function name");
+    consume(TokenType::LPAREN, "Expected '(' after function name");
+    
+    ExternFuncDecl* decl = new ExternFuncDecl(String(""), name.lexeme);
+    decl->line = ln;
+    
+    if (!check(TokenType::RPAREN)) {
+        do {
+            Token param_name = consume(TokenType::IDENTIFIER, "Expected parameter name");
+            consume(TokenType::COLON, "Expected ':' after parameter name");
+            Token param_type = parse_type();
+            decl->parameters.push(new Parameter(param_type.lexeme, param_name.lexeme));
+        } while (match(TokenType::COMMA));
+    }
+    
+    consume(TokenType::RPAREN, "Expected ')' after parameters");
+    consume(TokenType::COLON, "Expected ':' after parameters");
+    Token return_type = parse_type();
+    decl->return_type = return_type.lexeme;
+    consume(TokenType::SEMICOLON, "Expected ';' after extern function declaration");
+    
+    return decl;
+}
+
+void Parser::parse_interface_decl(Program* program) {
+    int ln = current_token().line;
+    consume(TokenType::INTERFACE, "Expected 'interface'");
+    Token name = consume(TokenType::IDENTIFIER, "Expected interface name");
+    consume(TokenType::LBRACE, "Expected '{' after interface name");
+    
+    InterfaceDecl* iface = new InterfaceDecl(name.lexeme);
+    iface->line = ln;
+    
+    while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
+        consume(TokenType::FUNC, "Expected 'func' in interface body");
+        Token method_name = consume(TokenType::IDENTIFIER, "Expected method name");
+        consume(TokenType::LPAREN, "Expected '(' after method name");
+        
+        InterfaceMethod* method = new InterfaceMethod(method_name.lexeme, String(""));
+        
+        if (!check(TokenType::RPAREN)) {
+            do {
+                Token param_name = consume(TokenType::IDENTIFIER, "Expected parameter name");
+                consume(TokenType::COLON, "Expected ':' after parameter name");
+                Token param_type = parse_type();
+                method->parameters.push(new Parameter(param_type.lexeme, param_name.lexeme));
+            } while (match(TokenType::COMMA));
+        }
+        
+        consume(TokenType::RPAREN, "Expected ')' after parameters");
+        consume(TokenType::COLON, "Expected ':' after parameters");
+        Token return_type = parse_type();
+        method->return_type = return_type.lexeme;
+        consume(TokenType::SEMICOLON, "Expected ';' after interface method");
+        
+        iface->methods.push(method);
+    }
+    
+    consume(TokenType::RBRACE, "Expected '}' after interface body");
+    program->interfaces.push(iface);
+}
+
+StmtNode* Parser::parse_try_catch_stmt() {
+    int ln = current_token().line;
+    consume(TokenType::TRY, "Expected 'try'");
+    BlockStmt* try_body = parse_block();
+    
+    consume(TokenType::CATCH, "Expected 'catch' after try block");
+    consume(TokenType::LPAREN, "Expected '(' after 'catch'");
+    Token catch_var = consume(TokenType::IDENTIFIER, "Expected catch variable name");
+    consume(TokenType::COLON, "Expected ':' after catch variable");
+    Token catch_type = parse_type();
+    consume(TokenType::RPAREN, "Expected ')' after catch type");
+    BlockStmt* catch_body = parse_block();
+    
+    TryCatchStmt* stmt = new TryCatchStmt(try_body, catch_var.lexeme, catch_type.lexeme, catch_body);
+    stmt->line = ln;
+    return stmt;
+}
+
+StmtNode* Parser::parse_throw_stmt() {
+    int ln = current_token().line;
+    consume(TokenType::THROW, "Expected 'throw'");
+    ExprNode* value = parse_expression();
+    consume(TokenType::SEMICOLON, "Expected ';' after throw expression");
+    ThrowStmt* stmt = new ThrowStmt(value);
+    stmt->line = ln;
+    return stmt;
 }
 
 }

@@ -6,6 +6,12 @@
 
 #define MAX_DEFER_SCOPES 64
 #define MAX_DEFERS_PER_SCOPE 64
+#define MAX_RAII_PER_SCOPE 32
+
+struct RaiiEntry {
+    Tick::String var_name;
+    Tick::String class_name;
+};
 
 struct CodeBuffer {
     char* data;
@@ -29,6 +35,8 @@ private:
     static int _defer_counts[MAX_DEFER_SCOPES];
     static int _defer_depth;
     static Tick::String _expected_type;
+    static RaiiEntry _raii_scopes[MAX_DEFER_SCOPES][MAX_RAII_PER_SCOPE];
+    static int _raii_counts[MAX_DEFER_SCOPES];
 
     static Tick::String generate_c_code(Tick::Program* program);
     static void generate_process(CodeBuffer& buf, Tick::ProcessDecl* proc, Tick::Program* program);
@@ -38,10 +46,15 @@ private:
     static void generate_print_arg(CodeBuffer& buf, Tick::ExprNode* arg, Tick::Program* program);
     static void generate_deferred(CodeBuffer& buf, int indent, Tick::Program* program);
     static void generate_all_deferred(CodeBuffer& buf, int indent, Tick::Program* program);
+    static void generate_raii_cleanup(CodeBuffer& buf, int indent, Tick::Program* program);
+    static void generate_all_raii_cleanup(CodeBuffer& buf, int indent, Tick::Program* program);
     static void push_defer_scope();
     static void pop_defer_scope();
+    static bool class_has_destructor(const Tick::String& class_name, Tick::Program* program);
+    static Tick::ClassDecl* find_class(const Tick::String& name, Tick::Program* program);
+    static Tick::FunctionDecl* find_method(const Tick::String& class_name, const Tick::String& method_name, Tick::Program* program);
     static void write_to_file(const char* filename, const char* content);
-    static bool invoke_gcc(const char* c_file, const char* output_file);
+    static bool invoke_gcc(const char* c_file, const char* output_file, const char* extra_flags);
     static void tick_type_to_c_type(const Tick::String& tick_type, Tick::Program* program, char* out, size_t out_size);
     static Tick::String lookup_var_type(const Tick::String& name, Tick::Program* program);
     static void lookup_var_type_in_block(const Tick::String& name, Tick::BlockStmt* block, Tick::String& result);

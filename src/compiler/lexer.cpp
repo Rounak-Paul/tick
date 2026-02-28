@@ -1,6 +1,7 @@
 #include "lexer.h"
 #include <cstdio>
 #include <cstring>
+#include <cctype>
 
 namespace Tick {
 
@@ -74,6 +75,8 @@ TokenType Lexer::check_keyword(const char* str, size_t length) {
         if (memcmp(str, "var", 3) == 0) return TokenType::VAR;
         if (memcmp(str, "for", 3) == 0) return TokenType::FOR;
         if (memcmp(str, "str", 3) == 0) return TokenType::STR;
+        if (memcmp(str, "try", 3) == 0) return TokenType::TRY;
+        if (memcmp(str, "ptr", 3) == 0) return TokenType::PTR;
         if (memcmp(str, "u16", 3) == 0) return TokenType::U16;
         if (memcmp(str, "u32", 3) == 0) return TokenType::U32;
         if (memcmp(str, "u64", 3) == 0) return TokenType::U64;
@@ -92,6 +95,9 @@ TokenType Lexer::check_keyword(const char* str, size_t length) {
         if (memcmp(str, "true", 4) == 0) return TokenType::TRUE;
         if (memcmp(str, "case", 4) == 0) return TokenType::CASE;
         if (memcmp(str, "enum", 4) == 0) return TokenType::ENUM;
+        if (memcmp(str, "cast", 4) == 0) return TokenType::CAST;
+        if (memcmp(str, "null", 4) == 0) return TokenType::NULL_LIT;
+        if (memcmp(str, "link", 4) == 0) return TokenType::LINK;
     }
     if (length == 5) {
         if (memcmp(str, "event", 5) == 0) return TokenType::EVENT;
@@ -102,18 +108,24 @@ TokenType Lexer::check_keyword(const char* str, size_t length) {
         if (memcmp(str, "false", 5) == 0) return TokenType::FALSE;
         if (memcmp(str, "defer", 5) == 0) return TokenType::DEFER;
         if (memcmp(str, "union", 5) == 0) return TokenType::UNION;
+        if (memcmp(str, "catch", 5) == 0) return TokenType::CATCH;
+        if (memcmp(str, "throw", 5) == 0) return TokenType::THROW;
     }
     if (length == 6) {
         if (memcmp(str, "signal", 6) == 0) return TokenType::SIGNAL;
         if (memcmp(str, "import", 6) == 0) return TokenType::IMPORT;
         if (memcmp(str, "return", 6) == 0) return TokenType::RETURN;
         if (memcmp(str, "switch", 6) == 0) return TokenType::SWITCH;
+        if (memcmp(str, "extern", 6) == 0) return TokenType::EXTERN;
+        if (memcmp(str, "sizeof", 6) == 0) return TokenType::SIZEOF;
     }
     if (length == 7) {
         if (memcmp(str, "process", 7) == 0) return TokenType::PROCESS;
         if (memcmp(str, "default", 7) == 0) return TokenType::DEFAULT;
     }
     if (length == 8 && memcmp(str, "continue", 8) == 0) return TokenType::CONTINUE;
+    if (length == 9 && memcmp(str, "interface", 9) == 0) return TokenType::INTERFACE;
+    if (length == 10 && memcmp(str, "implements", 10) == 0) return TokenType::IMPLEMENTS;
     return TokenType::IDENTIFIER;
 }
 
@@ -237,7 +249,18 @@ DynamicArray<Token> Lexer::tokenize() {
         }
         else if (c == '@') {
             advance();
-            tokens.push(make_token(TokenType::AT, "@", 1));
+            if (memcmp(_source + _position, "dataclass", 9) == 0) {
+                char after = _source[_position + 9];
+                if (!isalnum(after) && after != '_') {
+                    _position += 9;
+                    _column += 9;
+                    tokens.push(make_token(TokenType::DATACLASS, "@dataclass", 10));
+                } else {
+                    tokens.push(make_token(TokenType::AT, "@", 1));
+                }
+            } else {
+                tokens.push(make_token(TokenType::AT, "@", 1));
+            }
         }
         else if (c == '(') {
             advance();
@@ -265,7 +288,15 @@ DynamicArray<Token> Lexer::tokenize() {
         }
         else if (c == '<') {
             advance();
-            if (current_char() == '=') {
+            if (current_char() == '<') {
+                advance();
+                if (current_char() == '=') {
+                    advance();
+                    tokens.push(make_token(TokenType::LSHIFT_ASSIGN, "<<=", 3));
+                } else {
+                    tokens.push(make_token(TokenType::LSHIFT, "<<", 2));
+                }
+            } else if (current_char() == '=') {
                 advance();
                 tokens.push(make_token(TokenType::LTE, "<=", 2));
             } else {
@@ -274,7 +305,15 @@ DynamicArray<Token> Lexer::tokenize() {
         }
         else if (c == '>') {
             advance();
-            if (current_char() == '=') {
+            if (current_char() == '>') {
+                advance();
+                if (current_char() == '=') {
+                    advance();
+                    tokens.push(make_token(TokenType::RSHIFT_ASSIGN, ">>=", 3));
+                } else {
+                    tokens.push(make_token(TokenType::RSHIFT, ">>", 2));
+                }
+            } else if (current_char() == '=') {
                 advance();
                 tokens.push(make_token(TokenType::GTE, ">=", 2));
             } else {
@@ -366,15 +405,42 @@ DynamicArray<Token> Lexer::tokenize() {
                 tokens.push(make_token(TokenType::PERCENT, "%", 1));
             }
         }
-        else if (c == '&' && peek_char() == '&') {
+        else if (c == '&') {
             advance();
-            advance();
-            tokens.push(make_token(TokenType::AND, "&&", 2));
+            if (current_char() == '&') {
+                advance();
+                tokens.push(make_token(TokenType::AND, "&&", 2));
+            } else if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::AMPERSAND_ASSIGN, "&=", 2));
+            } else {
+                tokens.push(make_token(TokenType::AMPERSAND, "&", 1));
+            }
         }
-        else if (c == '|' && peek_char() == '|') {
+        else if (c == '|') {
             advance();
+            if (current_char() == '|') {
+                advance();
+                tokens.push(make_token(TokenType::OR, "||", 2));
+            } else if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::PIPE_ASSIGN, "|=", 2));
+            } else {
+                tokens.push(make_token(TokenType::PIPE, "|", 1));
+            }
+        }
+        else if (c == '^') {
             advance();
-            tokens.push(make_token(TokenType::OR, "||", 2));
+            if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::CARET_ASSIGN, "^=", 2));
+            } else {
+                tokens.push(make_token(TokenType::CARET, "^", 1));
+            }
+        }
+        else if (c == '~') {
+            advance();
+            tokens.push(make_token(TokenType::TILDE, "~", 1));
         }
         else {
             fprintf(stderr, "Lexer error: unexpected character '%c' at line %zu, column %zu\n", 

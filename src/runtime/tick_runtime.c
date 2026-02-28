@@ -212,3 +212,44 @@ void* tick_array_push(void* arr, int32_t* len, int32_t* cap, int32_t elem_size) 
 void tick_array_pop(int32_t* len) {
     if (*len > 0) (*len)--;
 }
+
+static TickGC _tick_gc = {{NULL}, 0};
+
+void tick_gc_init(void) {
+    _tick_gc.count = 0;
+}
+
+void* tick_gc_alloc(size_t size) {
+    void* ptr = malloc(size);
+    if (ptr && _tick_gc.count < TICK_GC_MAX_OBJECTS) {
+        _tick_gc.ptrs[_tick_gc.count++] = ptr;
+    }
+    return ptr;
+}
+
+void tick_gc_free(void* ptr) {
+    if (!ptr) return;
+    for (int i = 0; i < _tick_gc.count; i++) {
+        if (_tick_gc.ptrs[i] == ptr) {
+            _tick_gc.ptrs[i] = _tick_gc.ptrs[_tick_gc.count - 1];
+            _tick_gc.count--;
+            free(ptr);
+            return;
+        }
+    }
+    free(ptr);
+}
+
+void tick_gc_collect(void) {
+    tick_gc_cleanup();
+}
+
+void tick_gc_cleanup(void) {
+    for (int i = 0; i < _tick_gc.count; i++) {
+        if (_tick_gc.ptrs[i]) {
+            free(_tick_gc.ptrs[i]);
+            _tick_gc.ptrs[i] = NULL;
+        }
+    }
+    _tick_gc.count = 0;
+}
