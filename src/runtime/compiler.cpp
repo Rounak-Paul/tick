@@ -4,6 +4,7 @@
 #include "../compiler/semantic_analyzer.h"
 #include "../compiler/module_loader.h"
 #include <cstdlib>
+#include <cstdarg>
 #include <cstring>
 #include <unistd.h>
 
@@ -16,6 +17,74 @@ using namespace Tick;
 FunctionDecl* Compiler::_current_func = nullptr;
 ClassDecl* Compiler::_current_class = nullptr;
 
+CodeBuffer::CodeBuffer() : pos(0), capacity(1048576) {
+    data = (char*)malloc(capacity);
+}
+
+CodeBuffer::~CodeBuffer() {
+    free(data);
+}
+
+void CodeBuffer::ensure(int needed) {
+    while (pos + needed >= capacity) {
+        capacity *= 2;
+        data = (char*)realloc(data, capacity);
+    }
+}
+
+int CodeBuffer::append(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int needed = vsnprintf(nullptr, 0, fmt, args);
+    va_end(args);
+
+    ensure(needed + 1);
+
+    va_start(args, fmt);
+    int written = vsnprintf(data + pos, capacity - pos, fmt, args);
+    va_end(args);
+    pos += written;
+    return written;
+}
+
+void Compiler::lookup_var_type_in_block(const String& name, BlockStmt* block, String& result) {
+    if (!block || !result.empty()) return;
+    for (size_t i = 0; i < block->statements.size(); i++) {
+        StmtNode* s = block->statements[i];
+        if (s->type == AstNodeType::VAR_DECL) {
+            VarDecl* v = static_cast<VarDecl*>(s);
+            if (v->name == name) {
+                result = v->type_name;
+                return;
+            }
+        } else if (s->type == AstNodeType::BLOCK_STMT) {
+            lookup_var_type_in_block(name, static_cast<BlockStmt*>(s), result);
+        } else if (s->type == AstNodeType::IF_STMT) {
+            IfStmt* ifs = static_cast<IfStmt*>(s);
+            if (ifs->then_branch && ifs->then_branch->type == AstNodeType::BLOCK_STMT)
+                lookup_var_type_in_block(name, static_cast<BlockStmt*>(ifs->then_branch), result);
+            if (ifs->else_branch && ifs->else_branch->type == AstNodeType::BLOCK_STMT)
+                lookup_var_type_in_block(name, static_cast<BlockStmt*>(ifs->else_branch), result);
+        } else if (s->type == AstNodeType::WHILE_STMT) {
+            WhileStmt* ws = static_cast<WhileStmt*>(s);
+            if (ws->body && ws->body->type == AstNodeType::BLOCK_STMT)
+                lookup_var_type_in_block(name, static_cast<BlockStmt*>(ws->body), result);
+        } else if (s->type == AstNodeType::FOR_STMT) {
+            ForStmt* fs = static_cast<ForStmt*>(s);
+            if (fs->initializer && fs->initializer->type == AstNodeType::VAR_DECL) {
+                VarDecl* v = static_cast<VarDecl*>(fs->initializer);
+                if (v->name == name) {
+                    result = v->type_name;
+                    return;
+                }
+            }
+            if (fs->body && fs->body->type == AstNodeType::BLOCK_STMT)
+                lookup_var_type_in_block(name, static_cast<BlockStmt*>(fs->body), result);
+        }
+        if (!result.empty()) return;
+    }
+}
+
 String Compiler::lookup_var_type(const String& name, Program* program) {
     if (_current_func) {
         for (size_t i = 0; i < _current_func->parameters.size(); i++) {
@@ -24,11 +93,15 @@ String Compiler::lookup_var_type(const String& name, Program* program) {
             }
         }
         if (_current_func->body) {
-            for (size_t i = 0; i < _current_func->body->statements.size(); i++) {
-                if (_current_func->body->statements[i]->type == AstNodeType::VAR_DECL) {
-                    VarDecl* v = static_cast<VarDecl*>(_current_func->body->statements[i]);
-                    if (v->name == name) return v->type_name;
-                }
+            String result;
+            lookup_var_type_in_block(name, _current_func->body, result);
+            if (!result.empty()) return result;
+        }
+    }
+    if (_current_class) {
+        for (size_t i = 0; i < _current_class->fields.size(); i++) {
+            if (_current_class->fields[i]->name == name) {
+                return _current_class->fields[i]->type_name;
             }
         }
     }
@@ -40,42 +113,93 @@ String Compiler::lookup_var_type(const String& name, Program* program) {
     return String("");
 }
 
-const char* Compiler::tick_type_to_c_type(const String& tick_type, Program* program) {
-    if (tick_type == "void") return "void";
-    if (tick_type == "float") return "double";
-    if (tick_type == "bool") return "bool";
-    if (tick_type == "string") return "char*";
-    
+String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
+    if (!expr) return String("int");
+    switch (expr->type) {
+        case AstNodeType::INTEGER_LITERAL: return String("int");
+        case AstNodeType::FLOAT_LITERAL: return String("float");
+        case AstNodeType::DOUBLE_LITERAL: return String("double");
+        case AstNodeType::BOOL_LITERAL: return String("bool");
+        case AstNodeType::STRING_LITERAL: return String("string");
+        case AstNodeType::IDENTIFIER_EXPR: {
+            IdentifierExpr* id = static_cast<IdentifierExpr*>(expr);
+            return lookup_var_type(id->name, program);
+        }
+        case AstNodeType::MEMBER_EXPR: {
+            MemberExpr* me = static_cast<MemberExpr*>(expr);
+            String obj_type = infer_expr_type(me->object, program);
+            for (size_t i = 0; i < program->classes.size(); i++) {
+                if (program->classes[i]->name == obj_type) {
+                    for (size_t j = 0; j < program->classes[i]->fields.size(); j++) {
+                        if (program->classes[i]->fields[j]->name == me->member) {
+                            return program->classes[i]->fields[j]->type_name;
+                        }
+                    }
+                }
+            }
+            return String("int");
+        }
+        case AstNodeType::CALL_EXPR: {
+            CallExpr* call = static_cast<CallExpr*>(expr);
+            if (call->callee->type == AstNodeType::IDENTIFIER_EXPR) {
+                IdentifierExpr* id = static_cast<IdentifierExpr*>(call->callee);
+                for (size_t i = 0; i < program->functions.size(); i++) {
+                    if (program->functions[i]->name == id->name) {
+                        return program->functions[i]->return_type;
+                    }
+                }
+            }
+            return String("int");
+        }
+        case AstNodeType::BINARY_EXPR: {
+            BinaryExpr* bin = static_cast<BinaryExpr*>(expr);
+            if (bin->op == "==" || bin->op == "!=" || bin->op == "<" ||
+                bin->op == ">" || bin->op == "<=" || bin->op == ">=" ||
+                bin->op == "&&" || bin->op == "||") {
+                return String("bool");
+            }
+            return infer_expr_type(bin->left, program);
+        }
+        case AstNodeType::INDEX_EXPR: {
+            IndexExpr* idx = static_cast<IndexExpr*>(expr);
+            String arr_type = infer_expr_type(idx->array, program);
+            if (arr_type.length() > 2 &&
+                arr_type[arr_type.length() - 2] == '[' && arr_type[arr_type.length() - 1] == ']') {
+                return String(arr_type.c_str(), arr_type.length() - 2);
+            }
+            return String("int");
+        }
+        default:
+            return String("int");
+    }
+}
+
+void Compiler::tick_type_to_c_type(const String& tick_type, Program* program, char* out, size_t out_size) {
+    if (tick_type == "void") { snprintf(out, out_size, "void"); return; }
+    if (tick_type == "int") { snprintf(out, out_size, "int"); return; }
+    if (tick_type == "float") { snprintf(out, out_size, "double"); return; }
+    if (tick_type == "double") { snprintf(out, out_size, "double"); return; }
+    if (tick_type == "bool") { snprintf(out, out_size, "bool"); return; }
+    if (tick_type == "string") { snprintf(out, out_size, "char*"); return; }
+
     if (tick_type.length() > 2 && tick_type[tick_type.length() - 2] == '[' && tick_type[tick_type.length() - 1] == ']') {
         String base_type(tick_type.c_str(), tick_type.length() - 2);
-        static char result[256];
-        if (base_type == "int") {
-            snprintf(result, sizeof(result), "int*");
-        } else if (base_type == "float") {
-            snprintf(result, sizeof(result), "double*");
-        } else if (base_type == "double") {
-            snprintf(result, sizeof(result), "double*");
-        } else if (base_type == "bool") {
-            snprintf(result, sizeof(result), "bool*");
-        } else if (base_type == "string") {
-            snprintf(result, sizeof(result), "char**");
-        } else {
-            snprintf(result, sizeof(result), "%s*", base_type.c_str());
-        }
-        return result;
+        char base_c[128];
+        tick_type_to_c_type(base_type, program, base_c, sizeof(base_c));
+        snprintf(out, out_size, "%s*", base_c);
+        return;
     }
-    
+
     if (program) {
         for (size_t i = 0; i < program->classes.size(); i++) {
             if (program->classes[i]->name == tick_type) {
-                static char result[256];
-                snprintf(result, sizeof(result), "%s*", tick_type.c_str());
-                return result;
+                snprintf(out, out_size, "%s*", tick_type.c_str());
+                return;
             }
         }
     }
-    
-    return "int";
+
+    snprintf(out, out_size, "int");
 }
 
 bool Compiler::compile_to_native(const char* source_file, const char* output_file, bool keep_c) {
@@ -84,54 +208,53 @@ bool Compiler::compile_to_native(const char* source_file, const char* output_fil
         fprintf(stderr, "Error: Cannot open %s\n", source_file);
         return false;
     }
-    
+
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
     fseek(f, 0, SEEK_SET);
-    
+
     char* source = (char*)malloc(size + 1);
     fread(source, 1, size, f);
     source[size] = '\0';
     fclose(f);
-    
+
     Lexer lexer(source);
     DynamicArray<Token> tokens = lexer.tokenize();
-    
+
     Parser parser(tokens);
     Program* program = parser.parse();
-    
+
     if (!program) {
         fprintf(stderr, "Parse error\n");
         free(source);
         return false;
     }
-    
+
     ModuleLoader module_loader;
     SemanticAnalyzer analyzer;
     analyzer.set_module_loader(&module_loader);
     analyzer.set_current_file_path(source_file);
-    
+
     if (!analyzer.analyze(program)) {
         fprintf(stderr, "Semantic analysis failed\n");
         delete program;
         free(source);
         return false;
     }
-    
+
     String c_code = generate_c_code(program);
-    
+
     char temp_c[256];
-    
     if (keep_c) {
         snprintf(temp_c, sizeof(temp_c), "%s.c", output_file);
     } else {
         snprintf(temp_c, sizeof(temp_c), "/tmp/tick_%d.c", getpid());
     }
-    
+
     write_to_file(temp_c, c_code.c_str());
-    
+
     bool success = invoke_gcc(temp_c, output_file);
-    
+
     if (success && !keep_c) {
         remove(temp_c);
     } else if (!success) {
@@ -139,518 +262,516 @@ bool Compiler::compile_to_native(const char* source_file, const char* output_fil
     } else if (keep_c) {
         printf("Generated C file saved at: %s\n", temp_c);
     }
-    
+
     delete program;
     free(source);
-    
+
     return success;
 }
 
 String Compiler::generate_c_code(Program* program) {
-    char* buffer = (char*)malloc(524288);
-    int pos = 0;
-    
-    pos += sprintf(buffer + pos, "#include <stdio.h>\n");
-    pos += sprintf(buffer + pos, "#include <stdlib.h>\n");
-    pos += sprintf(buffer + pos, "#include <string.h>\n");
-    pos += sprintf(buffer + pos, "#include <stdbool.h>\n");
-    pos += sprintf(buffer + pos, "#include <stdint.h>\n");
-    pos += sprintf(buffer + pos, "#include \"runtime/tick_runtime.h\"\n\n");
-    
+    CodeBuffer buf;
+
+    buf.append("#include <stdio.h>\n");
+    buf.append("#include <stdlib.h>\n");
+    buf.append("#include <string.h>\n");
+    buf.append("#include <stdbool.h>\n");
+    buf.append("#include <stdint.h>\n");
+    buf.append("#include \"runtime/tick_runtime.h\"\n\n");
+
     for (size_t i = 0; i < program->globals.size(); i++) {
         VarDecl* var = program->globals[i];
-        
-        if (var->is_const) {
-            pos += sprintf(buffer + pos, "const ");
-        }
-        
-        bool is_array = var->type_name.length() > 2 && 
-                       var->type_name[var->type_name.length() - 2] == '[' && 
+        if (var->is_const) buf.append("const ");
+
+        bool is_array = var->type_name.length() > 2 &&
+                       var->type_name[var->type_name.length() - 2] == '[' &&
                        var->type_name[var->type_name.length() - 1] == ']';
-        
+
         if (is_array && var->initializer && var->initializer->type == AstNodeType::ARRAY_EXPR) {
-            ArrayExpr* arr = static_cast<ArrayExpr*>(var->initializer);
             String base_type(var->type_name.c_str(), var->type_name.length() - 2);
-            const char* c_base_type = tick_type_to_c_type(base_type, program);
-            
-            pos += sprintf(buffer + pos, "%s %s[] = ", c_base_type, var->name.c_str());
-            pos = generate_expression(buffer, pos, var->initializer, program);
+            char c_base[128];
+            tick_type_to_c_type(base_type, program, c_base, sizeof(c_base));
+            buf.append("%s %s[] = ", c_base, var->name.c_str());
+            generate_expression(buf, var->initializer, program);
         } else {
-            const char* c_type = tick_type_to_c_type(var->type_name, program);
-            pos += sprintf(buffer + pos, "%s %s", c_type, var->name.c_str());
+            char c_type[128];
+            tick_type_to_c_type(var->type_name, program, c_type, sizeof(c_type));
+            buf.append("%s %s", c_type, var->name.c_str());
             if (var->initializer) {
-                pos += sprintf(buffer + pos, " = ");
-                pos = generate_expression(buffer, pos, var->initializer, program);
+                buf.append(" = ");
+                generate_expression(buf, var->initializer, program);
             }
         }
-        pos += sprintf(buffer + pos, ";\n");
+        buf.append(";\n");
     }
-    
-    if (program->globals.size() > 0) {
-        pos += sprintf(buffer + pos, "\n");
-    }
-    
+
+    if (program->globals.size() > 0) buf.append("\n");
+
     for (size_t i = 0; i < program->classes.size(); i++) {
         ClassDecl* cls = program->classes[i];
-        pos += sprintf(buffer + pos, "typedef struct %s {\n", cls->name.c_str());
-        
+        buf.append("typedef struct %s {\n", cls->name.c_str());
         for (size_t j = 0; j < cls->fields.size(); j++) {
             VarDecl* field = cls->fields[j];
-            const char* field_type = tick_type_to_c_type(field->type_name, program);
-            pos += sprintf(buffer + pos, "    %s %s;\n", field_type, field->name.c_str());
+            char field_type[128];
+            tick_type_to_c_type(field->type_name, program, field_type, sizeof(field_type));
+            buf.append("    %s %s;\n", field_type, field->name.c_str());
         }
-        
-        pos += sprintf(buffer + pos, "} %s;\n\n", cls->name.c_str());
+        buf.append("} %s;\n\n", cls->name.c_str());
     }
-    
+
     for (size_t i = 0; i < program->signals.size(); i++) {
         SignalDecl* sig = program->signals[i];
         if (sig->array_size > 0) {
-            pos += sprintf(buffer + pos, "TickSignal %s[%d];\n", sig->name.c_str(), sig->array_size);
+            buf.append("TickSignal %s[%d];\n", sig->name.c_str(), sig->array_size);
         } else {
-            pos += sprintf(buffer + pos, "TickSignal %s;\n", sig->name.c_str());
+            buf.append("TickSignal %s;\n", sig->name.c_str());
         }
     }
-    
+
     for (size_t i = 0; i < program->events.size(); i++) {
-        EventDecl* evt = program->events[i];
-        pos += sprintf(buffer + pos, "TickEvent %s;\n", evt->name.c_str());
+        buf.append("TickEvent %s;\n", program->events[i]->name.c_str());
     }
-    
-    if (program->signals.size() > 0 || program->events.size() > 0) {
-        pos += sprintf(buffer + pos, "\n");
-    }
-    
+
+    if (program->signals.size() > 0 || program->events.size() > 0) buf.append("\n");
+
     for (size_t i = 0; i < program->processes.size(); i++) {
-        ProcessDecl* proc = program->processes[i];
-        pos += sprintf(buffer + pos, "void* %s(void* arg);\n", proc->name.c_str());
+        buf.append("void* %s(void* arg);\n", program->processes[i]->name.c_str());
     }
-    
+
     for (size_t i = 0; i < program->functions.size(); i++) {
         FunctionDecl* func = program->functions[i];
-        
-        const char* ret_type = tick_type_to_c_type(func->return_type, program);
-        
-        pos += sprintf(buffer + pos, "%s %s(", ret_type, func->name.c_str());
-        
+        char ret_type[128];
+        tick_type_to_c_type(func->return_type, program, ret_type, sizeof(ret_type));
+        buf.append("%s %s(", ret_type, func->name.c_str());
         for (size_t j = 0; j < func->parameters.size(); j++) {
-            if (j > 0) pos += sprintf(buffer + pos, ", ");
-            const char* param_type = tick_type_to_c_type(func->parameters[j]->type_name, program);
-            pos += sprintf(buffer + pos, "%s %s", param_type, func->parameters[j]->name.c_str());
+            if (j > 0) buf.append(", ");
+            char param_type[128];
+            tick_type_to_c_type(func->parameters[j]->type_name, program, param_type, sizeof(param_type));
+            buf.append("%s %s", param_type, func->parameters[j]->name.c_str());
         }
-        
-        pos += sprintf(buffer + pos, ");\n");
+        buf.append(");\n");
     }
-    
+
     for (size_t i = 0; i < program->classes.size(); i++) {
         ClassDecl* cls = program->classes[i];
         for (size_t j = 0; j < cls->methods.size(); j++) {
             FunctionDecl* method = cls->methods[j];
-            const char* ret_type = tick_type_to_c_type(method->return_type, program);
-            
-            pos += sprintf(buffer + pos, "%s %s_%s(%s* this", 
-                ret_type, cls->name.c_str(), method->name.c_str(), cls->name.c_str());
-            
+            char ret_type[128];
+            tick_type_to_c_type(method->return_type, program, ret_type, sizeof(ret_type));
+            buf.append("%s %s_%s(%s* self", ret_type, cls->name.c_str(), method->name.c_str(), cls->name.c_str());
             for (size_t k = 0; k < method->parameters.size(); k++) {
-                pos += sprintf(buffer + pos, ", ");
-                const char* param_type = tick_type_to_c_type(method->parameters[k]->type_name, program);
-                pos += sprintf(buffer + pos, "%s %s", param_type, method->parameters[k]->name.c_str());
+                char param_type[128];
+                tick_type_to_c_type(method->parameters[k]->type_name, program, param_type, sizeof(param_type));
+                buf.append(", %s %s", param_type, method->parameters[k]->name.c_str());
             }
-            
-            pos += sprintf(buffer + pos, ");\n");
+            buf.append(");\n");
         }
     }
-    
-    pos += sprintf(buffer + pos, "\n");
-    
+
+    buf.append("\n");
+
     for (size_t i = 0; i < program->processes.size(); i++) {
-        ProcessDecl* proc = program->processes[i];
-        pos = generate_process(buffer, pos, proc, program);
+        generate_process(buf, program->processes[i], program);
     }
-    
+
     for (size_t i = 0; i < program->functions.size(); i++) {
-        FunctionDecl* func = program->functions[i];
-        pos = generate_function(buffer, pos, func, program);
+        generate_function(buf, program->functions[i], program);
     }
-    
+
     for (size_t i = 0; i < program->classes.size(); i++) {
         ClassDecl* cls = program->classes[i];
         for (size_t j = 0; j < cls->methods.size(); j++) {
             FunctionDecl* method = cls->methods[j];
-            const char* ret_type = tick_type_to_c_type(method->return_type, program);
-            
-            pos += sprintf(buffer + pos, "%s %s_%s(%s* this", 
-                ret_type, cls->name.c_str(), method->name.c_str(), cls->name.c_str());
-            
+            char ret_type[128];
+            tick_type_to_c_type(method->return_type, program, ret_type, sizeof(ret_type));
+            buf.append("%s %s_%s(%s* self", ret_type, cls->name.c_str(), method->name.c_str(), cls->name.c_str());
             for (size_t k = 0; k < method->parameters.size(); k++) {
-                pos += sprintf(buffer + pos, ", ");
-                const char* param_type = tick_type_to_c_type(method->parameters[k]->type_name, program);
-                pos += sprintf(buffer + pos, "%s %s", param_type, method->parameters[k]->name.c_str());
+                char param_type[128];
+                tick_type_to_c_type(method->parameters[k]->type_name, program, param_type, sizeof(param_type));
+                buf.append(", %s %s", param_type, method->parameters[k]->name.c_str());
             }
-            
-            pos += sprintf(buffer + pos, ") {\n");
-            
+            buf.append(") {\n");
+
             _current_func = method;
             _current_class = cls;
-            
+
             if (method->body) {
                 for (size_t k = 0; k < method->body->statements.size(); k++) {
-                    pos = generate_statement(buffer, pos, method->body->statements[k], 1, program);
+                    generate_statement(buf, method->body->statements[k], 1, program);
                 }
             }
-            
-            pos += sprintf(buffer + pos, "}\n\n");
+
+            buf.append("}\n\n");
         }
     }
-    
-    String result(buffer);
-    free(buffer);
+
+    String result(buf.data, buf.pos);
     return result;
 }
 
-int Compiler::generate_process(char* buffer, int pos, ProcessDecl* proc, Program* program) {
-    pos += sprintf(buffer + pos, "void* %s(void* arg) {\n", proc->name.c_str());
-    
-    BlockStmt* body = proc->body;
-    for (size_t i = 0; i < body->statements.size(); i++) {
-        pos = generate_statement(buffer, pos, body->statements[i], 1, program);
+void Compiler::generate_process(CodeBuffer& buf, ProcessDecl* proc, Program* program) {
+    buf.append("void* %s(void* arg) {\n", proc->name.c_str());
+
+    for (size_t i = 0; i < proc->body->statements.size(); i++) {
+        generate_statement(buf, proc->body->statements[i], 1, program);
     }
-    
-    pos += sprintf(buffer + pos, "    return NULL;\n");
-    pos += sprintf(buffer + pos, "}\n\n");
-    
-    return pos;
+
+    buf.append("    return NULL;\n");
+    buf.append("}\n\n");
 }
 
-int Compiler::generate_function(char* buffer, int pos, FunctionDecl* func, Program* program) {
-    const char* ret_type = tick_type_to_c_type(func->return_type, program);
-    
+void Compiler::generate_function(CodeBuffer& buf, FunctionDecl* func, Program* program) {
+    char ret_type[128];
+    tick_type_to_c_type(func->return_type, program, ret_type, sizeof(ret_type));
+
     _current_func = func;
     _current_class = nullptr;
-    
-    pos += sprintf(buffer + pos, "%s %s(", ret_type, func->name.c_str());
-    
+
+    buf.append("%s %s(", ret_type, func->name.c_str());
     for (size_t j = 0; j < func->parameters.size(); j++) {
-        if (j > 0) pos += sprintf(buffer + pos, ", ");
-        const char* param_type = tick_type_to_c_type(func->parameters[j]->type_name, program);
-        pos += sprintf(buffer + pos, "%s %s", param_type, func->parameters[j]->name.c_str());
+        if (j > 0) buf.append(", ");
+        char param_type[128];
+        tick_type_to_c_type(func->parameters[j]->type_name, program, param_type, sizeof(param_type));
+        buf.append("%s %s", param_type, func->parameters[j]->name.c_str());
     }
-    
-    pos += sprintf(buffer + pos, ") {\n");
-    
+    buf.append(") {\n");
+
     if (func->name == "main") {
         for (size_t i = 0; i < program->signals.size(); i++) {
             SignalDecl* sig = program->signals[i];
             if (sig->array_size > 0) {
-                pos += sprintf(buffer + pos, "    for (int _i = 0; _i < %d; _i++) {\n", sig->array_size);
-                pos += sprintf(buffer + pos, "        tick_signal_init(&%s[_i]);\n", sig->name.c_str());
-                pos += sprintf(buffer + pos, "    }\n");
+                buf.append("    for (int _i = 0; _i < %d; _i++) {\n", sig->array_size);
+                buf.append("        tick_signal_init(&%s[_i]);\n", sig->name.c_str());
+                buf.append("    }\n");
             } else {
-                pos += sprintf(buffer + pos, "    tick_signal_init(&%s);\n", sig->name.c_str());
+                buf.append("    tick_signal_init(&%s);\n", sig->name.c_str());
             }
         }
-        
+
         for (size_t i = 0; i < program->events.size(); i++) {
             EventDecl* evt = program->events[i];
-            
             int proc_count = 0;
             for (size_t j = 0; j < program->processes.size(); j++) {
-                if (program->processes[j]->event_name == evt->name) {
-                    proc_count++;
-                }
+                if (program->processes[j]->event_name == evt->name) proc_count++;
             }
-            
-            pos += sprintf(buffer + pos, "    tick_event_init(&%s, %d);\n", evt->name.c_str(), proc_count);
-            
+            buf.append("    tick_event_init(&%s, %d);\n", evt->name.c_str(), proc_count);
             for (size_t j = 0; j < program->processes.size(); j++) {
                 ProcessDecl* proc = program->processes[j];
                 if (proc->event_name == evt->name) {
-                    pos += sprintf(buffer + pos, "    tick_event_add_process(&%s, %s);\n", 
-                        evt->name.c_str(), proc->name.c_str());
+                    buf.append("    tick_event_add_process(&%s, %s);\n", evt->name.c_str(), proc->name.c_str());
                 }
             }
         }
-        
-        if (program->signals.size() > 0 || program->events.size() > 0) {
-            pos += sprintf(buffer + pos, "\n");
-        }
+
+        if (program->signals.size() > 0 || program->events.size() > 0) buf.append("\n");
     }
-    
+
     if (func->body) {
         for (size_t i = 0; i < func->body->statements.size(); i++) {
-            pos = generate_statement(buffer, pos, func->body->statements[i], 1, program);
+            generate_statement(buf, func->body->statements[i], 1, program);
         }
     }
-    
-    pos += sprintf(buffer + pos, "}\n\n");
-    return pos;
+
+    buf.append("}\n\n");
 }
 
-int Compiler::generate_statement(char* buffer, int pos, StmtNode* stmt, int indent, Program* program) {
-    if (!stmt) return pos;
-    
+void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, Program* program) {
+    if (!stmt) return;
+
     switch (stmt->type) {
         case AstNodeType::VAR_DECL: {
             VarDecl* decl = static_cast<VarDecl*>(stmt);
-            for (int i = 0; i < indent; i++) pos += sprintf(buffer + pos, "    ");
-            
-            if (decl->is_const) {
-                pos += sprintf(buffer + pos, "const ");
-            }
-            
-            const char* type = tick_type_to_c_type(decl->type_name, program);
-            bool is_array = decl->type_name.length() > 2 && 
-                           decl->type_name[decl->type_name.length() - 2] == '[' && 
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            if (decl->is_const) buf.append("const ");
+
+            bool is_array = decl->type_name.length() > 2 &&
+                           decl->type_name[decl->type_name.length() - 2] == '[' &&
                            decl->type_name[decl->type_name.length() - 1] == ']';
-            
+
             if (is_array && decl->initializer && decl->initializer->type == AstNodeType::ARRAY_EXPR) {
-                ArrayExpr* arr = static_cast<ArrayExpr*>(decl->initializer);
                 String base_type(decl->type_name.c_str(), decl->type_name.length() - 2);
-                const char* c_base_type = tick_type_to_c_type(base_type, program);
-                
-                pos += sprintf(buffer + pos, "%s %s[] = ", c_base_type, decl->name.c_str());
-                pos = generate_expression(buffer, pos, decl->initializer, program);
+                char c_base[128];
+                tick_type_to_c_type(base_type, program, c_base, sizeof(c_base));
+                buf.append("%s %s[] = ", c_base, decl->name.c_str());
+                generate_expression(buf, decl->initializer, program);
             } else {
-                pos += sprintf(buffer + pos, "%s %s", type, decl->name.c_str());
-                
+                char c_type[128];
+                tick_type_to_c_type(decl->type_name, program, c_type, sizeof(c_type));
+                buf.append("%s %s", c_type, decl->name.c_str());
                 if (decl->initializer) {
-                    pos += sprintf(buffer + pos, " = ");
-                    pos = generate_expression(buffer, pos, decl->initializer, program);
+                    buf.append(" = ");
+                    generate_expression(buf, decl->initializer, program);
                 } else {
-                    pos += sprintf(buffer + pos, " = 0");
+                    buf.append(" = 0");
                 }
             }
-            
-            pos += sprintf(buffer + pos, ";\n");
+            buf.append(";\n");
             break;
         }
-        
+
         case AstNodeType::EXPR_STMT: {
             ExprStmt* expr_stmt = static_cast<ExprStmt*>(stmt);
-            for (int i = 0; i < indent; i++) pos += sprintf(buffer + pos, "    ");
-            pos = generate_expression(buffer, pos, expr_stmt->expression, program);
-            pos += sprintf(buffer + pos, ";\n");
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            generate_expression(buf, expr_stmt->expression, program);
+            buf.append(";\n");
             break;
         }
-        
+
         case AstNodeType::RETURN_STMT: {
             ReturnStmt* ret = static_cast<ReturnStmt*>(stmt);
-            for (int i = 0; i < indent; i++) pos += sprintf(buffer + pos, "    ");
-            pos += sprintf(buffer + pos, "return");
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("return");
             if (ret->value) {
-                pos += sprintf(buffer + pos, " ");
-                pos = generate_expression(buffer, pos, ret->value, program);
+                buf.append(" ");
+                generate_expression(buf, ret->value, program);
             }
-            pos += sprintf(buffer + pos, ";\n");
+            buf.append(";\n");
             break;
         }
-        
+
         case AstNodeType::IF_STMT: {
             IfStmt* if_stmt = static_cast<IfStmt*>(stmt);
-            for (int i = 0; i < indent; i++) pos += sprintf(buffer + pos, "    ");
-            pos += sprintf(buffer + pos, "if (");
-            pos = generate_expression(buffer, pos, if_stmt->condition, program);
-            pos += sprintf(buffer + pos, ") {\n");
-            
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("if (");
+            generate_expression(buf, if_stmt->condition, program);
+            buf.append(") {\n");
+
             if (if_stmt->then_branch->type == AstNodeType::BLOCK_STMT) {
                 BlockStmt* block = static_cast<BlockStmt*>(if_stmt->then_branch);
                 for (size_t i = 0; i < block->statements.size(); i++) {
-                    pos = generate_statement(buffer, pos, block->statements[i], indent + 1, program);
+                    generate_statement(buf, block->statements[i], indent + 1, program);
                 }
             } else {
-                pos = generate_statement(buffer, pos, if_stmt->then_branch, indent + 1, program);
+                generate_statement(buf, if_stmt->then_branch, indent + 1, program);
             }
-            
-            for (int i = 0; i < indent; i++) pos += sprintf(buffer + pos, "    ");
-            pos += sprintf(buffer + pos, "}");
-            
+
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("}");
+
             if (if_stmt->else_branch) {
-                pos += sprintf(buffer + pos, " else {\n");
+                buf.append(" else {\n");
                 if (if_stmt->else_branch->type == AstNodeType::BLOCK_STMT) {
                     BlockStmt* block = static_cast<BlockStmt*>(if_stmt->else_branch);
                     for (size_t i = 0; i < block->statements.size(); i++) {
-                        pos = generate_statement(buffer, pos, block->statements[i], indent + 1, program);
+                        generate_statement(buf, block->statements[i], indent + 1, program);
                     }
                 } else {
-                    pos = generate_statement(buffer, pos, if_stmt->else_branch, indent + 1, program);
+                    generate_statement(buf, if_stmt->else_branch, indent + 1, program);
                 }
-                for (int i = 0; i < indent; i++) pos += sprintf(buffer + pos, "    ");
-                pos += sprintf(buffer + pos, "}");
+                for (int i = 0; i < indent; i++) buf.append("    ");
+                buf.append("}");
             }
-            
-            pos += sprintf(buffer + pos, "\n");
+            buf.append("\n");
             break;
         }
-        
+
         case AstNodeType::WHILE_STMT: {
             WhileStmt* while_stmt = static_cast<WhileStmt*>(stmt);
-            for (int i = 0; i < indent; i++) pos += sprintf(buffer + pos, "    ");
-            pos += sprintf(buffer + pos, "while (");
-            pos = generate_expression(buffer, pos, while_stmt->condition, program);
-            pos += sprintf(buffer + pos, ") {\n");
-            
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("while (");
+            generate_expression(buf, while_stmt->condition, program);
+            buf.append(") {\n");
+
             if (while_stmt->body->type == AstNodeType::BLOCK_STMT) {
                 BlockStmt* block = static_cast<BlockStmt*>(while_stmt->body);
                 for (size_t i = 0; i < block->statements.size(); i++) {
-                    pos = generate_statement(buffer, pos, block->statements[i], indent + 1, program);
+                    generate_statement(buf, block->statements[i], indent + 1, program);
                 }
             } else {
-                pos = generate_statement(buffer, pos, while_stmt->body, indent + 1, program);
+                generate_statement(buf, while_stmt->body, indent + 1, program);
             }
-            
-            for (int i = 0; i < indent; i++) pos += sprintf(buffer + pos, "    ");
-            pos += sprintf(buffer + pos, "}\n");
+
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("}\n");
             break;
         }
-        
+
         case AstNodeType::FOR_STMT: {
             ForStmt* for_stmt = static_cast<ForStmt*>(stmt);
-            for (int i = 0; i < indent; i++) pos += sprintf(buffer + pos, "    ");
-            pos += sprintf(buffer + pos, "for (");
-            
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("for (");
+
             if (for_stmt->initializer) {
                 if (for_stmt->initializer->type == AstNodeType::VAR_DECL) {
                     VarDecl* decl = static_cast<VarDecl*>(for_stmt->initializer);
-                    const char* type = tick_type_to_c_type(decl->type_name, program);
-                    
-                    pos += sprintf(buffer + pos, "%s %s", type, decl->name.c_str());
+                    char c_type[128];
+                    tick_type_to_c_type(decl->type_name, program, c_type, sizeof(c_type));
+                    buf.append("%s %s", c_type, decl->name.c_str());
                     if (decl->initializer) {
-                        pos += sprintf(buffer + pos, " = ");
-                        pos = generate_expression(buffer, pos, decl->initializer, program);
+                        buf.append(" = ");
+                        generate_expression(buf, decl->initializer, program);
                     } else {
-                        pos += sprintf(buffer + pos, " = 0");
+                        buf.append(" = 0");
                     }
                 } else {
-                    pos = generate_expression(buffer, pos, static_cast<ExprStmt*>(for_stmt->initializer)->expression, program);
+                    generate_expression(buf, static_cast<ExprStmt*>(for_stmt->initializer)->expression, program);
                 }
             }
-            pos += sprintf(buffer + pos, "; ");
-            
+            buf.append("; ");
+
             if (for_stmt->condition) {
-                pos = generate_expression(buffer, pos, for_stmt->condition, program);
+                generate_expression(buf, for_stmt->condition, program);
             }
-            pos += sprintf(buffer + pos, "; ");
-            
+            buf.append("; ");
+
             if (for_stmt->increment) {
-                pos = generate_expression(buffer, pos, for_stmt->increment, program);
+                generate_expression(buf, for_stmt->increment, program);
             }
-            pos += sprintf(buffer + pos, ") {\n");
-            
+            buf.append(") {\n");
+
             if (for_stmt->body->type == AstNodeType::BLOCK_STMT) {
                 BlockStmt* block = static_cast<BlockStmt*>(for_stmt->body);
                 for (size_t i = 0; i < block->statements.size(); i++) {
-                    pos = generate_statement(buffer, pos, block->statements[i], indent + 1, program);
+                    generate_statement(buf, block->statements[i], indent + 1, program);
                 }
             } else {
-                pos = generate_statement(buffer, pos, for_stmt->body, indent + 1, program);
+                generate_statement(buf, for_stmt->body, indent + 1, program);
             }
-            
-            for (int i = 0; i < indent; i++) pos += sprintf(buffer + pos, "    ");
-            pos += sprintf(buffer + pos, "}\n");
+
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("}\n");
             break;
         }
-        
+
         case AstNodeType::BREAK_STMT: {
-            for (int i = 0; i < indent; i++) pos += sprintf(buffer + pos, "    ");
-            pos += sprintf(buffer + pos, "break;\n");
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("break;\n");
             break;
         }
-        
+
+        case AstNodeType::CONTINUE_STMT: {
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("continue;\n");
+            break;
+        }
+
+        case AstNodeType::BLOCK_STMT: {
+            BlockStmt* block = static_cast<BlockStmt*>(stmt);
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("{\n");
+            for (size_t i = 0; i < block->statements.size(); i++) {
+                generate_statement(buf, block->statements[i], indent + 1, program);
+            }
+            for (int i = 0; i < indent; i++) buf.append("    ");
+            buf.append("}\n");
+            break;
+        }
+
         default:
             break;
     }
-    
-    return pos;
 }
 
-int Compiler::generate_expression(char* buffer, int pos, ExprNode* expr, Program* program) {
-    if (!expr) return pos;
-    
+void Compiler::generate_print_arg(CodeBuffer& buf, ExprNode* arg, Program* program) {
+    if (arg->type == AstNodeType::STRING_LITERAL) {
+        StringLiteral* lit = static_cast<StringLiteral*>(arg);
+        buf.append("\"%s\"", lit->value.c_str());
+        return;
+    }
+    String arg_type = infer_expr_type(arg, program);
+    if (arg_type == "float" || arg_type == "double") {
+        buf.append("\"%%f\", ");
+    } else if (arg_type == "bool") {
+        buf.append("\"%%s\", (");
+        generate_expression(buf, arg, program);
+        buf.append(") ? \"true\" : \"false\"");
+        return;
+    } else if (arg_type == "string") {
+        buf.append("\"%%s\", ");
+    } else {
+        buf.append("\"%%d\", ");
+    }
+    generate_expression(buf, arg, program);
+}
+
+void Compiler::generate_expression(CodeBuffer& buf, ExprNode* expr, Program* program) {
+    if (!expr) return;
+
     switch (expr->type) {
         case AstNodeType::INTEGER_LITERAL: {
             IntegerLiteral* lit = static_cast<IntegerLiteral*>(expr);
-            pos += sprintf(buffer + pos, "%d", lit->value);
+            buf.append("%d", lit->value);
             break;
         }
-        
+
         case AstNodeType::FLOAT_LITERAL: {
             FloatLiteral* lit = static_cast<FloatLiteral*>(expr);
-            pos += sprintf(buffer + pos, "%f", lit->value);
+            buf.append("%f", lit->value);
             break;
         }
-        
+
         case AstNodeType::DOUBLE_LITERAL: {
             DoubleLiteral* lit = static_cast<DoubleLiteral*>(expr);
-            pos += sprintf(buffer + pos, "%f", lit->value);
+            buf.append("%f", lit->value);
             break;
         }
-        
+
         case AstNodeType::BOOL_LITERAL: {
             BoolLiteral* lit = static_cast<BoolLiteral*>(expr);
-            pos += sprintf(buffer + pos, "%s", lit->value ? "true" : "false");
+            buf.append("%s", lit->value ? "true" : "false");
             break;
         }
-        
+
         case AstNodeType::STRING_LITERAL: {
             StringLiteral* lit = static_cast<StringLiteral*>(expr);
-            pos += sprintf(buffer + pos, "\"%s\"", lit->value.c_str());
+            buf.append("\"%s\"", lit->value.c_str());
             break;
         }
-        
+
         case AstNodeType::IDENTIFIER_EXPR: {
             IdentifierExpr* ident = static_cast<IdentifierExpr*>(expr);
-            pos += sprintf(buffer + pos, "%s", ident->name.c_str());
+            buf.append("%s", ident->name.c_str());
             break;
         }
-        
+
         case AstNodeType::THIS_EXPR: {
-            pos += sprintf(buffer + pos, "this");
+            buf.append("self");
             break;
         }
-        
+
         case AstNodeType::BINARY_EXPR: {
             BinaryExpr* bin = static_cast<BinaryExpr*>(expr);
-            pos += sprintf(buffer + pos, "(");
-            pos = generate_expression(buffer, pos, bin->left, program);
-            pos += sprintf(buffer + pos, " %s ", bin->op.c_str());
-            pos = generate_expression(buffer, pos, bin->right, program);
-            pos += sprintf(buffer + pos, ")");
+            buf.append("(");
+            generate_expression(buf, bin->left, program);
+            buf.append(" %s ", bin->op.c_str());
+            generate_expression(buf, bin->right, program);
+            buf.append(")");
             break;
         }
-        
+
         case AstNodeType::UNARY_EXPR: {
             UnaryExpr* un = static_cast<UnaryExpr*>(expr);
-            pos += sprintf(buffer + pos, "%s", un->op.c_str());
-            pos = generate_expression(buffer, pos, un->operand, program);
+            buf.append("%s", un->op.c_str());
+            generate_expression(buf, un->operand, program);
             break;
         }
-        
+
         case AstNodeType::ASSIGN_EXPR: {
             AssignExpr* assign = static_cast<AssignExpr*>(expr);
-            pos = generate_expression(buffer, pos, assign->target, program);
-            pos += sprintf(buffer + pos, " = ");
-            pos = generate_expression(buffer, pos, assign->value, program);
+            generate_expression(buf, assign->target, program);
+            buf.append(" = ");
+            generate_expression(buf, assign->value, program);
             break;
         }
-        
+
         case AstNodeType::COMPOUND_ASSIGN_EXPR: {
             CompoundAssignExpr* compound = static_cast<CompoundAssignExpr*>(expr);
-            pos = generate_expression(buffer, pos, compound->target, program);
-            pos += sprintf(buffer + pos, " %s= ", compound->op.c_str());
-            pos = generate_expression(buffer, pos, compound->value, program);
+            generate_expression(buf, compound->target, program);
+            buf.append(" %s= ", compound->op.c_str());
+            generate_expression(buf, compound->value, program);
             break;
         }
-        
+
         case AstNodeType::CALL_EXPR: {
             CallExpr* call = static_cast<CallExpr*>(expr);
-            
+
             if (call->callee->type == AstNodeType::MEMBER_EXPR) {
                 MemberExpr* member = static_cast<MemberExpr*>(call->callee);
-                
+
                 if (member->member == "emit") {
                     String signal_name;
                     String signal_type;
-                    
+
                     if (member->object->type == AstNodeType::INDEX_EXPR) {
                         IndexExpr* idx_expr = static_cast<IndexExpr*>(member->object);
                         IdentifierExpr* obj = static_cast<IdentifierExpr*>(idx_expr->array);
@@ -659,14 +780,14 @@ int Compiler::generate_expression(char* buffer, int pos, ExprNode* expr, Program
                         IdentifierExpr* obj = static_cast<IdentifierExpr*>(member->object);
                         signal_name = obj->name;
                     }
-                    
+
                     for (size_t i = 0; i < program->signals.size(); i++) {
                         if (program->signals[i]->name == signal_name) {
                             signal_type = program->signals[i]->type_param;
                             break;
                         }
                     }
-                    
+
                     bool is_pointer_type = false;
                     if (signal_type.length() > 2 && signal_type[signal_type.length() - 2] == '[' && signal_type[signal_type.length() - 1] == ']') {
                         is_pointer_type = true;
@@ -678,33 +799,33 @@ int Compiler::generate_expression(char* buffer, int pos, ExprNode* expr, Program
                             }
                         }
                     }
-                    
+
                     if (member->object->type == AstNodeType::INDEX_EXPR) {
                         IndexExpr* idx_expr = static_cast<IndexExpr*>(member->object);
                         IdentifierExpr* obj = static_cast<IdentifierExpr*>(idx_expr->array);
-                        pos += sprintf(buffer + pos, "tick_signal_emit(&%s[", obj->name.c_str());
-                        pos = generate_expression(buffer, pos, idx_expr->index, program);
+                        buf.append("tick_signal_emit(&%s[", obj->name.c_str());
+                        generate_expression(buf, idx_expr->index, program);
                         if (is_pointer_type) {
-                            pos += sprintf(buffer + pos, "], (void*)(");
+                            buf.append("], (void*)(");
                         } else {
-                            pos += sprintf(buffer + pos, "], (void*)(intptr_t)(");
+                            buf.append("], (void*)(intptr_t)(");
                         }
                     } else {
                         IdentifierExpr* obj = static_cast<IdentifierExpr*>(member->object);
                         if (is_pointer_type) {
-                            pos += sprintf(buffer + pos, "tick_signal_emit(&%s, (void*)(", obj->name.c_str());
+                            buf.append("tick_signal_emit(&%s, (void*)(", obj->name.c_str());
                         } else {
-                            pos += sprintf(buffer + pos, "tick_signal_emit(&%s, (void*)(intptr_t)(", obj->name.c_str());
+                            buf.append("tick_signal_emit(&%s, (void*)(intptr_t)(", obj->name.c_str());
                         }
                     }
                     if (call->arguments.size() > 0) {
-                        pos = generate_expression(buffer, pos, call->arguments[0], program);
+                        generate_expression(buf, call->arguments[0], program);
                     }
-                    pos += sprintf(buffer + pos, "))");
+                    buf.append("))");
                 } else if (member->member == "recv") {
                     String signal_name;
                     String signal_type;
-                    
+
                     if (member->object->type == AstNodeType::INDEX_EXPR) {
                         IndexExpr* idx_expr = static_cast<IndexExpr*>(member->object);
                         IdentifierExpr* obj = static_cast<IdentifierExpr*>(idx_expr->array);
@@ -713,14 +834,14 @@ int Compiler::generate_expression(char* buffer, int pos, ExprNode* expr, Program
                         IdentifierExpr* obj = static_cast<IdentifierExpr*>(member->object);
                         signal_name = obj->name;
                     }
-                    
+
                     for (size_t i = 0; i < program->signals.size(); i++) {
                         if (program->signals[i]->name == signal_name) {
                             signal_type = program->signals[i]->type_param;
                             break;
                         }
                     }
-                    
+
                     bool is_pointer_type = false;
                     if (signal_type.length() > 2 && signal_type[signal_type.length() - 2] == '[' && signal_type[signal_type.length() - 1] == ']') {
                         is_pointer_type = true;
@@ -732,88 +853,83 @@ int Compiler::generate_expression(char* buffer, int pos, ExprNode* expr, Program
                             }
                         }
                     }
-                    
+
                     if (!is_pointer_type) {
-                        pos += sprintf(buffer + pos, "(intptr_t)");
+                        buf.append("(intptr_t)");
                     }
-                    
+
                     if (member->object->type == AstNodeType::INDEX_EXPR) {
                         IndexExpr* idx_expr = static_cast<IndexExpr*>(member->object);
                         IdentifierExpr* obj = static_cast<IdentifierExpr*>(idx_expr->array);
-                        pos += sprintf(buffer + pos, "tick_signal_recv(&%s[", obj->name.c_str());
-                        pos = generate_expression(buffer, pos, idx_expr->index, program);
-                        pos += sprintf(buffer + pos, "])");
+                        buf.append("tick_signal_recv(&%s[", obj->name.c_str());
+                        generate_expression(buf, idx_expr->index, program);
+                        buf.append("])");
                     } else {
                         IdentifierExpr* obj = static_cast<IdentifierExpr*>(member->object);
-                        pos += sprintf(buffer + pos, "tick_signal_recv(&%s)", obj->name.c_str());
+                        buf.append("tick_signal_recv(&%s)", obj->name.c_str());
                     }
                 } else if (member->member == "execute") {
                     IdentifierExpr* obj = static_cast<IdentifierExpr*>(member->object);
-                    pos += sprintf(buffer + pos, "tick_event_execute(&%s)", obj->name.c_str());
+                    buf.append("tick_event_execute(&%s)", obj->name.c_str());
                 } else {
                     if (member->object->type == AstNodeType::IDENTIFIER_EXPR) {
                         IdentifierExpr* obj_ident = static_cast<IdentifierExpr*>(member->object);
-                        
+
                         ClassDecl* obj_class = nullptr;
-                        if (program) {
-                            String var_type = lookup_var_type(obj_ident->name, program);
-                            for (size_t i = 0; i < program->classes.size(); i++) {
-                                if (program->classes[i]->name == var_type) {
-                                    obj_class = program->classes[i];
-                                    break;
-                                }
+                        String var_type = lookup_var_type(obj_ident->name, program);
+                        for (size_t i = 0; i < program->classes.size(); i++) {
+                            if (program->classes[i]->name == var_type) {
+                                obj_class = program->classes[i];
+                                break;
                             }
                         }
-                        
+
                         if (obj_class) {
-                            pos += sprintf(buffer + pos, "%s_%s(", obj_class->name.c_str(), member->member.c_str());
-                            pos = generate_expression(buffer, pos, member->object, program);
+                            buf.append("%s_%s(", obj_class->name.c_str(), member->member.c_str());
+                            generate_expression(buf, member->object, program);
                             for (size_t i = 0; i < call->arguments.size(); i++) {
-                                pos += sprintf(buffer + pos, ", ");
-                                pos = generate_expression(buffer, pos, call->arguments[i], program);
+                                buf.append(", ");
+                                generate_expression(buf, call->arguments[i], program);
                             }
-                            pos += sprintf(buffer + pos, ")");
+                            buf.append(")");
                         } else {
-                            pos = generate_expression(buffer, pos, call->callee, program);
-                            pos += sprintf(buffer + pos, "(");
+                            generate_expression(buf, call->callee, program);
+                            buf.append("(");
                             for (size_t i = 0; i < call->arguments.size(); i++) {
-                                if (i > 0) pos += sprintf(buffer + pos, ", ");
-                                pos = generate_expression(buffer, pos, call->arguments[i], program);
+                                if (i > 0) buf.append(", ");
+                                generate_expression(buf, call->arguments[i], program);
                             }
-                            pos += sprintf(buffer + pos, ")");
+                            buf.append(")");
                         }
                     } else {
-                        pos = generate_expression(buffer, pos, call->callee, program);
-                        pos += sprintf(buffer + pos, "(");
+                        generate_expression(buf, call->callee, program);
+                        buf.append("(");
                         for (size_t i = 0; i < call->arguments.size(); i++) {
-                            if (i > 0) pos += sprintf(buffer + pos, ", ");
-                            pos = generate_expression(buffer, pos, call->arguments[i], program);
+                            if (i > 0) buf.append(", ");
+                            generate_expression(buf, call->arguments[i], program);
                         }
-                        pos += sprintf(buffer + pos, ")");
+                        buf.append(")");
                     }
                 }
             } else if (call->callee->type == AstNodeType::IDENTIFIER_EXPR) {
                 IdentifierExpr* ident = static_cast<IdentifierExpr*>(call->callee);
-                
+
                 ClassDecl* matching_class = nullptr;
-                if (program) {
-                    for (size_t i = 0; i < program->classes.size(); i++) {
-                        if (program->classes[i]->name == ident->name) {
-                            matching_class = program->classes[i];
-                            break;
-                        }
+                for (size_t i = 0; i < program->classes.size(); i++) {
+                    if (program->classes[i]->name == ident->name) {
+                        matching_class = program->classes[i];
+                        break;
                     }
                 }
-                
+
                 if (matching_class) {
-                    pos += sprintf(buffer + pos, "({%s* __obj = malloc(sizeof(%s)); ", 
+                    buf.append("({%s* __obj = malloc(sizeof(%s)); ",
                         matching_class->name.c_str(), matching_class->name.c_str());
-                    
+
                     for (size_t i = 0; i < matching_class->fields.size(); i++) {
-                        VarDecl* field = matching_class->fields[i];
-                        pos += sprintf(buffer + pos, "__obj->%s = 0; ", field->name.c_str());
+                        buf.append("__obj->%s = 0; ", matching_class->fields[i]->name.c_str());
                     }
-                    
+
                     FunctionDecl* constructor = nullptr;
                     for (size_t i = 0; i < matching_class->methods.size(); i++) {
                         if (matching_class->methods[i]->name == matching_class->name) {
@@ -821,97 +937,82 @@ int Compiler::generate_expression(char* buffer, int pos, ExprNode* expr, Program
                             break;
                         }
                     }
-                    
+
                     if (constructor) {
-                        pos += sprintf(buffer + pos, "%s_%s(__obj", 
-                            matching_class->name.c_str(), constructor->name.c_str());
+                        buf.append("%s_%s(__obj", matching_class->name.c_str(), constructor->name.c_str());
                         for (size_t i = 0; i < call->arguments.size(); i++) {
-                            pos += sprintf(buffer + pos, ", ");
-                            pos = generate_expression(buffer, pos, call->arguments[i], program);
+                            buf.append(", ");
+                            generate_expression(buf, call->arguments[i], program);
                         }
-                        pos += sprintf(buffer + pos, "); ");
+                        buf.append("); ");
                     }
-                    
-                    pos += sprintf(buffer + pos, "__obj; })");
+
+                    buf.append("__obj; })");
                 } else if (ident->name == "print" || ident->name == "println") {
-                    pos += sprintf(buffer + pos, "printf(");
+                    buf.append("printf(");
                     if (call->arguments.size() > 0) {
-                        if (call->arguments[0]->type == AstNodeType::STRING_LITERAL) {
-                            pos = generate_expression(buffer, pos, call->arguments[0], program);
-                        } else {
-                            pos += sprintf(buffer + pos, "\"%%d\", ");
-                            pos = generate_expression(buffer, pos, call->arguments[0], program);
-                        }
+                        generate_print_arg(buf, call->arguments[0], program);
                     }
                     if (ident->name == "println") {
                         if (call->arguments.size() == 0) {
-                            pos += sprintf(buffer + pos, "\"\\n\"");
+                            buf.append("\"\\n\"");
                         } else {
-                            int i = pos - 1;
-                            while (i > 0 && buffer[i] != '"') i--;
-                            if (buffer[i] == '"') {
-                                memmove(buffer + i + 2, buffer + i, pos - i);
-                                buffer[i] = '\\';
-                                buffer[i + 1] = 'n';
-                                pos += 2;
-                            }
+                            buf.append("), printf(\"\\n\"");
                         }
                     }
-                    pos += sprintf(buffer + pos, ")");
+                    buf.append(")");
                 } else {
-                    pos = generate_expression(buffer, pos, call->callee, program);
-                    pos += sprintf(buffer + pos, "(");
+                    generate_expression(buf, call->callee, program);
+                    buf.append("(");
                     for (size_t i = 0; i < call->arguments.size(); i++) {
-                        if (i > 0) pos += sprintf(buffer + pos, ", ");
-                        pos = generate_expression(buffer, pos, call->arguments[i], program);
+                        if (i > 0) buf.append(", ");
+                        generate_expression(buf, call->arguments[i], program);
                     }
-                    pos += sprintf(buffer + pos, ")");
+                    buf.append(")");
                 }
             } else {
-                pos = generate_expression(buffer, pos, call->callee, program);
-                pos += sprintf(buffer + pos, "(");
+                generate_expression(buf, call->callee, program);
+                buf.append("(");
                 for (size_t i = 0; i < call->arguments.size(); i++) {
-                    if (i > 0) pos += sprintf(buffer + pos, ", ");
-                    pos = generate_expression(buffer, pos, call->arguments[i], program);
+                    if (i > 0) buf.append(", ");
+                    generate_expression(buf, call->arguments[i], program);
                 }
-                pos += sprintf(buffer + pos, ")");
+                buf.append(")");
             }
             break;
         }
-        
+
         case AstNodeType::INDEX_EXPR: {
             IndexExpr* idx = static_cast<IndexExpr*>(expr);
-            pos = generate_expression(buffer, pos, idx->array, program);
-            pos += sprintf(buffer + pos, "[");
-            pos = generate_expression(buffer, pos, idx->index, program);
-            pos += sprintf(buffer + pos, "]");
+            generate_expression(buf, idx->array, program);
+            buf.append("[");
+            generate_expression(buf, idx->index, program);
+            buf.append("]");
             break;
         }
-        
+
         case AstNodeType::ARRAY_EXPR: {
             ArrayExpr* arr = static_cast<ArrayExpr*>(expr);
-            pos += sprintf(buffer + pos, "{");
+            buf.append("{");
             for (size_t i = 0; i < arr->elements.size(); i++) {
-                if (i > 0) pos += sprintf(buffer + pos, ", ");
-                pos = generate_expression(buffer, pos, arr->elements[i], program);
+                if (i > 0) buf.append(", ");
+                generate_expression(buf, arr->elements[i], program);
             }
-            pos += sprintf(buffer + pos, "}");
+            buf.append("}");
             break;
         }
-        
+
         case AstNodeType::MEMBER_EXPR: {
             MemberExpr* member = static_cast<MemberExpr*>(expr);
-            pos = generate_expression(buffer, pos, member->object, program);
-            pos += sprintf(buffer + pos, "->%s", member->member.c_str());
+            generate_expression(buf, member->object, program);
+            buf.append("->%s", member->member.c_str());
             break;
         }
-        
+
         default:
-            pos += sprintf(buffer + pos, "0");
+            buf.append("0");
             break;
     }
-    
-    return pos;
 }
 
 void Compiler::write_to_file(const char* filename, const char* content) {
@@ -926,7 +1027,7 @@ bool Compiler::invoke_gcc(const char* c_file, const char* output_file) {
     char cmd[2048];
     char exe_path[1024];
     char runtime_path[1024];
-    
+
 #ifdef __APPLE__
     uint32_t size = sizeof(exe_path);
     if (_NSGetExecutablePath(exe_path, &size) == 0) {
@@ -957,13 +1058,13 @@ bool Compiler::invoke_gcc(const char* c_file, const char* output_file) {
         strcpy(runtime_path, "src/runtime/tick_runtime.c");
     }
 #endif
-    
+
     char include_path[1024];
     snprintf(include_path, sizeof(include_path), "-I%s/../src", exe_path);
-    
-    snprintf(cmd, sizeof(cmd), "gcc -O2 -o %s %s %s -pthread %s", 
+
+    snprintf(cmd, sizeof(cmd), "gcc -O2 -o %s %s %s -pthread %s",
         output_file, c_file, runtime_path, include_path);
-    
+
     int result = system(cmd);
     return result == 0;
 }

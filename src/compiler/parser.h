@@ -37,6 +37,7 @@ private:
     StmtNode* parse_for_stmt();
     StmtNode* parse_return_stmt();
     StmtNode* parse_break_stmt();
+    StmtNode* parse_continue_stmt();
     StmtNode* parse_expr_stmt();
     BlockStmt* parse_block();
     
@@ -49,8 +50,6 @@ private:
     ExprNode* parse_term();
     ExprNode* parse_factor();
     ExprNode* parse_unary();
-    ExprNode* parse_call();
-    ExprNode* parse_member();
     ExprNode* parse_postfix();
     ExprNode* parse_primary();
     

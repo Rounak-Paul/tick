@@ -1,6 +1,7 @@
 #include "tick_runtime.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 void tick_signal_init(TickSignal* sig) {
     sig->head = 0;
@@ -18,6 +19,8 @@ void tick_signal_emit(TickSignal* sig, void* value) {
         sig->tail = (sig->tail + 1) % SIGNAL_QUEUE_SIZE;
         sig->count++;
         pthread_cond_signal(&sig->cond);
+    } else {
+        fprintf(stderr, "tick: signal queue full, value dropped\n");
     }
     
     pthread_mutex_unlock(&sig->mutex);

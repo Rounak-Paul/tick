@@ -33,6 +33,7 @@ enum class TokenType {
     ELSE,
     RETURN,
     BREAK,
+    CONTINUE,
     TRUE,
     FALSE,
     

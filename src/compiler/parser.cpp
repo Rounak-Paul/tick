@@ -307,6 +307,9 @@ StmtNode* Parser::parse_statement() {
     if (check(TokenType::BREAK)) {
         return parse_break_stmt();
     }
+    if (check(TokenType::CONTINUE)) {
+        return parse_continue_stmt();
+    }
     if (check(TokenType::LBRACE)) {
         return parse_block();
     }
@@ -410,6 +413,12 @@ StmtNode* Parser::parse_break_stmt() {
     consume(TokenType::BREAK, "Expected 'break'");
     consume(TokenType::SEMICOLON, "Expected ';' after break statement");
     return new BreakStmt();
+}
+
+StmtNode* Parser::parse_continue_stmt() {
+    consume(TokenType::CONTINUE, "Expected 'continue'");
+    consume(TokenType::SEMICOLON, "Expected ';' after continue statement");
+    return new ContinueStmt();
 }
 
 StmtNode* Parser::parse_expr_stmt() {
@@ -548,47 +557,33 @@ ExprNode* Parser::parse_unary() {
         return new UnaryExpr(String("--"), operand);
     }
     
-    return parse_call();
-}
-
-ExprNode* Parser::parse_call() {
-    ExprNode* expr = parse_member();
-    
-    while (match(TokenType::LPAREN)) {
-        CallExpr* call = new CallExpr(expr);
-        
-        if (!check(TokenType::RPAREN)) {
-            do {
-                call->arguments.push(parse_expression());
-            } while (match(TokenType::COMMA));
-        }
-        
-        consume(TokenType::RPAREN, "Expected ')' after arguments");
-        expr = call;
-    }
-    
-    return expr;
-}
-
-ExprNode* Parser::parse_member() {
-    ExprNode* expr = parse_postfix();
-    
-    while (match(TokenType::DOT)) {
-        Token member = consume(TokenType::IDENTIFIER, "Expected member name");
-        expr = new MemberExpr(expr, member.lexeme);
-    }
-    
-    return expr;
+    return parse_postfix();
 }
 
 ExprNode* Parser::parse_postfix() {
     ExprNode* expr = parse_primary();
     
-    while (check(TokenType::LBRACKET)) {
-        advance();
-        ExprNode* index = parse_expression();
-        consume(TokenType::RBRACKET, "Expected ']' after index");
-        expr = new IndexExpr(expr, index);
+    for (;;) {
+        if (match(TokenType::DOT)) {
+            Token member = consume(TokenType::IDENTIFIER, "Expected member name");
+            expr = new MemberExpr(expr, member.lexeme);
+        } else if (check(TokenType::LBRACKET)) {
+            advance();
+            ExprNode* index = parse_expression();
+            consume(TokenType::RBRACKET, "Expected ']' after index");
+            expr = new IndexExpr(expr, index);
+        } else if (match(TokenType::LPAREN)) {
+            CallExpr* call = new CallExpr(expr);
+            if (!check(TokenType::RPAREN)) {
+                do {
+                    call->arguments.push(parse_expression());
+                } while (match(TokenType::COMMA));
+            }
+            consume(TokenType::RPAREN, "Expected ')' after arguments");
+            expr = call;
+        } else {
+            break;
+        }
     }
     
     return expr;

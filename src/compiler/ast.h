@@ -23,6 +23,7 @@ enum class AstNodeType {
     FOR_STMT,
     RETURN_STMT,
     BREAK_STMT,
+    CONTINUE_STMT,
     
     BINARY_EXPR,
     UNARY_EXPR,
@@ -300,6 +301,10 @@ struct ReturnStmt : public StmtNode {
 
 struct BreakStmt : public StmtNode {
     BreakStmt() : StmtNode(AstNodeType::BREAK_STMT) {}
+};
+
+struct ContinueStmt : public StmtNode {
+    ContinueStmt() : StmtNode(AstNodeType::CONTINUE_STMT) {}
 };
 
 struct ForStmt : public StmtNode {
