@@ -16,3 +16,4 @@ test_*.cpp
 a.out
 fib
 /tmp/tick_*.c
+.cache/
