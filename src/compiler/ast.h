@@ -14,6 +14,8 @@ enum class AstNodeType {
     PROCESS_DECL,
     FUNCTION_DECL,
     CLASS_DECL,
+    ENUM_DECL,
+    UNION_DECL,
     VAR_DECL,
     
     BLOCK_STMT,
@@ -24,11 +26,14 @@ enum class AstNodeType {
     RETURN_STMT,
     BREAK_STMT,
     CONTINUE_STMT,
+    DEFER_STMT,
+    SWITCH_STMT,
     
     BINARY_EXPR,
     UNARY_EXPR,
     ASSIGN_EXPR,
     COMPOUND_ASSIGN_EXPR,
+    POSTFIX_EXPR,
     CALL_EXPR,
     MEMBER_EXPR,
     INDEX_EXPR,
@@ -45,8 +50,9 @@ enum class AstNodeType {
 
 struct AstNode {
     AstNodeType type;
+    int line;
     
-    AstNode(AstNodeType t) : type(t) {}
+    AstNode(AstNodeType t) : type(t), line(0) {}
     virtual ~AstNode() {}
 };
 
@@ -307,6 +313,54 @@ struct ContinueStmt : public StmtNode {
     ContinueStmt() : StmtNode(AstNodeType::CONTINUE_STMT) {}
 };
 
+struct DeferStmt : public StmtNode {
+    StmtNode* statement;
+    
+    DeferStmt(StmtNode* stmt)
+        : StmtNode(AstNodeType::DEFER_STMT), statement(stmt) {}
+    
+    ~DeferStmt() {
+        delete statement;
+    }
+};
+
+struct SwitchCase {
+    DynamicArray<ExprNode*> values;
+    BlockStmt* body;
+    bool is_default;
+    
+    SwitchCase() : body(nullptr), is_default(false) {}
+    ~SwitchCase() {
+        for (size_t i = 0; i < values.size(); i++) delete values[i];
+        if (body) delete body;
+    }
+};
+
+struct SwitchStmt : public StmtNode {
+    ExprNode* subject;
+    DynamicArray<SwitchCase*> cases;
+    
+    SwitchStmt(ExprNode* subj)
+        : StmtNode(AstNodeType::SWITCH_STMT), subject(subj) {}
+    
+    ~SwitchStmt() {
+        delete subject;
+        for (size_t i = 0; i < cases.size(); i++) delete cases[i];
+    }
+};
+
+struct PostfixExpr : public ExprNode {
+    ExprNode* operand;
+    String op;
+    
+    PostfixExpr(ExprNode* opnd, const String& o)
+        : ExprNode(AstNodeType::POSTFIX_EXPR), operand(opnd), op(o) {}
+    
+    ~PostfixExpr() {
+        delete operand;
+    }
+};
+
 struct ForStmt : public StmtNode {
     StmtNode* initializer;
     ExprNode* condition;
@@ -373,6 +427,7 @@ struct Parameter {
 struct FunctionDecl : public AstNode {
     String return_type;
     String name;
+    String class_name;
     DynamicArray<Parameter*> parameters;
     BlockStmt* body;
     
@@ -390,7 +445,6 @@ struct FunctionDecl : public AstNode {
 struct ClassDecl : public AstNode {
     String name;
     DynamicArray<VarDecl*> fields;
-    DynamicArray<FunctionDecl*> methods;
     
     ClassDecl(const String& n)
         : AstNode(AstNodeType::CLASS_DECL), name(n) {}
@@ -399,9 +453,46 @@ struct ClassDecl : public AstNode {
         for (size_t i = 0; i < fields.size(); i++) {
             delete fields[i];
         }
-        for (size_t i = 0; i < methods.size(); i++) {
-            delete methods[i];
-        }
+    }
+};
+
+struct EnumValue {
+    String name;
+    int value;
+    bool has_value;
+    
+    EnumValue(const String& n) : name(n), value(0), has_value(false) {}
+    EnumValue(const String& n, int v) : name(n), value(v), has_value(true) {}
+};
+
+struct EnumDecl : public AstNode {
+    String name;
+    DynamicArray<EnumValue*> values;
+    
+    EnumDecl(const String& n)
+        : AstNode(AstNodeType::ENUM_DECL), name(n) {}
+    
+    ~EnumDecl() {
+        for (size_t i = 0; i < values.size(); i++) delete values[i];
+    }
+};
+
+struct UnionField {
+    String type_name;
+    String name;
+    
+    UnionField(const String& type, const String& n) : type_name(type), name(n) {}
+};
+
+struct UnionDecl : public AstNode {
+    String name;
+    DynamicArray<UnionField*> fields;
+    
+    UnionDecl(const String& n)
+        : AstNode(AstNodeType::UNION_DECL), name(n) {}
+    
+    ~UnionDecl() {
+        for (size_t i = 0; i < fields.size(); i++) delete fields[i];
     }
 };
 
@@ -412,7 +503,10 @@ struct Program : public AstNode {
     DynamicArray<SignalDecl*> signals;
     DynamicArray<ProcessDecl*> processes;
     DynamicArray<FunctionDecl*> functions;
+    DynamicArray<FunctionDecl*> methods;
     DynamicArray<ClassDecl*> classes;
+    DynamicArray<EnumDecl*> enums;
+    DynamicArray<UnionDecl*> unions;
     
     Program() : AstNode(AstNodeType::PROGRAM) {}
     
@@ -435,8 +529,17 @@ struct Program : public AstNode {
         for (size_t i = 0; i < functions.size(); i++) {
             if (functions[i]) delete functions[i];
         }
+        for (size_t i = 0; i < methods.size(); i++) {
+            if (methods[i]) delete methods[i];
+        }
         for (size_t i = 0; i < classes.size(); i++) {
             if (classes[i]) delete classes[i];
+        }
+        for (size_t i = 0; i < enums.size(); i++) {
+            if (enums[i]) delete enums[i];
+        }
+        for (size_t i = 0; i < unions.size(); i++) {
+            if (unions[i]) delete unions[i];
         }
     }
 };

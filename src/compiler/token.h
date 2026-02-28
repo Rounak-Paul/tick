@@ -42,6 +42,12 @@ enum class TokenType {
     RETURN,
     BREAK,
     CONTINUE,
+    DEFER,
+    SWITCH,
+    CASE,
+    DEFAULT,
+    ENUM,
+    UNION,
     TRUE,
     FALSE,
     

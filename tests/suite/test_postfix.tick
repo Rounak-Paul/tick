@@ -1,0 +1,79 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Postfix Increment Test ===");
+    
+    var a : i32 = 5;
+    a++;
+    if (a == 6) {
+        println("PASS: postfix increment");
+        pass = pass + 1;
+    } else {
+        println("FAIL: postfix increment");
+        fail = fail + 1;
+    }
+    
+    a--;
+    if (a == 5) {
+        println("PASS: postfix decrement");
+        pass = pass + 1;
+    } else {
+        println("FAIL: postfix decrement");
+        fail = fail + 1;
+    }
+    
+    var b : i32 = 0;
+    b++;
+    b++;
+    b++;
+    if (b == 3) {
+        println("PASS: multiple postfix increment");
+        pass = pass + 1;
+    } else {
+        println("FAIL: multiple postfix increment");
+        fail = fail + 1;
+    }
+    
+    var sum : i32 = 0;
+    for (var i : i32 = 0; i < 5; i++) {
+        sum = sum + i;
+    }
+    if (sum == 10) {
+        println("PASS: postfix in for loop");
+        pass = pass + 1;
+    } else {
+        println("FAIL: postfix in for loop");
+        fail = fail + 1;
+    }
+    
+    sum = 0;
+    for (var i : i32 = 10; i > 0; i--) {
+        sum = sum + i;
+    }
+    if (sum == 55) {
+        println("PASS: postfix decrement in for loop");
+        pass = pass + 1;
+    } else {
+        println("FAIL: postfix decrement in for loop");
+        fail = fail + 1;
+    }
+    
+    var c : i32 = 0;
+    ++c;
+    c++;
+    if (c == 2) {
+        println("PASS: mix prefix and postfix");
+        pass = pass + 1;
+    } else {
+        println("FAIL: mix prefix and postfix");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

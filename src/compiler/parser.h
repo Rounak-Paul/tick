@@ -28,7 +28,9 @@ private:
     SignalDecl* parse_signal_decl();
     ProcessDecl* parse_process_decl();
     FunctionDecl* parse_function_decl();
-    ClassDecl* parse_class_decl();
+    void parse_class_decl(Program* program);
+    EnumDecl* parse_enum_decl();
+    UnionDecl* parse_union_decl();
     
     StmtNode* parse_statement();
     StmtNode* parse_var_decl();
@@ -38,6 +40,8 @@ private:
     StmtNode* parse_return_stmt();
     StmtNode* parse_break_stmt();
     StmtNode* parse_continue_stmt();
+    StmtNode* parse_defer_stmt();
+    StmtNode* parse_switch_stmt();
     StmtNode* parse_expr_stmt();
     BlockStmt* parse_block();
     

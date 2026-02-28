@@ -90,6 +90,8 @@ TokenType Lexer::check_keyword(const char* str, size_t length) {
         if (memcmp(str, "void", 4) == 0) return TokenType::VOID_TYPE;
         if (memcmp(str, "else", 4) == 0) return TokenType::ELSE;
         if (memcmp(str, "true", 4) == 0) return TokenType::TRUE;
+        if (memcmp(str, "case", 4) == 0) return TokenType::CASE;
+        if (memcmp(str, "enum", 4) == 0) return TokenType::ENUM;
     }
     if (length == 5) {
         if (memcmp(str, "event", 5) == 0) return TokenType::EVENT;
@@ -98,13 +100,19 @@ TokenType Lexer::check_keyword(const char* str, size_t length) {
         if (memcmp(str, "while", 5) == 0) return TokenType::WHILE;
         if (memcmp(str, "break", 5) == 0) return TokenType::BREAK;
         if (memcmp(str, "false", 5) == 0) return TokenType::FALSE;
+        if (memcmp(str, "defer", 5) == 0) return TokenType::DEFER;
+        if (memcmp(str, "union", 5) == 0) return TokenType::UNION;
     }
     if (length == 6) {
         if (memcmp(str, "signal", 6) == 0) return TokenType::SIGNAL;
         if (memcmp(str, "import", 6) == 0) return TokenType::IMPORT;
         if (memcmp(str, "return", 6) == 0) return TokenType::RETURN;
+        if (memcmp(str, "switch", 6) == 0) return TokenType::SWITCH;
     }
-    if (length == 7 && memcmp(str, "process", 7) == 0) return TokenType::PROCESS;
+    if (length == 7) {
+        if (memcmp(str, "process", 7) == 0) return TokenType::PROCESS;
+        if (memcmp(str, "default", 7) == 0) return TokenType::DEFAULT;
+    }
     if (length == 8 && memcmp(str, "continue", 8) == 0) return TokenType::CONTINUE;
     return TokenType::IDENTIFIER;
 }
@@ -183,6 +191,23 @@ Token Lexer::read_string() {
     return make_token(TokenType::STRING, start, length);
 }
 
+Token Lexer::read_multiline_string() {
+    advance();
+    const char* start = &_source[_position];
+    size_t length = 0;
+    
+    while (current_char() != '`' && current_char() != '\0') {
+        advance();
+        length++;
+    }
+    
+    if (current_char() == '`') {
+        advance();
+    }
+    
+    return make_token(TokenType::STRING, start, length);
+}
+
 DynamicArray<Token> Lexer::tokenize() {
     DynamicArray<Token> tokens;
     
@@ -206,6 +231,9 @@ DynamicArray<Token> Lexer::tokenize() {
         }
         else if (c == '"') {
             tokens.push(read_string());
+        }
+        else if (c == '`') {
+            tokens.push(read_multiline_string());
         }
         else if (c == '@') {
             advance();

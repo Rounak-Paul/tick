@@ -22,10 +22,11 @@ struct Symbol {
     SymbolType type;
     String name;
     String data_type;
-    
-    Symbol() : type(SymbolType::VARIABLE) {}
-    Symbol(SymbolType t, const String& n, const String& dt)
-        : type(t), name(n), data_type(dt) {}
+    int param_count;
+
+    Symbol() : type(SymbolType::VARIABLE), param_count(-1) {}
+    Symbol(SymbolType t, const String& n, const String& dt, int pc = -1)
+        : type(t), name(n), data_type(dt), param_count(pc) {}
 };
 
 class SemanticAnalyzer {
@@ -53,8 +54,9 @@ private:
     ModuleLoader* _module_loader;
     const char* _current_file_path;
     Program* _program;
+    FunctionDecl* _current_function;
 
-    void error(const char* message);
+    void error(int line, const char* message);
     void push_scope();
     void pop_scope();
     void declare_in_scope(const char* name, Symbol* sym);
@@ -74,6 +76,8 @@ private:
     void analyze_return_stmt(ReturnStmt* node);
     void analyze_expr_stmt(ExprStmt* node);
     void analyze_block(BlockStmt* node);
+    void analyze_defer_stmt(DeferStmt* node);
+    void analyze_switch_stmt(SwitchStmt* node);
 
     void analyze_expression(ExprNode* node);
     void analyze_binary_expr(BinaryExpr* node);
@@ -84,6 +88,16 @@ private:
     void analyze_identifier(IdentifierExpr* node);
     void analyze_index_expr(IndexExpr* node);
     void analyze_compound_assign_expr(CompoundAssignExpr* node);
+    void analyze_postfix_expr(PostfixExpr* node);
+
+    String infer_type(ExprNode* node);
+    bool is_numeric_type(const String& t);
+    bool is_integer_type(const String& t);
+    bool is_float_type(const String& t);
+    bool is_array_type(const String& t);
+    String array_base_type(const String& t);
+    bool types_compatible(const String& expected, const String& actual);
+    bool is_builtin_function(const String& name);
 };
 
 }

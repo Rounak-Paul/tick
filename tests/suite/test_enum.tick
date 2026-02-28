@@ -1,0 +1,105 @@
+enum Color {
+    RED,
+    GREEN,
+    BLUE
+}
+
+enum Status {
+    OK = 0,
+    ERROR = 1,
+    PENDING = 100,
+    DONE
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Enum Test ===");
+    
+    var c : i32 = Color.RED;
+    if (c == 0) {
+        println("PASS: enum first value is 0");
+        pass = pass + 1;
+    } else {
+        println("FAIL: enum first value is 0");
+        fail = fail + 1;
+    }
+    
+    if (Color.GREEN == 1) {
+        println("PASS: enum auto increment");
+        pass = pass + 1;
+    } else {
+        println("FAIL: enum auto increment");
+        fail = fail + 1;
+    }
+    
+    if (Color.BLUE == 2) {
+        println("PASS: enum third value");
+        pass = pass + 1;
+    } else {
+        println("FAIL: enum third value");
+        fail = fail + 1;
+    }
+    
+    if (Status.OK == 0) {
+        println("PASS: enum explicit value 0");
+        pass = pass + 1;
+    } else {
+        println("FAIL: enum explicit value 0");
+        fail = fail + 1;
+    }
+    
+    if (Status.ERROR == 1) {
+        println("PASS: enum explicit value 1");
+        pass = pass + 1;
+    } else {
+        println("FAIL: enum explicit value 1");
+        fail = fail + 1;
+    }
+    
+    if (Status.PENDING == 100) {
+        println("PASS: enum explicit value 100");
+        pass = pass + 1;
+    } else {
+        println("FAIL: enum explicit value 100");
+        fail = fail + 1;
+    }
+    
+    if (Status.DONE == 101) {
+        println("PASS: enum auto after explicit");
+        pass = pass + 1;
+    } else {
+        println("FAIL: enum auto after explicit");
+        fail = fail + 1;
+    }
+    
+    var s : i32 = Status.PENDING;
+    switch (s) {
+        case 0:
+            println("FAIL: enum in switch");
+            fail = fail + 1;
+        case 100:
+            println("PASS: enum in switch");
+            pass = pass + 1;
+        default:
+            println("FAIL: enum in switch");
+            fail = fail + 1;
+    }
+    
+    c = Color.GREEN;
+    if (c == Color.GREEN) {
+        println("PASS: enum equality check");
+        pass = pass + 1;
+    } else {
+        println("FAIL: enum equality check");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

@@ -1,0 +1,65 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Defer Test ===");
+
+    var order : i32 = 0;
+
+    {
+        defer order = 10;
+        order = 1;
+    }
+    if (order == 10) {
+        println("PASS: defer executes at scope exit");
+        pass = pass + 1;
+    } else {
+        println("FAIL: defer executes at scope exit");
+        fail = fail + 1;
+    }
+
+    var result : i32 = 0;
+    {
+        defer result = result + 1;
+        defer result = result + 10;
+        result = 100;
+    }
+    if (result == 111) {
+        println("PASS: defer LIFO order");
+        pass = pass + 1;
+    } else {
+        println("FAIL: defer LIFO order");
+        fail = fail + 1;
+    }
+
+    var flag : i32 = 0;
+    if (true) {
+        defer flag = 42;
+        flag = 1;
+    }
+    if (flag == 42) {
+        println("PASS: defer in if block");
+        pass = pass + 1;
+    } else {
+        println("FAIL: defer in if block");
+        fail = fail + 1;
+    }
+
+    var counter : i32 = 0;
+    for (var i : i32 = 0; i < 3; ++i) {
+        defer counter = counter + 1;
+    }
+    if (counter == 3) {
+        println("PASS: defer in loop");
+        pass = pass + 1;
+    } else {
+        println("FAIL: defer in loop");
+        fail = fail + 1;
+    }
+
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    return fail;
+}

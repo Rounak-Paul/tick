@@ -1,0 +1,118 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Switch Test ===");
+    
+    var x : i32 = 2;
+    var result : i32 = 0;
+    switch (x) {
+        case 1:
+            result = 10;
+        case 2:
+            result = 20;
+        case 3:
+            result = 30;
+    }
+    if (result == 20) {
+        println("PASS: switch basic match");
+        pass = pass + 1;
+    } else {
+        println("FAIL: switch basic match");
+        fail = fail + 1;
+    }
+    
+    var y : i32 = 99;
+    var res2 : i32 = 0;
+    switch (y) {
+        case 1:
+            res2 = 1;
+        case 2:
+            res2 = 2;
+        default:
+            res2 = -1;
+    }
+    if (res2 == -1) {
+        println("PASS: switch default case");
+        pass = pass + 1;
+    } else {
+        println("FAIL: switch default case");
+        fail = fail + 1;
+    }
+    
+    var z : i32 = 1;
+    var res3 : i32 = 0;
+    switch (z) {
+        case 1:
+            res3 = 100;
+        default:
+            res3 = 200;
+    }
+    if (res3 == 100) {
+        println("PASS: switch first case over default");
+        pass = pass + 1;
+    } else {
+        println("FAIL: switch first case over default");
+        fail = fail + 1;
+    }
+    
+    var a : i32 = 3;
+    var res4 : i32 = 0;
+    switch (a) {
+        case 1:
+        case 2:
+        case 3:
+            res4 = 42;
+        case 4:
+            res4 = 99;
+    }
+    if (res4 == 42) {
+        println("PASS: switch fallthrough cases");
+        pass = pass + 1;
+    } else {
+        println("FAIL: switch fallthrough cases");
+        fail = fail + 1;
+    }
+    
+    var b : i32 = 5;
+    var res5 : i32 = 0;
+    switch (b) {
+        case 5:
+            var temp : i32 = 10;
+            res5 = temp * 2;
+    }
+    if (res5 == 20) {
+        println("PASS: switch with local var");
+        pass = pass + 1;
+    } else {
+        println("FAIL: switch with local var");
+        fail = fail + 1;
+    }
+    
+    var c : i32 = 0;
+    var res6 : i32 = 0;
+    switch (c) {
+        case 0:
+            res6 = 1;
+        case 1:
+            res6 = 2;
+        case 2:
+            res6 = 3;
+        default:
+            res6 = 4;
+    }
+    if (res6 == 1) {
+        println("PASS: switch zero value");
+        pass = pass + 1;
+    } else {
+        println("FAIL: switch zero value");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

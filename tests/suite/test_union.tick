@@ -1,0 +1,152 @@
+union Data {
+    i : i32;
+    f : f32;
+    b : b8;
+}
+
+union Register {
+    val32 : u32;
+    val16 : u16;
+    val8 : u8;
+}
+
+class Vec2 {
+    var x : f32;
+    var y : f32;
+}
+
+class Vec3 {
+    var x : f32;
+    var y : f32;
+    var z : f32;
+}
+
+union Geometry {
+    v2 : Vec2;
+    v3 : Vec3;
+}
+
+union Packet {
+    raw : u32;
+    data : Vec2;
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Union Test ===");
+    
+    var d : Data;
+    d.i = 42;
+    if (d.i == 42) {
+        println("PASS: union i32 field write/read");
+        pass = pass + 1;
+    } else {
+        println("FAIL: union i32 field write/read");
+        fail = fail + 1;
+    }
+    
+    d.i = 0;
+    d.b = true;
+    if (d.b == true) {
+        println("PASS: union b8 field");
+        pass = pass + 1;
+    } else {
+        println("FAIL: union b8 field");
+        fail = fail + 1;
+    }
+    
+    var r : Register;
+    r.val8 = 255;
+    if (r.val8 == 255) {
+        println("PASS: union u8 max value");
+        pass = pass + 1;
+    } else {
+        println("FAIL: union u8 max value");
+        fail = fail + 1;
+    }
+    
+    r.val32 = 1000;
+    if (r.val32 == 1000) {
+        println("PASS: union u32 field");
+        pass = pass + 1;
+    } else {
+        println("FAIL: union u32 field");
+        fail = fail + 1;
+    }
+    
+    var d2 : Data;
+    d2.i = 99;
+    var d3 : Data;
+    d3.i = 99;
+    if (d2.i == d3.i) {
+        println("PASS: union field compare");
+        pass = pass + 1;
+    } else {
+        println("FAIL: union field compare");
+        fail = fail + 1;
+    }
+    
+    var g : Geometry;
+    var p2 : Vec2 = Vec2();
+    p2.x = 1.0;
+    p2.y = 2.0;
+    g.v2 = p2;
+    if (g.v2.x == 1.0) {
+        println("PASS: union custom type write/read x");
+        pass = pass + 1;
+    } else {
+        println("FAIL: union custom type write/read x");
+        fail = fail + 1;
+    }
+    if (g.v2.y == 2.0) {
+        println("PASS: union custom type write/read y");
+        pass = pass + 1;
+    } else {
+        println("FAIL: union custom type write/read y");
+        fail = fail + 1;
+    }
+    
+    var p3 : Vec3 = Vec3();
+    p3.x = 10.0;
+    p3.y = 20.0;
+    p3.z = 30.0;
+    g.v3 = p3;
+    if (g.v3.z == 30.0) {
+        println("PASS: union overwrite with different custom type");
+        pass = pass + 1;
+    } else {
+        println("FAIL: union overwrite with different custom type");
+        fail = fail + 1;
+    }
+    
+    var pkt : Packet;
+    var hdr : Vec2 = Vec2();
+    hdr.x = 5.0;
+    hdr.y = 10.0;
+    pkt.data = hdr;
+    if (pkt.data.x == 5.0) {
+        println("PASS: union mixed primitive and custom type");
+        pass = pass + 1;
+    } else {
+        println("FAIL: union mixed primitive and custom type");
+        fail = fail + 1;
+    }
+    
+    pkt.raw = 0;
+    if (pkt.raw == 0) {
+        println("PASS: union overwrite custom with primitive");
+        pass = pass + 1;
+    } else {
+        println("FAIL: union overwrite custom with primitive");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

@@ -1,0 +1,79 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Type Checking Test ===");
+
+    var x : i32 = 42;
+    var y : f64 = 3.14;
+    var z : b8 = true;
+    var s : str = "hello";
+
+    if (x == 42) {
+        println("PASS: i32 type");
+        pass = pass + 1;
+    } else {
+        println("FAIL: i32 type");
+        fail = fail + 1;
+    }
+
+    if (y > 3.0) {
+        println("PASS: f64 type");
+        pass = pass + 1;
+    } else {
+        println("FAIL: f64 type");
+        fail = fail + 1;
+    }
+
+    if (z == true) {
+        println("PASS: b8 type");
+        pass = pass + 1;
+    } else {
+        println("FAIL: b8 type");
+        fail = fail + 1;
+    }
+
+    if (s == "hello") {
+        println("PASS: str type");
+        pass = pass + 1;
+    } else {
+        println("FAIL: str type");
+        fail = fail + 1;
+    }
+
+    var a : i32 = 10;
+    var b : i32 = 20;
+    a = b;
+    if (a == 20) {
+        println("PASS: same type assign");
+        pass = pass + 1;
+    } else {
+        println("FAIL: same type assign");
+        fail = fail + 1;
+    }
+
+    var f1 : f32 = 1.5;
+    var f2 : f64 = 2.5;
+    if (f1 > 1.0) {
+        println("PASS: f32 type");
+        pass = pass + 1;
+    } else {
+        println("FAIL: f32 type");
+        fail = fail + 1;
+    }
+
+    var u : u32 = 100;
+    if (u == 100) {
+        println("PASS: u32 type");
+        pass = pass + 1;
+    } else {
+        println("FAIL: u32 type");
+        fail = fail + 1;
+    }
+
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    return fail;
+}

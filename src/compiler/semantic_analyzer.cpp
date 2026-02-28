@@ -6,7 +6,8 @@ namespace Tick {
 
 SemanticAnalyzer::SemanticAnalyzer()
     : _scope_depth(0), _has_errors(false), _loop_depth(0),
-      _module_loader(nullptr), _current_file_path(nullptr), _program(nullptr) {}
+      _module_loader(nullptr), _current_file_path(nullptr),
+      _program(nullptr), _current_function(nullptr) {}
 
 SemanticAnalyzer::~SemanticAnalyzer() {
     _symbols.for_each([](const char*, Symbol*& sym) {
@@ -22,14 +23,18 @@ void SemanticAnalyzer::set_current_file_path(const char* path) {
     _current_file_path = path;
 }
 
-void SemanticAnalyzer::error(const char* message) {
-    fprintf(stderr, "Semantic error: %s\n", message);
+void SemanticAnalyzer::error(int line, const char* message) {
+    if (line > 0) {
+        fprintf(stderr, "Semantic error at line %d: %s\n", line, message);
+    } else {
+        fprintf(stderr, "Semantic error: %s\n", message);
+    }
     _has_errors = true;
 }
 
 void SemanticAnalyzer::push_scope() {
     if (_scope_depth >= MAX_SCOPE_DEPTH - 1) {
-        error("Maximum scope depth exceeded");
+        error(0, "Maximum scope depth exceeded");
         return;
     }
     _scope_depth++;
@@ -69,11 +74,257 @@ void SemanticAnalyzer::declare_in_scope(const char* name, Symbol* sym) {
     _scope_stack[_scope_depth].push(entry);
 }
 
+bool SemanticAnalyzer::is_numeric_type(const String& t) {
+    return is_integer_type(t) || is_float_type(t);
+}
+
+bool SemanticAnalyzer::is_integer_type(const String& t) {
+    return t == "i8" || t == "i16" || t == "i32" || t == "i64" ||
+           t == "u8" || t == "u16" || t == "u32" || t == "u64";
+}
+
+bool SemanticAnalyzer::is_float_type(const String& t) {
+    return t == "f32" || t == "f64";
+}
+
+bool SemanticAnalyzer::is_array_type(const String& t) {
+    return t.length() > 2 && t[t.length() - 2] == '[' && t[t.length() - 1] == ']';
+}
+
+String SemanticAnalyzer::array_base_type(const String& t) {
+    if (is_array_type(t)) {
+        return String(t.c_str(), t.length() - 2);
+    }
+    return t;
+}
+
+bool SemanticAnalyzer::types_compatible(const String& expected, const String& actual) {
+    if (expected == actual) return true;
+    if (expected.empty() || actual.empty()) return true;
+    if (is_numeric_type(expected) && is_numeric_type(actual)) return true;
+    if (is_numeric_type(expected) && actual == "b8") return true;
+    if (expected == "b8" && is_numeric_type(actual)) return true;
+    if (is_array_type(expected) && is_array_type(actual)) {
+        String eb = array_base_type(expected);
+        String ab = array_base_type(actual);
+        return types_compatible(eb, ab);
+    }
+    if (expected == "b8" && actual == "b8") return true;
+    if (expected == "str" && actual == "str") return true;
+    return false;
+}
+
+bool SemanticAnalyzer::is_builtin_function(const String& name) {
+    return name == "print" || name == "println" ||
+           name == "sqrt" || name == "abs" || name == "pow" ||
+           name == "sin" || name == "cos" || name == "tan" ||
+           name == "floor" || name == "ceil" || name == "round" ||
+           name == "log" || name == "log2" || name == "log10" ||
+           name == "fmin" || name == "fmax" ||
+           name == "strlen" || name == "str_concat" ||
+           name == "str_substring" || name == "str_index_of" ||
+           name == "str_compare" || name == "to_str" ||
+           name == "parse" || name == "str_char_at" ||
+           name == "file_open" || name == "file_read" ||
+           name == "file_write" || name == "file_close" ||
+           name == "file_exists" ||
+           name == "free" || name == "array_length";
+}
+
+String SemanticAnalyzer::infer_type(ExprNode* node) {
+    if (!node) return String("");
+    switch (node->type) {
+        case AstNodeType::INTEGER_LITERAL: return String("i32");
+        case AstNodeType::FLOAT_LITERAL: return String("f32");
+        case AstNodeType::DOUBLE_LITERAL: return String("f64");
+        case AstNodeType::BOOL_LITERAL: return String("b8");
+        case AstNodeType::STRING_LITERAL: return String("str");
+        case AstNodeType::IDENTIFIER_EXPR: {
+            IdentifierExpr* id = static_cast<IdentifierExpr*>(node);
+            Symbol** sym = _symbols.find(id->name.c_str());
+            if (sym) return (*sym)->data_type;
+            return String("");
+        }
+        case AstNodeType::MEMBER_EXPR: {
+            MemberExpr* me = static_cast<MemberExpr*>(node);
+            if (me->member == "length") {
+                String obj_type = infer_type(me->object);
+                if (is_array_type(obj_type) || obj_type == "str") {
+                    return String("i32");
+                }
+            }
+            String obj_type = infer_type(me->object);
+            if (_program) {
+                for (size_t i = 0; i < _program->classes.size(); i++) {
+                    if (_program->classes[i]->name == obj_type) {
+                        for (size_t j = 0; j < _program->classes[i]->fields.size(); j++) {
+                            if (_program->classes[i]->fields[j]->name == me->member) {
+                                return _program->classes[i]->fields[j]->type_name;
+                            }
+                        }
+                    }
+                }
+            }
+            return String("");
+        }
+        case AstNodeType::CALL_EXPR: {
+            CallExpr* call = static_cast<CallExpr*>(node);
+            if (call->callee->type == AstNodeType::IDENTIFIER_EXPR) {
+                IdentifierExpr* id = static_cast<IdentifierExpr*>(call->callee);
+                if (id->name == "strlen" || id->name == "str_compare" ||
+                    id->name == "str_index_of") {
+                    return String("i32");
+                }
+                if (id->name == "str_concat" || id->name == "str_substring" ||
+                    id->name == "to_str" ||
+                    id->name == "file_read") {
+                    return String("str");
+                }
+                if (id->name == "parse") return String("");
+                if (id->name == "str_char_at") return String("u8");
+                if (id->name == "file_exists") return String("b8");
+                if (id->name == "sqrt" || id->name == "pow" ||
+                    id->name == "sin" || id->name == "cos" ||
+                    id->name == "tan" || id->name == "floor" ||
+                    id->name == "ceil" || id->name == "round" ||
+                    id->name == "log" || id->name == "log2" ||
+                    id->name == "log10" || id->name == "fmin" ||
+                    id->name == "fmax") {
+                    return String("f64");
+                }
+                if (id->name == "abs") return String("i32");
+                if (_program) {
+                    for (size_t i = 0; i < _program->functions.size(); i++) {
+                        if (_program->functions[i]->name == id->name) {
+                            return _program->functions[i]->return_type;
+                        }
+                    }
+                    for (size_t i = 0; i < _program->classes.size(); i++) {
+                        if (_program->classes[i]->name == id->name) {
+                            return id->name;
+                        }
+                    }
+                }
+            }
+            if (call->callee->type == AstNodeType::MEMBER_EXPR) {
+                MemberExpr* me = static_cast<MemberExpr*>(call->callee);
+                if (me->member == "length") return String("i32");
+                if (me->member == "push") return String("void");
+                if (me->member == "pop") {
+                    String arr_type = infer_type(me->object);
+                    if (is_array_type(arr_type)) return array_base_type(arr_type);
+                }
+                if (me->member == "recv") {
+                    if (_program && me->object->type == AstNodeType::IDENTIFIER_EXPR) {
+                        IdentifierExpr* sig_id = static_cast<IdentifierExpr*>(me->object);
+                        for (size_t i = 0; i < _program->signals.size(); i++) {
+                            if (_program->signals[i]->name == sig_id->name) {
+                                return _program->signals[i]->type_param;
+                            }
+                        }
+                    }
+                    if (_program && me->object->type == AstNodeType::INDEX_EXPR) {
+                        IndexExpr* idx = static_cast<IndexExpr*>(me->object);
+                        if (idx->array->type == AstNodeType::IDENTIFIER_EXPR) {
+                            IdentifierExpr* sig_id = static_cast<IdentifierExpr*>(idx->array);
+                            for (size_t i = 0; i < _program->signals.size(); i++) {
+                                if (_program->signals[i]->name == sig_id->name) {
+                                    return _program->signals[i]->type_param;
+                                }
+                            }
+                        }
+                    }
+                    return String("i32");
+                }
+                String obj_type = infer_type(me->object);
+                if (_program) {
+                    for (size_t i = 0; i < _program->methods.size(); i++) {
+                        if (_program->methods[i]->class_name == obj_type &&
+                            _program->methods[i]->name == me->member) {
+                            return _program->methods[i]->return_type;
+                        }
+                    }
+                }
+            }
+            return String("");
+        }
+        case AstNodeType::BINARY_EXPR: {
+            BinaryExpr* bin = static_cast<BinaryExpr*>(node);
+            if (bin->op == "==" || bin->op == "!=" || bin->op == "<" ||
+                bin->op == ">" || bin->op == "<=" || bin->op == ">=" ||
+                bin->op == "&&" || bin->op == "||") {
+                return String("b8");
+            }
+            String left = infer_type(bin->left);
+            String right = infer_type(bin->right);
+            if (bin->op == "+" && (left == "str" || right == "str")) {
+                return String("str");
+            }
+            if (is_float_type(left) || is_float_type(right)) {
+                if (left == "f64" || right == "f64") return String("f64");
+                return String("f32");
+            }
+            return left.empty() ? right : left;
+        }
+        case AstNodeType::UNARY_EXPR: {
+            UnaryExpr* un = static_cast<UnaryExpr*>(node);
+            if (un->op == "!") return String("b8");
+            return infer_type(un->operand);
+        }
+        case AstNodeType::POSTFIX_EXPR: {
+            PostfixExpr* post = static_cast<PostfixExpr*>(node);
+            return infer_type(post->operand);
+        }
+        case AstNodeType::INDEX_EXPR: {
+            IndexExpr* idx = static_cast<IndexExpr*>(node);
+            String arr_type = infer_type(idx->array);
+            if (is_array_type(arr_type)) return array_base_type(arr_type);
+            if (arr_type == "str") return String("u8");
+            return String("");
+        }
+        case AstNodeType::ARRAY_EXPR: {
+            ArrayExpr* arr = static_cast<ArrayExpr*>(node);
+            if (arr->elements.size() > 0) {
+                String elem_type = infer_type(arr->elements[0]);
+                char buf[128];
+                snprintf(buf, sizeof(buf), "%s[]", elem_type.c_str());
+                return String(buf);
+            }
+            return String("");
+        }
+        case AstNodeType::THIS_EXPR:
+            return String("");
+        case AstNodeType::NEW_EXPR: {
+            NewExpr* ne = static_cast<NewExpr*>(node);
+            return ne->class_name;
+        }
+        default:
+            return String("");
+    }
+}
+
 bool SemanticAnalyzer::analyze(Program* program) {
     _program = program;
 
     for (size_t i = 0; i < program->imports.size(); i++) {
         analyze_import_decl(program->imports[i], program);
+    }
+
+    for (size_t i = 0; i < program->enums.size(); i++) {
+        EnumDecl* ed = program->enums[i];
+        int next_val = 0;
+        for (size_t j = 0; j < ed->values.size(); j++) {
+            int v = ed->values[j]->has_value ? ed->values[j]->value : next_val;
+            char buf[256];
+            snprintf(buf, sizeof(buf), "%s_%s", ed->name.c_str(), ed->values[j]->name.c_str());
+            _symbols.insert(strdup(buf), new Symbol(SymbolType::VARIABLE, String(buf), String("i32")));
+            next_val = v + 1;
+        }
+    }
+
+    for (size_t i = 0; i < program->unions.size(); i++) {
+        _symbols.insert(program->unions[i]->name.c_str(),
+            new Symbol(SymbolType::CLASS, program->unions[i]->name, String("union")));
     }
 
     for (size_t i = 0; i < program->classes.size(); i++) {
@@ -86,12 +337,20 @@ bool SemanticAnalyzer::analyze(Program* program) {
         if (_symbols.contains(var->name.c_str())) {
             char msg[256];
             snprintf(msg, sizeof(msg), "Duplicate global variable '%s'", var->name.c_str());
-            error(msg);
+            error(var->line, msg);
         } else {
             _symbols.insert(var->name.c_str(), new Symbol(SymbolType::VARIABLE, var->name, var->type_name));
         }
         if (var->initializer) {
             analyze_expression(var->initializer);
+            String init_type = infer_type(var->initializer);
+            if (!init_type.empty() && !var->type_name.empty() &&
+                !types_compatible(var->type_name, init_type)) {
+                char msg[256];
+                snprintf(msg, sizeof(msg), "Type mismatch: cannot assign '%s' to variable '%s' of type '%s'",
+                    init_type.c_str(), var->name.c_str(), var->type_name.c_str());
+                error(var->line, msg);
+            }
         }
     }
 
@@ -104,8 +363,10 @@ bool SemanticAnalyzer::analyze(Program* program) {
     }
 
     for (size_t i = 0; i < program->functions.size(); i++) {
+        int pc = (int)program->functions[i]->parameters.size();
         _symbols.insert(program->functions[i]->name.c_str(),
-            new Symbol(SymbolType::FUNCTION, program->functions[i]->name, program->functions[i]->return_type));
+            new Symbol(SymbolType::FUNCTION, program->functions[i]->name,
+                       program->functions[i]->return_type, pc));
     }
 
     for (size_t i = 0; i < program->classes.size(); i++) {
@@ -125,12 +386,12 @@ bool SemanticAnalyzer::analyze(Program* program) {
 
 void SemanticAnalyzer::analyze_import_decl(ImportDecl* node, Program* program) {
     if (!_module_loader) {
-        error("Module loader not set");
+        error(node->line, "Module loader not set");
         return;
     }
 
     if (!_current_file_path) {
-        error("Current file path not set");
+        error(node->line, "Current file path not set");
         return;
     }
 
@@ -138,7 +399,7 @@ void SemanticAnalyzer::analyze_import_decl(ImportDecl* node, Program* program) {
     if (!imported_module) {
         char err_msg[256];
         snprintf(err_msg, sizeof(err_msg), "Failed to load module '%s'", node->module_path.c_str());
-        error(err_msg);
+        error(node->line, err_msg);
         return;
     }
 
@@ -149,21 +410,18 @@ void SemanticAnalyzer::analyze_import_decl(ImportDecl* node, Program* program) {
                 imported_module->functions[i] = nullptr;
             }
         }
-
         for (size_t i = 0; i < imported_module->classes.size(); i++) {
             if (imported_module->classes[i]) {
                 program->classes.push(imported_module->classes[i]);
                 imported_module->classes[i] = nullptr;
             }
         }
-
         for (size_t i = 0; i < imported_module->events.size(); i++) {
             if (imported_module->events[i]) {
                 program->events.push(imported_module->events[i]);
                 imported_module->events[i] = nullptr;
             }
         }
-
         for (size_t i = 0; i < imported_module->signals.size(); i++) {
             if (imported_module->signals[i]) {
                 program->signals.push(imported_module->signals[i]);
@@ -174,7 +432,6 @@ void SemanticAnalyzer::analyze_import_decl(ImportDecl* node, Program* program) {
         for (size_t i = 0; i < node->imported_names.size(); i++) {
             const char* name = node->imported_names[i].c_str();
             bool found = false;
-
             for (size_t j = 0; j < imported_module->functions.size(); j++) {
                 if (imported_module->functions[j] && strcmp(imported_module->functions[j]->name.c_str(), name) == 0) {
                     program->functions.push(imported_module->functions[j]);
@@ -183,7 +440,6 @@ void SemanticAnalyzer::analyze_import_decl(ImportDecl* node, Program* program) {
                     break;
                 }
             }
-
             if (!found) {
                 for (size_t j = 0; j < imported_module->classes.size(); j++) {
                     if (imported_module->classes[j] && strcmp(imported_module->classes[j]->name.c_str(), name) == 0) {
@@ -194,11 +450,10 @@ void SemanticAnalyzer::analyze_import_decl(ImportDecl* node, Program* program) {
                     }
                 }
             }
-
             if (!found) {
                 char err_msg[256];
                 snprintf(err_msg, sizeof(err_msg), "Name '%s' not found in module '%s'", name, node->module_path.c_str());
-                error(err_msg);
+                error(node->line, err_msg);
             }
         }
     }
@@ -208,10 +463,9 @@ void SemanticAnalyzer::analyze_event_decl(EventDecl* node) {
     if (_symbols.contains(node->name.c_str())) {
         char msg[256];
         snprintf(msg, sizeof(msg), "Event '%s' already declared", node->name.c_str());
-        error(msg);
+        error(node->line, msg);
         return;
     }
-
     _symbols.insert(node->name.c_str(), new Symbol(SymbolType::EVENT, node->name, String("event")));
 }
 
@@ -219,10 +473,9 @@ void SemanticAnalyzer::analyze_signal_decl(SignalDecl* node) {
     if (_symbols.contains(node->name.c_str())) {
         char msg[256];
         snprintf(msg, sizeof(msg), "Signal '%s' already declared", node->name.c_str());
-        error(msg);
+        error(node->line, msg);
         return;
     }
-
     _symbols.insert(node->name.c_str(), new Symbol(SymbolType::SIGNAL, node->name, node->type_param));
 }
 
@@ -231,13 +484,13 @@ void SemanticAnalyzer::analyze_process_decl(ProcessDecl* node) {
         char msg[256];
         snprintf(msg, sizeof(msg), "Undeclared event '%s' referenced by process '%s'",
             node->event_name.c_str(), node->name.c_str());
-        error(msg);
+        error(node->line, msg);
     }
 
     if (_symbols.contains(node->name.c_str())) {
         char msg[256];
         snprintf(msg, sizeof(msg), "Process '%s' already declared", node->name.c_str());
-        error(msg);
+        error(node->line, msg);
         return;
     }
 
@@ -253,6 +506,9 @@ void SemanticAnalyzer::analyze_process_decl(ProcessDecl* node) {
 }
 
 void SemanticAnalyzer::analyze_function_decl(FunctionDecl* node) {
+    FunctionDecl* prev_func = _current_function;
+    _current_function = node;
+
     push_scope();
 
     for (size_t i = 0; i < node->parameters.size(); i++) {
@@ -267,6 +523,7 @@ void SemanticAnalyzer::analyze_function_decl(FunctionDecl* node) {
     }
 
     pop_scope();
+    _current_function = prev_func;
 }
 
 void SemanticAnalyzer::analyze_class_decl(ClassDecl* node) {
@@ -277,8 +534,11 @@ void SemanticAnalyzer::analyze_class_decl(ClassDecl* node) {
         declare_in_scope(field->name.c_str(), new Symbol(SymbolType::VARIABLE, field->name, field->type_name));
     }
 
-    for (size_t i = 0; i < node->methods.size(); i++) {
-        FunctionDecl* method = node->methods[i];
+    for (size_t i = 0; i < _program->methods.size(); i++) {
+        FunctionDecl* method = _program->methods[i];
+        if (!(method->class_name == node->name)) continue;
+        FunctionDecl* prev_func = _current_function;
+        _current_function = method;
 
         push_scope();
 
@@ -296,6 +556,7 @@ void SemanticAnalyzer::analyze_class_decl(ClassDecl* node) {
         }
 
         pop_scope();
+        _current_function = prev_func;
     }
 
     pop_scope();
@@ -325,14 +586,20 @@ void SemanticAnalyzer::analyze_statement(StmtNode* node) {
         case AstNodeType::BLOCK_STMT:
             analyze_block(static_cast<BlockStmt*>(node));
             break;
+        case AstNodeType::DEFER_STMT:
+            analyze_defer_stmt(static_cast<DeferStmt*>(node));
+            break;
+        case AstNodeType::SWITCH_STMT:
+            analyze_switch_stmt(static_cast<SwitchStmt*>(node));
+            break;
         case AstNodeType::BREAK_STMT:
             if (_loop_depth == 0) {
-                error("'break' used outside of loop");
+                error(node->line, "'break' used outside of loop");
             }
             break;
         case AstNodeType::CONTINUE_STMT:
             if (_loop_depth == 0) {
-                error("'continue' used outside of loop");
+                error(node->line, "'continue' used outside of loop");
             }
             break;
         default:
@@ -343,6 +610,15 @@ void SemanticAnalyzer::analyze_statement(StmtNode* node) {
 void SemanticAnalyzer::analyze_var_decl(VarDecl* node) {
     if (node->initializer) {
         analyze_expression(node->initializer);
+
+        String init_type = infer_type(node->initializer);
+        if (!init_type.empty() && !node->type_name.empty() &&
+            !types_compatible(node->type_name, init_type)) {
+            char msg[256];
+            snprintf(msg, sizeof(msg), "Type mismatch: cannot assign '%s' to variable '%s' of type '%s'",
+                init_type.c_str(), node->name.c_str(), node->type_name.c_str());
+            error(node->line, msg);
+        }
     }
 
     declare_in_scope(node->name.c_str(), new Symbol(SymbolType::VARIABLE, node->name, node->type_name));
@@ -418,6 +694,17 @@ void SemanticAnalyzer::analyze_for_stmt(ForStmt* node) {
 void SemanticAnalyzer::analyze_return_stmt(ReturnStmt* node) {
     if (node->value) {
         analyze_expression(node->value);
+        if (_current_function && _current_function->return_type != "void") {
+            String ret_type = infer_type(node->value);
+            if (!ret_type.empty() && !types_compatible(_current_function->return_type, ret_type)) {
+                char msg[256];
+                snprintf(msg, sizeof(msg), "Return type mismatch: function '%s' expects '%s' but got '%s'",
+                    _current_function->name.c_str(),
+                    _current_function->return_type.c_str(),
+                    ret_type.c_str());
+                error(node->line, msg);
+            }
+        }
     }
 }
 
@@ -431,6 +718,27 @@ void SemanticAnalyzer::analyze_block(BlockStmt* node) {
         analyze_statement(node->statements[i]);
     }
     pop_scope();
+}
+
+void SemanticAnalyzer::analyze_defer_stmt(DeferStmt* node) {
+    analyze_statement(node->statement);
+}
+
+void SemanticAnalyzer::analyze_switch_stmt(SwitchStmt* node) {
+    analyze_expression(node->subject);
+    for (size_t i = 0; i < node->cases.size(); i++) {
+        SwitchCase* sc = node->cases[i];
+        for (size_t j = 0; j < sc->values.size(); j++) {
+            analyze_expression(sc->values[j]);
+        }
+        if (sc->body) {
+            push_scope();
+            for (size_t j = 0; j < sc->body->statements.size(); j++) {
+                analyze_statement(sc->body->statements[j]);
+            }
+            pop_scope();
+        }
+    }
 }
 
 void SemanticAnalyzer::analyze_expression(ExprNode* node) {
@@ -447,6 +755,9 @@ void SemanticAnalyzer::analyze_expression(ExprNode* node) {
             break;
         case AstNodeType::COMPOUND_ASSIGN_EXPR:
             analyze_compound_assign_expr(static_cast<CompoundAssignExpr*>(node));
+            break;
+        case AstNodeType::POSTFIX_EXPR:
+            analyze_postfix_expr(static_cast<PostfixExpr*>(node));
             break;
         case AstNodeType::CALL_EXPR:
             analyze_call_expr(static_cast<CallExpr*>(node));
@@ -489,6 +800,34 @@ void SemanticAnalyzer::analyze_expression(ExprNode* node) {
 void SemanticAnalyzer::analyze_binary_expr(BinaryExpr* node) {
     analyze_expression(node->left);
     analyze_expression(node->right);
+
+    String left_type = infer_type(node->left);
+    String right_type = infer_type(node->right);
+
+    if (node->op == "+" && (left_type == "str" || right_type == "str")) {
+        return;
+    }
+
+    if (!left_type.empty() && !right_type.empty()) {
+        if (node->op == "&&" || node->op == "||") {
+            return;
+        }
+        if ((node->op == "==" || node->op == "!=") &&
+            (left_type == "str" && right_type == "str")) {
+            return;
+        }
+        if ((node->op == "==" || node->op == "!=") &&
+            (left_type == "b8" && right_type == "b8")) {
+            return;
+        }
+        if (is_numeric_type(left_type) && is_numeric_type(right_type)) {
+            return;
+        }
+        if (left_type == "b8" && right_type == "b8" &&
+            (node->op == "==" || node->op == "!=")) {
+            return;
+        }
+    }
 }
 
 void SemanticAnalyzer::analyze_unary_expr(UnaryExpr* node) {
@@ -498,6 +837,21 @@ void SemanticAnalyzer::analyze_unary_expr(UnaryExpr* node) {
 void SemanticAnalyzer::analyze_assign_expr(AssignExpr* node) {
     analyze_expression(node->target);
     analyze_expression(node->value);
+
+    if (node->target->type == AstNodeType::IDENTIFIER_EXPR) {
+        IdentifierExpr* id = static_cast<IdentifierExpr*>(node->target);
+        Symbol** sym = _symbols.find(id->name.c_str());
+        if (sym) {
+            String val_type = infer_type(node->value);
+            if (!val_type.empty() && !(*sym)->data_type.empty() &&
+                !types_compatible((*sym)->data_type, val_type)) {
+                char msg[256];
+                snprintf(msg, sizeof(msg), "Type mismatch: cannot assign '%s' to '%s' of type '%s'",
+                    val_type.c_str(), id->name.c_str(), (*sym)->data_type.c_str());
+                error(node->line, msg);
+            }
+        }
+    }
 }
 
 void SemanticAnalyzer::analyze_compound_assign_expr(CompoundAssignExpr* node) {
@@ -505,10 +859,14 @@ void SemanticAnalyzer::analyze_compound_assign_expr(CompoundAssignExpr* node) {
     analyze_expression(node->value);
 }
 
+void SemanticAnalyzer::analyze_postfix_expr(PostfixExpr* node) {
+    analyze_expression(node->operand);
+}
+
 void SemanticAnalyzer::analyze_call_expr(CallExpr* node) {
     if (node->callee->type == AstNodeType::IDENTIFIER_EXPR) {
         IdentifierExpr* ident = static_cast<IdentifierExpr*>(node->callee);
-        if (!(ident->name == "print" || ident->name == "println")) {
+        if (!is_builtin_function(ident->name)) {
             bool found = _symbols.contains(ident->name.c_str());
             if (!found && _program) {
                 for (size_t i = 0; i < _program->classes.size(); i++) {
@@ -521,7 +879,19 @@ void SemanticAnalyzer::analyze_call_expr(CallExpr* node) {
             if (!found) {
                 char msg[256];
                 snprintf(msg, sizeof(msg), "Call to undeclared function or class '%s'", ident->name.c_str());
-                error(msg);
+                error(node->line, msg);
+            }
+        }
+
+        Symbol** sym = _symbols.find(ident->name.c_str());
+        if (sym && (*sym)->type == SymbolType::FUNCTION && (*sym)->param_count >= 0) {
+            int expected = (*sym)->param_count;
+            int actual = (int)node->arguments.size();
+            if (expected != actual) {
+                char msg[256];
+                snprintf(msg, sizeof(msg), "Function '%s' expects %d argument(s) but got %d",
+                    ident->name.c_str(), expected, actual);
+                error(node->line, msg);
             }
         }
     } else {
@@ -540,13 +910,25 @@ void SemanticAnalyzer::analyze_member_expr(MemberExpr* node) {
 void SemanticAnalyzer::analyze_index_expr(IndexExpr* node) {
     analyze_expression(node->array);
     analyze_expression(node->index);
+
+    String idx_type = infer_type(node->index);
+    if (!idx_type.empty() && !is_integer_type(idx_type)) {
+        char msg[256];
+        snprintf(msg, sizeof(msg), "Array index must be an integer type, got '%s'", idx_type.c_str());
+        error(node->line, msg);
+    }
 }
 
 void SemanticAnalyzer::analyze_identifier(IdentifierExpr* node) {
     if (!_symbols.contains(node->name.c_str())) {
+        if (_program) {
+            for (size_t i = 0; i < _program->enums.size(); i++) {
+                if (_program->enums[i]->name == node->name) return;
+            }
+        }
         char msg[256];
         snprintf(msg, sizeof(msg), "Use of undeclared identifier '%s'", node->name.c_str());
-        error(msg);
+        error(node->line, msg);
     }
 }
 

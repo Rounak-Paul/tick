@@ -28,6 +28,7 @@ private:
     Token read_identifier();
     Token read_number();
     Token read_string();
+    Token read_multiline_string();
     TokenType check_keyword(const char* str, size_t length);
 };
 
