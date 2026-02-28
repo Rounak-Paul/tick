@@ -13,6 +13,33 @@
 
 using namespace Tick;
 
+FunctionDecl* Compiler::_current_func = nullptr;
+ClassDecl* Compiler::_current_class = nullptr;
+
+String Compiler::lookup_var_type(const String& name, Program* program) {
+    if (_current_func) {
+        for (size_t i = 0; i < _current_func->parameters.size(); i++) {
+            if (_current_func->parameters[i]->name == name) {
+                return _current_func->parameters[i]->type_name;
+            }
+        }
+        if (_current_func->body) {
+            for (size_t i = 0; i < _current_func->body->statements.size(); i++) {
+                if (_current_func->body->statements[i]->type == AstNodeType::VAR_DECL) {
+                    VarDecl* v = static_cast<VarDecl*>(_current_func->body->statements[i]);
+                    if (v->name == name) return v->type_name;
+                }
+            }
+        }
+    }
+    for (size_t i = 0; i < program->globals.size(); i++) {
+        if (program->globals[i]->name == name) {
+            return program->globals[i]->type_name;
+        }
+    }
+    return String("");
+}
+
 const char* Compiler::tick_type_to_c_type(const String& tick_type, Program* program) {
     if (tick_type == "void") return "void";
     if (tick_type == "float") return "double";
@@ -263,6 +290,9 @@ String Compiler::generate_c_code(Program* program) {
             
             pos += sprintf(buffer + pos, ") {\n");
             
+            _current_func = method;
+            _current_class = cls;
+            
             if (method->body) {
                 for (size_t k = 0; k < method->body->statements.size(); k++) {
                     pos = generate_statement(buffer, pos, method->body->statements[k], 1, program);
@@ -294,6 +324,9 @@ int Compiler::generate_process(char* buffer, int pos, ProcessDecl* proc, Program
 
 int Compiler::generate_function(char* buffer, int pos, FunctionDecl* func, Program* program) {
     const char* ret_type = tick_type_to_c_type(func->return_type, program);
+    
+    _current_func = func;
+    _current_class = nullptr;
     
     pos += sprintf(buffer + pos, "%s %s(", ret_type, func->name.c_str());
     
@@ -723,8 +756,9 @@ int Compiler::generate_expression(char* buffer, int pos, ExprNode* expr, Program
                         
                         ClassDecl* obj_class = nullptr;
                         if (program) {
+                            String var_type = lookup_var_type(obj_ident->name, program);
                             for (size_t i = 0; i < program->classes.size(); i++) {
-                                if (program->classes[i]->name == obj_ident->name) {
+                                if (program->classes[i]->name == var_type) {
                                     obj_class = program->classes[i];
                                     break;
                                 }
