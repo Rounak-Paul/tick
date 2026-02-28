@@ -1,0 +1,64 @@
+event simple_event;
+event worker_event;
+
+signal done : i32;
+var result : i32 = 0;
+
+@simple_event process simple_handler {
+    result = 42;
+    done.emit(1);
+}
+
+@worker_event process worker1 {
+    result = result + 10;
+}
+
+@worker_event process worker2 {
+    result = result + 5;
+    done.emit(1);
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Events Test ===");
+    
+    simple_event.execute();
+    var sync : i32 = done.recv();
+    if (result == 42) {
+        println("PASS: simple event");
+        pass = pass + 1;
+    } else {
+        println("FAIL: simple event");
+        fail = fail + 1;
+    }
+    
+    worker_event.execute();
+    sync = done.recv();
+    if (result == 57) {
+        println("PASS: multiple processes");
+        pass = pass + 1;
+    } else {
+        println("FAIL: multiple processes");
+        fail = fail + 1;
+    }
+    
+    result = 0;
+    simple_event.execute();
+    sync = done.recv();
+    if (result == 42) {
+        println("PASS: event reuse");
+        pass = pass + 1;
+    } else {
+        println("FAIL: event reuse");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

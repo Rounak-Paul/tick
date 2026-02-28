@@ -1,0 +1,75 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Arrays Test ===");
+    
+    var arr : i32[] = [1, 2, 3, 4, 5];
+    if (arr[0] == 1) {
+        println("PASS: array literal first");
+        pass = pass + 1;
+    } else {
+        println("FAIL: array literal first");
+        fail = fail + 1;
+    }
+    
+    if (arr[4] == 5) {
+        println("PASS: array literal last");
+        pass = pass + 1;
+    } else {
+        println("FAIL: array literal last");
+        fail = fail + 1;
+    }
+    
+    arr[2] = 99;
+    if (arr[2] == 99) {
+        println("PASS: array assignment");
+        pass = pass + 1;
+    } else {
+        println("FAIL: array assignment");
+        fail = fail + 1;
+    }
+    
+    var sum : i32 = arr[0] + arr[1] + arr[2] + arr[3] + arr[4];
+    if (sum == 111) {
+        println("PASS: array sum");
+        pass = pass + 1;
+    } else {
+        println("FAIL: array sum");
+        fail = fail + 1;
+    }
+    
+    var floats : f64[] = [1.5, 2.5, 3.5];
+    if (floats[1] > 2.0 && floats[1] < 3.0) {
+        println("PASS: f64 array");
+        pass = pass + 1;
+    } else {
+        println("FAIL: f64 array");
+        fail = fail + 1;
+    }
+    
+    var bools : b8[] = [true, false, true];
+    if (bools[0] == true && bools[1] == false) {
+        println("PASS: b8 array");
+        pass = pass + 1;
+    } else {
+        println("FAIL: b8 array");
+        fail = fail + 1;
+    }
+    
+    var nested : i32 = arr[arr[0]];
+    if (nested == 2) {
+        println("PASS: nested indexing");
+        pass = pass + 1;
+    } else {
+        println("FAIL: nested indexing");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

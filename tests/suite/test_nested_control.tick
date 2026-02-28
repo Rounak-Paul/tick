@@ -1,0 +1,99 @@
+func early_return(x : i32) : i32 {
+    if (x < 0) {
+        return -1;
+    }
+    if (x == 0) {
+        return 0;
+    }
+    return 1;
+}
+
+func multi_branch(x : i32) : i32 {
+    if (x > 100) {
+        return 3;
+    } else {
+        if (x > 50) {
+            return 2;
+        } else {
+            if (x > 0) {
+                return 1;
+            } else {
+                return 0;
+            }
+        }
+    }
+}
+
+func deeply_nested() : i32 {
+    var result : i32 = 0;
+    for (var i : i32 = 0; i < 3; i = i + 1) {
+        for (var j : i32 = 0; j < 3; j = j + 1) {
+            if (i == j) {
+                result = result + 1;
+            } else {
+                if (i > j) {
+                    result = result + 2;
+                }
+            }
+        }
+    }
+    return result;
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Nested Control Flow Test ===");
+
+    if (early_return(-5) == -1) {
+        println("PASS: early return negative");
+        pass = pass + 1;
+    } else {
+        println("FAIL: early return negative");
+        fail = fail + 1;
+    }
+
+    if (early_return(0) == 0) {
+        println("PASS: early return zero");
+        pass = pass + 1;
+    } else {
+        println("FAIL: early return zero");
+        fail = fail + 1;
+    }
+
+    if (early_return(5) == 1) {
+        println("PASS: early return positive");
+        pass = pass + 1;
+    } else {
+        println("FAIL: early return positive");
+        fail = fail + 1;
+    }
+
+    if (multi_branch(200) == 3 && multi_branch(75) == 2 && multi_branch(25) == 1 && multi_branch(-5) == 0) {
+        println("PASS: multi branch");
+        pass = pass + 1;
+    } else {
+        println("FAIL: multi branch");
+        fail = fail + 1;
+    }
+
+    /* i=0: j=0 (i==j +1), j=1 (none), j=2 (none) => +1
+       i=1: j=0 (i>j +2), j=1 (i==j +1), j=2 (none) => +3
+       i=2: j=0 (i>j +2), j=1 (i>j +2), j=2 (i==j +1) => +5
+       total = 9 */
+    if (deeply_nested() == 9) {
+        println("PASS: deeply nested");
+        pass = pass + 1;
+    } else {
+        println("FAIL: deeply nested");
+        fail = fail + 1;
+    }
+
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+
+    return fail;
+}

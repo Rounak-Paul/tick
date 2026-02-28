@@ -12,26 +12,33 @@ Tick is a statically-typed, compiled programming language that transpiles to C a
 
 | Type | Description | C Equivalent |
 |------|-------------|--------------|
-| `int` | 32-bit signed integer | `int` |
-| `float` | 64-bit floating point | `double` |
-| `double` | 64-bit floating point | `double` |
-| `bool` | Boolean (`true`/`false`) | `bool` |
-| `string` | String literal | `char*` |
+| `u8` | 8-bit unsigned integer | `uint8_t` |
+| `u16` | 16-bit unsigned integer | `uint16_t` |
+| `u32` | 32-bit unsigned integer | `uint32_t` |
+| `u64` | 64-bit unsigned integer | `uint64_t` |
+| `i8` | 8-bit signed integer | `int8_t` |
+| `i16` | 16-bit signed integer | `int16_t` |
+| `i32` | 32-bit signed integer | `int32_t` |
+| `i64` | 64-bit signed integer | `int64_t` |
+| `f32` | 32-bit floating point | `float` |
+| `f64` | 64-bit floating point | `double` |
+| `b8` | Boolean (`true`/`false`) | `bool` |
+| `str` | String (u8*) | `char*` |
 
 ### Array Types
 
 Arrays are declared with `[]` suffix on the base type. Array literals use square brackets.
 
 ```tick
-var numbers : int[] = [1, 2, 3, 4, 5];
-var flags : bool[] = [true, false, true];
-var values : float[] = [1.5, 2.5, 3.5];
+var numbers : i32[] = [1, 2, 3, 4, 5];
+var flags : b8[] = [true, false, true];
+var values : f64[] = [1.5, 2.5, 3.5];
 ```
 
 Array elements are accessed via index notation:
 
 ```tick
-var x : int = numbers[0];
+var x : i32 = numbers[0];
 numbers[2] = 99;
 ```
 
@@ -40,9 +47,9 @@ numbers[2] = 99;
 Variables declared with `const` cannot be reassigned.
 
 ```tick
-const pi : float = 3.14159;
-const max_size : int = 1024;
-const enabled : bool = true;
+const pi : f64 = 3.14159;
+const max_size : i32 = 1024;
+const enabled : b8 = true;
 ```
 
 ---
@@ -52,10 +59,10 @@ const enabled : bool = true;
 Variables are explicitly typed with the syntax `var name : type = value`.
 
 ```tick
-var x : int = 10;
-var name : string = "tick";
-var active : bool = true;
-var ratio : double = 2.718;
+var x : i32 = 10;
+var name : str = "tick";
+var active : b8 = true;
+var ratio : f64 = 2.718;
 ```
 
 Variables default to `0` if no initializer is provided.
@@ -67,7 +74,7 @@ Variables default to `0` if no initializer is provided.
 Functions are declared with `func`, explicit parameter types, and a return type.
 
 ```tick
-func add(a : int, b : int) : int {
+func add(a : i32, b : i32) : i32 {
     return a + b;
 }
 
@@ -81,7 +88,7 @@ func greet() : void {
 Full recursive function support:
 
 ```tick
-func factorial(n : int) : int {
+func factorial(n : i32) : i32 {
     if (n <= 1) {
         return 1;
     }
@@ -93,10 +100,10 @@ func factorial(n : int) : int {
 
 | Function | Description |
 |----------|-------------|
-| `print(expr)` | Print a value (type-aware: int, float, bool, string) |
+| `print(expr)` | Print a value (type-aware formatting) |
 | `println(expr)` | Print a value followed by a newline |
 
-Print is type-aware: integers use `%d`, floats/doubles use `%f`, booleans print `true`/`false`, and strings use `%s`.
+Print is type-aware: signed integers use `%d`, unsigned integers use `%u`, `i64` uses `%lld`, `u64` uses `%llu`, `f32`/`f64` use `%f`, `b8` prints `true`/`false`, and `str` uses `%s`.
 
 ---
 
@@ -148,7 +155,7 @@ if (x > 100) {
 ### While Loop
 
 ```tick
-var i : int = 0;
+var i : i32 = 0;
 while (i < 10) {
     println(i);
     i = i + 1;
@@ -160,7 +167,7 @@ while (i < 10) {
 C-style for loops with initializer, condition, and increment:
 
 ```tick
-for (var i : int = 0; i < 10; i = i + 1) {
+for (var i : i32 = 0; i < 10; i = i + 1) {
     println(i);
 }
 ```
@@ -184,7 +191,7 @@ while (true) {
 Skip to the next iteration of a loop:
 
 ```tick
-for (var i : int = 0; i < 10; i = i + 1) {
+for (var i : i32 = 0; i < 10; i = i + 1) {
     if (i % 2 == 0) {
         continue;
     }
@@ -200,15 +207,15 @@ Classes support fields, constructors, and methods. Instances are heap-allocated.
 
 ```tick
 class Point {
-    var x : int = 0;
-    var y : int = 0;
+    var x : i32 = 0;
+    var y : i32 = 0;
 
-    func Point(px : int, py : int) : void {
+    func Point(px : i32, py : i32) : void {
         self.x = px;
         self.y = py;
     }
 
-    func distance_from_origin() : int {
+    func distance_from_origin() : i32 {
         return self.x * self.x + self.y * self.y;
     }
 }
@@ -227,8 +234,8 @@ var p : Point = Point(3, 4);
 Fields and methods are accessed with `.` notation:
 
 ```tick
-var x : int = p.x;
-var d : int = p.distance_from_origin();
+var x : i32 = p.x;
+var d : i32 = p.distance_from_origin();
 ```
 
 ### Self Reference
@@ -254,9 +261,9 @@ var b : Point = Point(3, 4);
 Variables follow lexical scoping rules. Inner scopes can shadow outer variables:
 
 ```tick
-var x : int = 10;
+var x : i32 = 10;
 if (true) {
-    var x : int = 20;  /* shadows outer x */
+    var x : i32 = 20;  /* shadows outer x */
     println(x);        /* prints 20 */
 }
 println(x);            /* prints 10, outer x restored */
@@ -267,7 +274,7 @@ println(x);            /* prints 10, outer x restored */
 Globals declared outside functions are accessible from all functions:
 
 ```tick
-var counter : int = 0;
+var counter : i32 = 0;
 
 func increment() : void {
     counter = counter + 1;
@@ -285,7 +292,7 @@ Tick provides built-in concurrency primitives: signals, events, and processes.
 Typed, thread-safe message queues for inter-process communication:
 
 ```tick
-signal data_ready : Signal<int>;
+signal data_ready : Signal<i32>;
 ```
 
 Emit a value:
@@ -297,7 +304,7 @@ data_ready.emit(42);
 Receive blocks until a value is available:
 
 ```tick
-var value : int = data_ready.recv();
+var value : i32 = data_ready.recv();
 ```
 
 ### Signal Arrays
@@ -305,10 +312,10 @@ var value : int = data_ready.recv();
 Arrays of signals for channel-per-index patterns:
 
 ```tick
-signal channels : Signal<int>[4];
+signal channels : Signal<i32>[4];
 
 channels[0].emit(10);
-var v : int = channels[0].recv();
+var v : i32 = channels[0].recv();
 ```
 
 ### Signal Type Parameters
@@ -317,7 +324,7 @@ Signals support any type as parameter, including class types and array types:
 
 ```tick
 signal point_sig : Signal<Point>;
-signal data_sig : Signal<int[]>;
+signal data_sig : Signal<i32[]>;
 ```
 
 ### Events
@@ -334,7 +341,7 @@ Processes are functions bound to events that run in separate threads:
 
 ```tick
 process worker on on_start {
-    var result : int = heavy_computation();
+    var result : i32 = heavy_computation();
     output.emit(result);
 }
 ```
@@ -390,7 +397,7 @@ Module files use the `.tick` extension.
 
 ```tick
 /* this is a comment */
-var x : int = 5;
+var x : i32 = 5;
 ```
 
 ### Block Comments
@@ -398,9 +405,9 @@ var x : int = 5;
 ```tick
 /* Multi-line
    block comment */
-var y : int = 10;
+var y : i32 = 10;
 
-var z : int = /* inline */ 42;
+var z : i32 = /* inline */ 42;
 ```
 
 ---
@@ -449,9 +456,9 @@ The language ships with 28 test files covering:
 
 | Category | Tests |
 |----------|-------|
-| Arithmetic | addition, subtraction, multiplication, division, modulo, float arithmetic |
-| Arrays | literals, indexing, assignment, sum, float/bool arrays, nested indexing |
-| Basic Types | int, float, bool, double assignment and operations |
+| Arithmetic | addition, subtraction, multiplication, division, modulo, f64 arithmetic |
+| Arrays | literals, indexing, assignment, sum, f64/b8 arrays, nested indexing |
+| Basic Types | i32, f64, b8 assignment and operations |
 | Block Comments | inline comments, multi-line comments |
 | Chained Access | method calls, array index expressions, variable indexing |
 | Class Methods | constructors, mutation, multiple instances, method parameters |
@@ -462,20 +469,20 @@ The language ships with 28 test files covering:
 | Constants | global/local const, const with expressions |
 | Continue | while continue, for continue, nested continue |
 | Control Flow | if, if-else, while, break, continue, nested loops |
-| Double Type | double arithmetic, multiplication, subtraction, comparisons |
+| Double Type | f64 arithmetic, multiplication, subtraction, comparisons |
 | Edge Cases | zero, negatives, large numbers, division, empty arrays, false branches |
 | Events | simple event, multiple processes, event reuse |
 | Fibonacci | recursive and iterative implementations |
 | For Loops | sum range, countdown, nested, break in for, loop scoping |
-| Functions | calls, float/bool returns, void functions, recursion, nested calls |
+| Functions | calls, f64/b8 returns, void functions, recursion, nested calls |
 | Increment | prefix ++/--, multiple increments/decrements |
 | Logical | AND, OR, NOT, complex boolean expressions |
 | Nested Control | early return, multi-branch, deeply nested loops with conditionals |
 | Recursion | fibonacci, factorial, power, GCD |
 | Scoping | global access/modification, local scope, shadowing, nested scope, restoration |
-| Signals (basic) | int/bool signals, signal queue, bool false |
+| Signals (basic) | i32/b8 signals, signal queue, b8 false |
 | Signals (arrays) | signal array indexing, sum across channels |
-| Signals (array types) | int array as signal type parameter |
+| Signals (array types) | i32 array as signal type parameter |
 | Signals (classes) | class instances through signals |
 
 Run the full suite:

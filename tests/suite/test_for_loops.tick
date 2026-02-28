@@ -1,0 +1,94 @@
+func sum_range(start : i32, end : i32) : i32 {
+    var sum : i32 = 0;
+    for (var i : i32 = start; i <= end; i = i + 1) {
+        sum = sum + i;
+    }
+    return sum;
+}
+
+func count_down(n : i32) : i32 {
+    var count : i32 = 0;
+    for (var i : i32 = n; i > 0; i = i - 1) {
+        count = count + 1;
+    }
+    return count;
+}
+
+func nested_sum() : i32 {
+    var total : i32 = 0;
+    for (var i : i32 = 0; i < 3; i = i + 1) {
+        for (var j : i32 = 0; j < 3; j = j + 1) {
+            total = total + 1;
+        }
+    }
+    return total;
+}
+
+func for_with_break() : i32 {
+    var sum : i32 = 0;
+    for (var i : i32 = 0; i < 100; i = i + 1) {
+        if (i >= 5) {
+            break;
+        }
+        sum = sum + i;
+    }
+    return sum;
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== For Loop Test ===");
+
+    if (sum_range(1, 10) == 55) {
+        println("PASS: for sum range");
+        pass = pass + 1;
+    } else {
+        println("FAIL: for sum range");
+        fail = fail + 1;
+    }
+
+    if (count_down(5) == 5) {
+        println("PASS: for countdown");
+        pass = pass + 1;
+    } else {
+        println("FAIL: for countdown");
+        fail = fail + 1;
+    }
+
+    if (nested_sum() == 9) {
+        println("PASS: nested for loops");
+        pass = pass + 1;
+    } else {
+        println("FAIL: nested for loops");
+        fail = fail + 1;
+    }
+
+    if (for_with_break() == 10) {
+        println("PASS: for with break");
+        pass = pass + 1;
+    } else {
+        println("FAIL: for with break");
+        fail = fail + 1;
+    }
+
+    /* for loop scoping: i should not leak */
+    var i : i32 = 999;
+    for (var i : i32 = 0; i < 3; i = i + 1) {
+    }
+    if (i == 999) {
+        println("PASS: for loop scoping");
+        pass = pass + 1;
+    } else {
+        println("FAIL: for loop scoping");
+        fail = fail + 1;
+    }
+
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+
+    return fail;
+}

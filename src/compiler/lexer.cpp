@@ -64,17 +64,30 @@ Token Lexer::make_token(TokenType type, const char* start, size_t length) {
 }
 
 TokenType Lexer::check_keyword(const char* str, size_t length) {
-    if (length == 2 && memcmp(str, "if", 2) == 0) return TokenType::IF;
+    if (length == 2) {
+        if (memcmp(str, "if", 2) == 0) return TokenType::IF;
+        if (memcmp(str, "u8", 2) == 0) return TokenType::U8;
+        if (memcmp(str, "i8", 2) == 0) return TokenType::I8;
+        if (memcmp(str, "b8", 2) == 0) return TokenType::B8;
+    }
     if (length == 3) {
         if (memcmp(str, "var", 3) == 0) return TokenType::VAR;
-        if (memcmp(str, "int", 3) == 0) return TokenType::INT;
         if (memcmp(str, "for", 3) == 0) return TokenType::FOR;
+        if (memcmp(str, "str", 3) == 0) return TokenType::STR;
+        if (memcmp(str, "u16", 3) == 0) return TokenType::U16;
+        if (memcmp(str, "u32", 3) == 0) return TokenType::U32;
+        if (memcmp(str, "u64", 3) == 0) return TokenType::U64;
+        if (memcmp(str, "i16", 3) == 0) return TokenType::I16;
+        if (memcmp(str, "i32", 3) == 0) return TokenType::I32;
+        if (memcmp(str, "i64", 3) == 0) return TokenType::I64;
+        if (memcmp(str, "f32", 3) == 0) return TokenType::F32;
+        if (memcmp(str, "f64", 3) == 0) return TokenType::F64;
     }
     if (length == 4) {
         if (memcmp(str, "func", 4) == 0) return TokenType::FUNC;
         if (memcmp(str, "this", 4) == 0) return TokenType::THIS;
         if (memcmp(str, "from", 4) == 0) return TokenType::FROM;
-        if (memcmp(str, "bool", 4) == 0) return TokenType::BOOL;
+        if (memcmp(str, "void", 4) == 0) return TokenType::VOID_TYPE;
         if (memcmp(str, "else", 4) == 0) return TokenType::ELSE;
         if (memcmp(str, "true", 4) == 0) return TokenType::TRUE;
     }
@@ -82,7 +95,6 @@ TokenType Lexer::check_keyword(const char* str, size_t length) {
         if (memcmp(str, "event", 5) == 0) return TokenType::EVENT;
         if (memcmp(str, "class", 5) == 0) return TokenType::CLASS;
         if (memcmp(str, "const", 5) == 0) return TokenType::CONST;
-        if (memcmp(str, "float", 5) == 0) return TokenType::FLOAT;
         if (memcmp(str, "while", 5) == 0) return TokenType::WHILE;
         if (memcmp(str, "break", 5) == 0) return TokenType::BREAK;
         if (memcmp(str, "false", 5) == 0) return TokenType::FALSE;
@@ -90,8 +102,6 @@ TokenType Lexer::check_keyword(const char* str, size_t length) {
     if (length == 6) {
         if (memcmp(str, "signal", 6) == 0) return TokenType::SIGNAL;
         if (memcmp(str, "import", 6) == 0) return TokenType::IMPORT;
-        if (memcmp(str, "double", 6) == 0) return TokenType::DOUBLE;
-        if (memcmp(str, "string", 6) == 0) return TokenType::STRING_TYPE;
         if (memcmp(str, "return", 6) == 0) return TokenType::RETURN;
     }
     if (length == 7 && memcmp(str, "process", 7) == 0) return TokenType::PROCESS;

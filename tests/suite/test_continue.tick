@@ -1,0 +1,77 @@
+func test_while_continue() : i32 {
+    var sum : i32 = 0;
+    var i : i32 = 0;
+    while (i < 10) {
+        i = i + 1;
+        if (i == 5) {
+            continue;
+        }
+        sum = sum + i;
+    }
+    return sum;
+}
+
+func test_for_continue() : i32 {
+    var sum : i32 = 0;
+    for (var i : i32 = 0; i < 10; i = i + 1) {
+        if (i % 2 == 0) {
+            continue;
+        }
+        sum = sum + i;
+    }
+    return sum;
+}
+
+func test_nested_continue() : i32 {
+    var count : i32 = 0;
+    for (var i : i32 = 0; i < 5; i = i + 1) {
+        for (var j : i32 = 0; j < 5; j = j + 1) {
+            if (j == 2) {
+                continue;
+            }
+            count = count + 1;
+        }
+    }
+    return count;
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Continue Statement Test ===");
+
+    /* while loop continue: sum 1..10 skipping 5 = 50 */
+    if (test_while_continue() == 50) {
+        println("PASS: while continue");
+        pass = pass + 1;
+    } else {
+        println("FAIL: while continue");
+        fail = fail + 1;
+    }
+
+    /* for loop continue: sum odd numbers 1+3+5+7+9 = 25 */
+    if (test_for_continue() == 25) {
+        println("PASS: for continue");
+        pass = pass + 1;
+    } else {
+        println("FAIL: for continue");
+        fail = fail + 1;
+    }
+
+    /* nested: 5*5=25 minus 5 skipped = 20 */
+    if (test_nested_continue() == 20) {
+        println("PASS: nested continue");
+        pass = pass + 1;
+    } else {
+        println("FAIL: nested continue");
+        fail = fail + 1;
+    }
+
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+
+    return fail;
+}

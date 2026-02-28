@@ -48,9 +48,13 @@ void Parser::advance() {
 
 bool Parser::is_type_keyword() {
     TokenType type = current_token().type;
-    if (type == TokenType::INT || type == TokenType::BOOL || 
-        type == TokenType::FLOAT || type == TokenType::DOUBLE ||
-        type == TokenType::STRING_TYPE) {
+    if (type == TokenType::U8 || type == TokenType::U16 ||
+        type == TokenType::U32 || type == TokenType::U64 ||
+        type == TokenType::I8 || type == TokenType::I16 ||
+        type == TokenType::I32 || type == TokenType::I64 ||
+        type == TokenType::F32 || type == TokenType::F64 ||
+        type == TokenType::B8 || type == TokenType::STR ||
+        type == TokenType::VOID_TYPE) {
         return true;
     }
     if (type == TokenType::IDENTIFIER) {
@@ -62,9 +66,13 @@ bool Parser::is_type_keyword() {
 
 Token Parser::parse_type() {
     TokenType type = current_token().type;
-    if (type == TokenType::INT || type == TokenType::BOOL || 
-        type == TokenType::FLOAT || type == TokenType::DOUBLE ||
-        type == TokenType::STRING_TYPE || type == TokenType::IDENTIFIER) {
+    if (type == TokenType::U8 || type == TokenType::U16 ||
+        type == TokenType::U32 || type == TokenType::U64 ||
+        type == TokenType::I8 || type == TokenType::I16 ||
+        type == TokenType::I32 || type == TokenType::I64 ||
+        type == TokenType::F32 || type == TokenType::F64 ||
+        type == TokenType::B8 || type == TokenType::STR ||
+        type == TokenType::VOID_TYPE || type == TokenType::IDENTIFIER) {
         Token type_token = current_token();
         advance();
         

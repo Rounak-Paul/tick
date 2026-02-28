@@ -114,13 +114,13 @@ String Compiler::lookup_var_type(const String& name, Program* program) {
 }
 
 String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
-    if (!expr) return String("int");
+    if (!expr) return String("i32");
     switch (expr->type) {
-        case AstNodeType::INTEGER_LITERAL: return String("int");
-        case AstNodeType::FLOAT_LITERAL: return String("float");
-        case AstNodeType::DOUBLE_LITERAL: return String("double");
-        case AstNodeType::BOOL_LITERAL: return String("bool");
-        case AstNodeType::STRING_LITERAL: return String("string");
+        case AstNodeType::INTEGER_LITERAL: return String("i32");
+        case AstNodeType::FLOAT_LITERAL: return String("f32");
+        case AstNodeType::DOUBLE_LITERAL: return String("f64");
+        case AstNodeType::BOOL_LITERAL: return String("b8");
+        case AstNodeType::STRING_LITERAL: return String("str");
         case AstNodeType::IDENTIFIER_EXPR: {
             IdentifierExpr* id = static_cast<IdentifierExpr*>(expr);
             return lookup_var_type(id->name, program);
@@ -137,7 +137,7 @@ String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
                     }
                 }
             }
-            return String("int");
+            return String("i32");
         }
         case AstNodeType::CALL_EXPR: {
             CallExpr* call = static_cast<CallExpr*>(expr);
@@ -149,14 +149,14 @@ String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
                     }
                 }
             }
-            return String("int");
+            return String("i32");
         }
         case AstNodeType::BINARY_EXPR: {
             BinaryExpr* bin = static_cast<BinaryExpr*>(expr);
             if (bin->op == "==" || bin->op == "!=" || bin->op == "<" ||
                 bin->op == ">" || bin->op == "<=" || bin->op == ">=" ||
                 bin->op == "&&" || bin->op == "||") {
-                return String("bool");
+                return String("b8");
             }
             return infer_expr_type(bin->left, program);
         }
@@ -167,20 +167,27 @@ String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
                 arr_type[arr_type.length() - 2] == '[' && arr_type[arr_type.length() - 1] == ']') {
                 return String(arr_type.c_str(), arr_type.length() - 2);
             }
-            return String("int");
+            return String("i32");
         }
         default:
-            return String("int");
+            return String("i32");
     }
 }
 
 void Compiler::tick_type_to_c_type(const String& tick_type, Program* program, char* out, size_t out_size) {
     if (tick_type == "void") { snprintf(out, out_size, "void"); return; }
-    if (tick_type == "int") { snprintf(out, out_size, "int"); return; }
-    if (tick_type == "float") { snprintf(out, out_size, "double"); return; }
-    if (tick_type == "double") { snprintf(out, out_size, "double"); return; }
-    if (tick_type == "bool") { snprintf(out, out_size, "bool"); return; }
-    if (tick_type == "string") { snprintf(out, out_size, "char*"); return; }
+    if (tick_type == "u8") { snprintf(out, out_size, "uint8_t"); return; }
+    if (tick_type == "u16") { snprintf(out, out_size, "uint16_t"); return; }
+    if (tick_type == "u32") { snprintf(out, out_size, "uint32_t"); return; }
+    if (tick_type == "u64") { snprintf(out, out_size, "uint64_t"); return; }
+    if (tick_type == "i8") { snprintf(out, out_size, "int8_t"); return; }
+    if (tick_type == "i16") { snprintf(out, out_size, "int16_t"); return; }
+    if (tick_type == "i32") { snprintf(out, out_size, "int32_t"); return; }
+    if (tick_type == "i64") { snprintf(out, out_size, "int64_t"); return; }
+    if (tick_type == "f32") { snprintf(out, out_size, "float"); return; }
+    if (tick_type == "f64") { snprintf(out, out_size, "double"); return; }
+    if (tick_type == "b8") { snprintf(out, out_size, "bool"); return; }
+    if (tick_type == "str") { snprintf(out, out_size, "char*"); return; }
 
     if (tick_type.length() > 2 && tick_type[tick_type.length() - 2] == '[' && tick_type[tick_type.length() - 1] == ']') {
         String base_type(tick_type.c_str(), tick_type.length() - 2);
@@ -199,7 +206,7 @@ void Compiler::tick_type_to_c_type(const String& tick_type, Program* program, ch
         }
     }
 
-    snprintf(out, out_size, "int");
+    snprintf(out, out_size, "int32_t");
 }
 
 bool Compiler::compile_to_native(const char* source_file, const char* output_file, bool keep_c) {
@@ -669,15 +676,21 @@ void Compiler::generate_print_arg(CodeBuffer& buf, ExprNode* arg, Program* progr
         return;
     }
     String arg_type = infer_expr_type(arg, program);
-    if (arg_type == "float" || arg_type == "double") {
+    if (arg_type == "f32" || arg_type == "f64") {
         buf.append("\"%%f\", ");
-    } else if (arg_type == "bool") {
+    } else if (arg_type == "b8") {
         buf.append("\"%%s\", (");
         generate_expression(buf, arg, program);
         buf.append(") ? \"true\" : \"false\"");
         return;
-    } else if (arg_type == "string") {
+    } else if (arg_type == "str") {
         buf.append("\"%%s\", ");
+    } else if (arg_type == "i64") {
+        buf.append("\"%%lld\", (long long)");
+    } else if (arg_type == "u64") {
+        buf.append("\"%%llu\", (unsigned long long)");
+    } else if (arg_type == "u8" || arg_type == "u16" || arg_type == "u32") {
+        buf.append("\"%%u\", ");
     } else {
         buf.append("\"%%d\", ");
     }

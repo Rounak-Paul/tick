@@ -1,0 +1,49 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Basic Types Test ===");
+    
+    var i : i32 = 42;
+    if (i == 42) {
+        println("PASS: i32 assignment");
+        pass = pass + 1;
+    } else {
+        println("FAIL: i32 assignment");
+        fail = fail + 1;
+    }
+    
+    var f : f64 = 3.14;
+    if (f > 3.0 && f < 4.0) {
+        println("PASS: f64 assignment");
+        pass = pass + 1;
+    } else {
+        println("FAIL: f64 assignment");
+        fail = fail + 1;
+    }
+    
+    var b : b8 = true;
+    if (b == true) {
+        println("PASS: b8 assignment");
+        pass = pass + 1;
+    } else {
+        println("FAIL: b8 assignment");
+        fail = fail + 1;
+    }
+    
+    var b2 : b8 = false;
+    if (b2 == false) {
+        println("PASS: b8 false");
+        pass = pass + 1;
+    } else {
+        println("FAIL: b8 false");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

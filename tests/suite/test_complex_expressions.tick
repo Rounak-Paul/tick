@@ -1,0 +1,81 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Complex Expressions Test ===");
+    
+    var a : i32 = 5;
+    var b : i32 = 3;
+    var c : i32 = 2;
+    
+    var result : i32 = a + b * c;
+    if (result == 11) {
+        println("PASS: operator precedence");
+        pass = pass + 1;
+    } else {
+        println("FAIL: operator precedence");
+        fail = fail + 1;
+    }
+    
+    result = (a + b) * c;
+    if (result == 16) {
+        println("PASS: parentheses");
+        pass = pass + 1;
+    } else {
+        println("FAIL: parentheses");
+        fail = fail + 1;
+    }
+    
+    result = a * b + c * a - b;
+    if (result == 22) {
+        println("PASS: mixed operations");
+        pass = pass + 1;
+    } else {
+        println("FAIL: mixed operations");
+        fail = fail + 1;
+    }
+    
+    var cond : b8 = a > b && b > c;
+    if (cond == true) {
+        println("PASS: chained comparisons");
+        pass = pass + 1;
+    } else {
+        println("FAIL: chained comparisons");
+        fail = fail + 1;
+    }
+    
+    cond = (a > 10 || b > 2) && c < 5;
+    if (cond == true) {
+        println("PASS: complex boolean");
+        pass = pass + 1;
+    } else {
+        println("FAIL: complex boolean");
+        fail = fail + 1;
+    }
+    
+    var arr : i32[] = [1, 2, 3];
+    result = arr[0] + arr[1] * arr[2];
+    if (result == 7) {
+        println("PASS: array in expression");
+        pass = pass + 1;
+    } else {
+        println("FAIL: array in expression");
+        fail = fail + 1;
+    }
+    
+    result = arr[arr[0]];
+    if (result == 2) {
+        println("PASS: nested array access");
+        pass = pass + 1;
+    } else {
+        println("FAIL: nested array access");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

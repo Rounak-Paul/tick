@@ -1,0 +1,54 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Increment/Decrement Test ===");
+    
+    var a : i32 = 10;
+    ++a;
+    if (a == 11) {
+        println("PASS: prefix increment");
+        pass = pass + 1;
+    } else {
+        println("FAIL: prefix increment");
+        fail = fail + 1;
+    }
+    
+    --a;
+    if (a == 10) {
+        println("PASS: prefix decrement");
+        pass = pass + 1;
+    } else {
+        println("FAIL: prefix decrement");
+        fail = fail + 1;
+    }
+    
+    var b : i32 = 0;
+    ++b;
+    ++b;
+    ++b;
+    if (b == 3) {
+        println("PASS: multiple increment");
+        pass = pass + 1;
+    } else {
+        println("FAIL: multiple increment");
+        fail = fail + 1;
+    }
+    
+    --b;
+    --b;
+    if (b == 1) {
+        println("PASS: multiple decrement");
+        pass = pass + 1;
+    } else {
+        println("FAIL: multiple decrement");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}
