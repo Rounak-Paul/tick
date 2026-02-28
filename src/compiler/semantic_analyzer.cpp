@@ -142,7 +142,7 @@ bool SemanticAnalyzer::types_compatible(const String& expected, const String& ac
 }
 
 bool SemanticAnalyzer::is_builtin_function(const String& name) {
-    return name == "print" || name == "println" ||
+    return name == "print" || name == "println" || name == "input" ||
            name == "sqrt" || name == "abs" || name == "pow" ||
            name == "sin" || name == "cos" || name == "tan" ||
            name == "floor" || name == "ceil" || name == "round" ||
@@ -212,7 +212,7 @@ String SemanticAnalyzer::infer_type(ExprNode* node) {
                 }
                 if (id->name == "str_concat" || id->name == "str_substring" ||
                     id->name == "to_str" ||
-                    id->name == "file_read") {
+                    id->name == "file_read" || id->name == "input") {
                     return String("str");
                 }
                 if (id->name == "parse") return String("");

@@ -295,7 +295,7 @@ String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
                 IdentifierExpr* id = static_cast<IdentifierExpr*>(call->callee);
                 if (id->name == "str_concat" || id->name == "str_substring" ||
                     id->name == "to_str" ||
-                    id->name == "file_read") {
+                    id->name == "file_read" || id->name == "input") {
                     return String("str");
                 }
                 if (id->name == "str_index_of" ||
@@ -1810,6 +1810,14 @@ void Compiler::generate_expression(CodeBuffer& buf, ExprNode* expr, Program* pro
                     for (size_t i = 0; i < call->arguments.size(); i++) {
                         if (i > 0) buf.append(", ");
                         generate_expression(buf, call->arguments[i], program);
+                    }
+                    buf.append(")");
+                } else if (ident->name == "input") {
+                    buf.append("tick_input_readline(");
+                    if (call->arguments.size() > 0) {
+                        generate_expression(buf, call->arguments[0], program);
+                    } else {
+                        buf.append("\"\"");
                     }
                     buf.append(")");
                 } else {

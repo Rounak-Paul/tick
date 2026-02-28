@@ -24,8 +24,14 @@ for test_file in "$TEST_DIR"/*.tick; do
     echo "Running: $test_name"
     echo "----------------------------------------"
     
+    stdin_file="${test_file%.tick}.stdin"
+
     if "$TICK_COMPILER" "$test_file" -o "$output" 2>&1 | grep -q "Success"; then
-        "$output"
+        if [ -f "$stdin_file" ]; then
+            "$output" < "$stdin_file"
+        else
+            "$output"
+        fi
         exit_code=$?
         
         if [ $exit_code -eq 0 ]; then

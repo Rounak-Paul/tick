@@ -162,6 +162,26 @@ bool tick_str_to_b8(const char* s) {
     return strcmp(s, "true") == 0 || strcmp(s, "1") == 0;
 }
 
+char* tick_input_readline(const char* prompt) {
+    if (prompt && prompt[0] != '\0') {
+        fputs(prompt, stdout);
+        fflush(stdout);
+    }
+    size_t cap = 128;
+    size_t len = 0;
+    char* buf = (char*)malloc(cap);
+    int c;
+    while ((c = fgetc(stdin)) != EOF && c != '\n') {
+        if (len + 1 >= cap) {
+            cap *= 2;
+            buf = (char*)realloc(buf, cap);
+        }
+        buf[len++] = (char)c;
+    }
+    buf[len] = '\0';
+    return buf;
+}
+
 TickFile* tick_file_open(const char* path, const char* mode) {
     if (!path || !mode) return NULL;
     FILE* h = fopen(path, mode);

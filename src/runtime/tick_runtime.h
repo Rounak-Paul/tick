@@ -54,6 +54,8 @@ double tick_str_to_f64(const char* s);
 char* tick_str_from_b8(bool val);
 bool tick_str_to_b8(const char* s);
 
+char* tick_input_readline(const char* prompt);
+
 TickFile* tick_file_open(const char* path, const char* mode);
 char* tick_file_read(TickFile* f);
 void tick_file_write(TickFile* f, const char* data);
