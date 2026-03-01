@@ -8,11 +8,17 @@
 #define MAX_DEFERS_PER_SCOPE 64
 #define MAX_RAII_PER_SCOPE 32
 #define MAX_ARRAYS_PER_SCOPE 64
+#define MAX_STRINGS_PER_SCOPE 64
 #define MAX_LOOP_DEPTH 32
 
 struct RaiiEntry {
     Tick::String var_name;
     Tick::String class_name;
+};
+
+struct StrEntry {
+    Tick::String var_name;
+    Tick::String owner_name;
 };
 
 struct CodeBuffer {
@@ -45,6 +51,8 @@ private:
     static int _raii_counts[MAX_DEFER_SCOPES];
     static Tick::String _array_scopes[MAX_DEFER_SCOPES][MAX_ARRAYS_PER_SCOPE];
     static int _array_counts[MAX_DEFER_SCOPES];
+    static StrEntry _str_scopes[MAX_DEFER_SCOPES][MAX_STRINGS_PER_SCOPE];
+    static int _str_counts[MAX_DEFER_SCOPES];
     static int _loop_scope_stack[MAX_LOOP_DEPTH];
     static int _loop_depth;
 
@@ -77,6 +85,8 @@ private:
     static Tick::String lookup_var_type(const Tick::String& name, Tick::Program* program);
     static void lookup_var_type_in_block(const Tick::String& name, Tick::BlockStmt* block, Tick::String& result);
     static Tick::String infer_expr_type(Tick::ExprNode* expr, Tick::Program* program);
+    static bool is_owned_string_expr(Tick::ExprNode* expr, Tick::Program* program);
+    static const char* find_owned_string_flag(const Tick::String& name);
     static bool is_string_type(Tick::ExprNode* expr, Tick::Program* program);
     static bool is_array_type_str(const Tick::String& t);
     static bool is_array_param(const Tick::String& name);

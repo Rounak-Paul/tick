@@ -27,11 +27,63 @@ RaiiEntry Compiler::_raii_scopes[MAX_DEFER_SCOPES][MAX_RAII_PER_SCOPE] = {};
 int Compiler::_raii_counts[MAX_DEFER_SCOPES] = {};
 String Compiler::_array_scopes[MAX_DEFER_SCOPES][MAX_ARRAYS_PER_SCOPE] = {};
 int Compiler::_array_counts[MAX_DEFER_SCOPES] = {};
+StrEntry Compiler::_str_scopes[MAX_DEFER_SCOPES][MAX_STRINGS_PER_SCOPE] = {};
+int Compiler::_str_counts[MAX_DEFER_SCOPES] = {};
 int Compiler::_loop_scope_stack[MAX_LOOP_DEPTH] = {};
 int Compiler::_loop_depth = 0;
 
 bool Compiler::is_string_type(ExprNode* expr, Program* program) {
     return infer_expr_type(expr, program) == "str";
+}
+
+const char* Compiler::find_owned_string_flag(const String& name) {
+    for (int s = _defer_depth; s >= 0; s--) {
+        int sc = _str_counts[s];
+        for (int i = sc - 1; i >= 0; i--) {
+            if (_str_scopes[s][i].var_name == name) {
+                return _str_scopes[s][i].owner_name.c_str();
+            }
+        }
+    }
+    return nullptr;
+}
+
+bool Compiler::is_owned_string_expr(ExprNode* expr, Program* program) {
+    if (!expr) return false;
+    switch (expr->type) {
+        case AstNodeType::BINARY_EXPR: {
+            BinaryExpr* bin = static_cast<BinaryExpr*>(expr);
+            if (bin->op == "+") {
+                String left_t = infer_expr_type(bin->left, program);
+                String right_t = infer_expr_type(bin->right, program);
+                if (left_t == "str" || right_t == "str") {
+                    return true;
+                }
+            }
+            return false;
+        }
+        case AstNodeType::CALL_EXPR: {
+            CallExpr* call = static_cast<CallExpr*>(expr);
+            if (call->callee->type == AstNodeType::IDENTIFIER_EXPR) {
+                IdentifierExpr* id = static_cast<IdentifierExpr*>(call->callee);
+                if (id->name == "str_concat" || id->name == "str_substring" ||
+                    id->name == "to_str" || id->name == "file_read" ||
+                    id->name == "input") {
+                    return true;
+                }
+                return false;
+            }
+            if (call->callee->type == AstNodeType::MEMBER_EXPR) {
+                MemberExpr* me = static_cast<MemberExpr*>(call->callee);
+                if (me->member == "substring") {
+                    return true;
+                }
+            }
+            return false;
+        }
+        default:
+            return false;
+    }
 }
 
 void Compiler::add_define(const char* name) {
@@ -106,6 +158,7 @@ void Compiler::push_defer_scope() {
         _defer_counts[_defer_depth] = 0;
         _raii_counts[_defer_depth] = 0;
         _array_counts[_defer_depth] = 0;
+        _str_counts[_defer_depth] = 0;
     }
 }
 
@@ -132,6 +185,12 @@ void Compiler::generate_deferred_to_depth(CodeBuffer& buf, int indent, Program* 
             for (int t = 0; t < indent; t++) buf.append("    ");
             buf.append("if (%s) { %s_dtor(%s); free(%s); %s = NULL; }\n", entry.var_name.c_str(), entry.class_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str());
         }
+        int sc = _str_counts[s];
+        for (int i = sc - 1; i >= 0; i--) {
+            StrEntry& entry = _str_scopes[s][i];
+            for (int t = 0; t < indent; t++) buf.append("    ");
+            buf.append("if (%s && %s) { free(%s); %s = NULL; %s = false; }\n", entry.owner_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str(), entry.owner_name.c_str());
+        }
         int ac = _array_counts[s];
         for (int i = ac - 1; i >= 0; i--) {
             const char* n = _array_scopes[s][i].c_str();
@@ -152,6 +211,12 @@ void Compiler::generate_all_deferred(CodeBuffer& buf, int indent, Program* progr
             RaiiEntry& entry = _raii_scopes[s][i];
             for (int t = 0; t < indent; t++) buf.append("    ");
             buf.append("if (%s) { %s_dtor(%s); free(%s); %s = NULL; }\n", entry.var_name.c_str(), entry.class_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str());
+        }
+        int sc = _str_counts[s];
+        for (int i = sc - 1; i >= 0; i--) {
+            StrEntry& entry = _str_scopes[s][i];
+            for (int t = 0; t < indent; t++) buf.append("    ");
+            buf.append("if (%s && %s) { free(%s); %s = NULL; %s = false; }\n", entry.owner_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str(), entry.owner_name.c_str());
         }
         int ac = _array_counts[s];
         for (int i = ac - 1; i >= 0; i--) {
@@ -174,6 +239,12 @@ void Compiler::generate_raii_cleanup(CodeBuffer& buf, int indent, Program* progr
         for (int t = 0; t < indent; t++) buf.append("    ");
         buf.append("if (%s) { %s_dtor(%s); free(%s); %s = NULL; }\n", entry.var_name.c_str(), entry.class_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str());
     }
+    int sc = _str_counts[_defer_depth];
+    for (int i = sc - 1; i >= 0; i--) {
+        StrEntry& entry = _str_scopes[_defer_depth][i];
+        for (int t = 0; t < indent; t++) buf.append("    ");
+        buf.append("if (%s && %s) { free(%s); %s = NULL; %s = false; }\n", entry.owner_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str(), entry.owner_name.c_str());
+    }
     int ac = _array_counts[_defer_depth];
     for (int i = ac - 1; i >= 0; i--) {
         const char* n = _array_scopes[_defer_depth][i].c_str();
@@ -189,6 +260,12 @@ void Compiler::generate_all_raii_cleanup(CodeBuffer& buf, int indent, Program* p
             RaiiEntry& entry = _raii_scopes[s][i];
             for (int t = 0; t < indent; t++) buf.append("    ");
             buf.append("if (%s) { %s_dtor(%s); free(%s); %s = NULL; }\n", entry.var_name.c_str(), entry.class_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str());
+        }
+        int sc = _str_counts[s];
+        for (int i = sc - 1; i >= 0; i--) {
+            StrEntry& entry = _str_scopes[s][i];
+            for (int t = 0; t < indent; t++) buf.append("    ");
+            buf.append("if (%s && %s) { free(%s); %s = NULL; %s = false; }\n", entry.owner_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str(), entry.owner_name.c_str());
         }
         int ac = _array_counts[s];
         for (int i = ac - 1; i >= 0; i--) {
@@ -1171,37 +1248,59 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
             } else if (is_array) {
                 buf.append("TickArray %s = {0};\n", decl->name.c_str());
             } else {
-                generate_typed_decl(buf, decl->type_name, decl->name.c_str(), program);
-                if (decl->initializer) {
-                    buf.append(" = ");
-                    _expected_type = decl->type_name;
-                    generate_expression(buf, decl->initializer, program);
-                    _expected_type = String("");
-                } else {
-                    bool is_union_type = false;
-                    for (size_t ui = 0; ui < program->unions.size(); ui++) {
-                        if (program->unions[ui]->name == decl->type_name) { is_union_type = true; break; }
-                    }
-                    bool is_class_type = false;
-                    for (size_t ci = 0; ci < program->classes.size(); ci++) {
-                        if (program->classes[ci]->name == decl->type_name) { is_class_type = true; break; }
-                    }
-                    if (decl->type_name == "str") {
-                        buf.append(" = NULL");
-                    } else if (decl->type_name == "ptr" || is_typed_ptr_type(decl->type_name) || is_func_ptr_type(decl->type_name)) {
-                        buf.append(" = NULL");
-                    } else if (is_fixed_array_type(decl->type_name) || is_union_type || is_class_type) {
-                        buf.append(" = {0}");
+                if (decl->type_name == "str") {
+                    bool owned_init = decl->initializer && is_owned_string_expr(decl->initializer, program);
+                    generate_typed_decl(buf, decl->type_name, decl->name.c_str(), program);
+                    if (decl->initializer) {
+                        buf.append(" = ");
+                        _expected_type = decl->type_name;
+                        generate_expression(buf, decl->initializer, program);
+                        _expected_type = String("");
                     } else {
-                        buf.append(" = 0");
+                        buf.append(" = NULL");
                     }
-                }
-                buf.append(";\n");
-                if (class_has_destructor(decl->type_name, program) && _defer_depth >= 0 &&
-                    _raii_counts[_defer_depth] < MAX_RAII_PER_SCOPE) {
-                    _raii_scopes[_defer_depth][_raii_counts[_defer_depth]].var_name = decl->name;
-                    _raii_scopes[_defer_depth][_raii_counts[_defer_depth]].class_name = decl->type_name;
-                    _raii_counts[_defer_depth]++;
+                    buf.append(";\n");
+
+                    if (_defer_depth >= 0 && _str_counts[_defer_depth] < MAX_STRINGS_PER_SCOPE) {
+                        char owner_name_buf[256];
+                        snprintf(owner_name_buf, sizeof(owner_name_buf), "__tick_owned_str_%s_%d_%d", decl->name.c_str(), _defer_depth, _str_counts[_defer_depth]);
+                        for (int i = 0; i < indent; i++) buf.append("    ");
+                        buf.append("bool %s = %s;\n", owner_name_buf, owned_init ? "true" : "false");
+                        _str_scopes[_defer_depth][_str_counts[_defer_depth]].var_name = decl->name;
+                        _str_scopes[_defer_depth][_str_counts[_defer_depth]].owner_name = String(owner_name_buf);
+                        _str_counts[_defer_depth]++;
+                    }
+                } else {
+                    generate_typed_decl(buf, decl->type_name, decl->name.c_str(), program);
+                    if (decl->initializer) {
+                        buf.append(" = ");
+                        _expected_type = decl->type_name;
+                        generate_expression(buf, decl->initializer, program);
+                        _expected_type = String("");
+                    } else {
+                        bool is_union_type = false;
+                        for (size_t ui = 0; ui < program->unions.size(); ui++) {
+                            if (program->unions[ui]->name == decl->type_name) { is_union_type = true; break; }
+                        }
+                        bool is_class_type = false;
+                        for (size_t ci = 0; ci < program->classes.size(); ci++) {
+                            if (program->classes[ci]->name == decl->type_name) { is_class_type = true; break; }
+                        }
+                        if (decl->type_name == "ptr" || is_typed_ptr_type(decl->type_name) || is_func_ptr_type(decl->type_name)) {
+                            buf.append(" = NULL");
+                        } else if (is_fixed_array_type(decl->type_name) || is_union_type || is_class_type) {
+                            buf.append(" = {0}");
+                        } else {
+                            buf.append(" = 0");
+                        }
+                    }
+                    buf.append(";\n");
+                    if (class_has_destructor(decl->type_name, program) && _defer_depth >= 0 &&
+                        _raii_counts[_defer_depth] < MAX_RAII_PER_SCOPE) {
+                        _raii_scopes[_defer_depth][_raii_counts[_defer_depth]].var_name = decl->name;
+                        _raii_scopes[_defer_depth][_raii_counts[_defer_depth]].class_name = decl->type_name;
+                        _raii_counts[_defer_depth]++;
+                    }
                 }
             }
             if (is_array && !decl->is_const && _defer_depth >= 0 &&
@@ -1215,21 +1314,39 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
         case AstNodeType::EXPR_STMT: {
             ExprStmt* expr_stmt = static_cast<ExprStmt*>(stmt);
             for (int i = 0; i < indent; i++) buf.append("    ");
-            generate_expression(buf, expr_stmt->expression, program);
-            buf.append(";\n");
+            if (is_owned_string_expr(expr_stmt->expression, program)) {
+                buf.append("{ char* __tick_tmp_str = ");
+                generate_expression(buf, expr_stmt->expression, program);
+                buf.append("; if (__tick_tmp_str) free(__tick_tmp_str); }\n");
+            } else {
+                generate_expression(buf, expr_stmt->expression, program);
+                buf.append(";\n");
+            }
             break;
         }
 
         case AstNodeType::RETURN_STMT: {
             ReturnStmt* ret = static_cast<ReturnStmt*>(stmt);
-            generate_all_deferred(buf, indent, program);
-            for (int i = 0; i < indent; i++) buf.append("    ");
-            buf.append("return");
             if (ret->value) {
-                buf.append(" ");
+                char ret_c_type[128];
+                String ret_type = _current_func ? _current_func->return_type : infer_expr_type(ret->value, program);
+                tick_type_to_c_type(ret_type, program, ret_c_type, sizeof(ret_c_type));
+                for (int i = 0; i < indent; i++) buf.append("    ");
+                buf.append("{\n");
+                for (int i = 0; i < indent + 1; i++) buf.append("    ");
+                buf.append("%s __tick_ret = ", ret_c_type);
                 generate_expression(buf, ret->value, program);
+                buf.append(";\n");
+                generate_all_deferred(buf, indent + 1, program);
+                for (int i = 0; i < indent + 1; i++) buf.append("    ");
+                buf.append("return __tick_ret;\n");
+                for (int i = 0; i < indent; i++) buf.append("    ");
+                buf.append("}\n");
+            } else {
+                generate_all_deferred(buf, indent, program);
+                for (int i = 0; i < indent; i++) buf.append("    ");
+                buf.append("return;\n");
             }
-            buf.append(";\n");
             break;
         }
 
@@ -1680,9 +1797,27 @@ void Compiler::generate_expression(CodeBuffer& buf, ExprNode* expr, Program* pro
 
         case AstNodeType::ASSIGN_EXPR: {
             AssignExpr* assign = static_cast<AssignExpr*>(expr);
+            _expected_type = infer_expr_type(assign->target, program);
+            if (_expected_type == "str" && assign->target->type == AstNodeType::IDENTIFIER_EXPR) {
+                IdentifierExpr* target_id = static_cast<IdentifierExpr*>(assign->target);
+                const char* owner_flag = find_owned_string_flag(target_id->name);
+                if (owner_flag) {
+                    bool rhs_owned = is_owned_string_expr(assign->value, program);
+                    buf.append("({ char* __tick_new_str = ");
+                    generate_expression(buf, assign->value, program);
+                    buf.append("; if (%s && %s) { free(%s); } %s = %s; (%s = __tick_new_str); })",
+                        owner_flag,
+                        target_id->name.c_str(),
+                        target_id->name.c_str(),
+                        owner_flag,
+                        rhs_owned ? "true" : "false",
+                        target_id->name.c_str());
+                    _expected_type = String("");
+                    break;
+                }
+            }
             generate_expression(buf, assign->target, program);
             buf.append(" = ");
-            _expected_type = infer_expr_type(assign->target, program);
             bool deref_rhs = false;
             if (assign->target->type == AstNodeType::MEMBER_EXPR) {
                 MemberExpr* tgt = static_cast<MemberExpr*>(assign->target);
@@ -2059,6 +2194,22 @@ void Compiler::generate_expression(CodeBuffer& buf, ExprNode* expr, Program* pro
                                 arg_id->name.c_str(), acc,
                                 arg_id->name.c_str(), acc,
                                 arg_id->name.c_str(), acc);
+                        } else if (arg_type == "str" && call->arguments[0]->type == AstNodeType::IDENTIFIER_EXPR) {
+                            IdentifierExpr* arg_id = static_cast<IdentifierExpr*>(call->arguments[0]);
+                            const char* owner_flag = find_owned_string_flag(arg_id->name);
+                            if (owner_flag) {
+                                buf.append("{ if (%s && %s) free(%s); %s = NULL; %s = false; }",
+                                    owner_flag,
+                                    arg_id->name.c_str(),
+                                    arg_id->name.c_str(),
+                                    arg_id->name.c_str(),
+                                    owner_flag);
+                            } else {
+                                buf.append("{ if (%s) free(%s); %s = NULL; }",
+                                    arg_id->name.c_str(),
+                                    arg_id->name.c_str(),
+                                    arg_id->name.c_str());
+                            }
                         } else {
                             buf.append("free(");
                             generate_expression(buf, call->arguments[0], program);
