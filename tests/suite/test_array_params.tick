@@ -1,0 +1,76 @@
+func sum(arr : i32[]) : i32 {
+    var total : i32 = 0;
+    var i : i32 = 0;
+    while (i < arr.length()) {
+        total = total + arr[i];
+        i = i + 1;
+    }
+    return total;
+}
+
+func count_above(arr : i32[], threshold : i32) : i32 {
+    var count : i32 = 0;
+    var i : i32 = 0;
+    while (i < arr.length()) {
+        if (arr[i] > threshold) {
+            count = count + 1;
+        }
+        i = i + 1;
+    }
+    return count;
+}
+
+func pop_count(arr : i32[]) : i32 {
+    arr.pop();
+    return arr.length();
+}
+
+func push_local_len(arr : i32[], val : i32) : i32 {
+    arr.push(val);
+    return arr.length();
+}
+
+func first_elem(arr : i32[]) : i32 {
+    return arr[0];
+}
+
+func main() : i32 {
+    var nums : i32[] = [10, 20, 30, 40, 50];
+
+    var s : i32 = sum(nums);
+    if (s == 150) {
+        println("PASS: sum via param");
+    } else {
+        println("FAIL: sum via param");
+    }
+
+    var c : i32 = count_above(nums, 25);
+    if (c == 3) {
+        println("PASS: count_above via param");
+    } else {
+        println("FAIL: count_above via param");
+    }
+
+    var fe : i32 = first_elem(nums);
+    if (fe == 10) {
+        println("PASS: array element access via param");
+    } else {
+        println("FAIL: array element access via param");
+    }
+
+    var pc : i32 = pop_count(nums);
+    if (pc == 4) {
+        println("PASS: pop inside callee updates local len");
+    } else {
+        println("FAIL: pop inside callee updates local len");
+    }
+
+    var ppl : i32 = push_local_len(nums, 99);
+    if (ppl == 6) {
+        println("PASS: push inside callee updates local len");
+    } else {
+        println("FAIL: push inside callee updates local len");
+    }
+
+    return 0;
+}

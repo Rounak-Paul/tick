@@ -62,8 +62,14 @@ void tick_file_write(TickFile* f, const char* data);
 void tick_file_close(TickFile* f);
 bool tick_file_exists(const char* path);
 
-void* tick_array_push(void* arr, int32_t* len, int32_t* cap, int32_t elem_size);
-void tick_array_pop(int32_t* len);
+typedef struct {
+    void* ptr;
+    int32_t len;
+    int32_t cap;
+} TickArray;
+
+void tick_array_push(TickArray* arr, size_t elem_size);
+void tick_array_pop(TickArray* arr);
 
 #define TICK_GC_MAX_OBJECTS 65536
 
@@ -74,6 +80,7 @@ typedef struct {
 
 void tick_gc_init(void);
 void* tick_gc_alloc(size_t size);
+void* tick_gc_realloc(void* ptr, size_t new_size);
 void tick_gc_free(void* ptr);
 void tick_gc_collect(void);
 void tick_gc_cleanup(void);

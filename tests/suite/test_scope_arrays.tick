@@ -1,0 +1,86 @@
+func loop_alloc() : void {
+    var i : i32 = 0;
+    while (i < 1000) {
+        var tmp : i32[] = [1, 2, 3, 4, 5];
+        tmp.push(6);
+        i++;
+    }
+}
+
+func make_and_sum() : i32 {
+    var nums : i32[] = [10, 20, 30];
+    nums.push(40);
+    var s : i32 = nums[0] + nums[1] + nums[2] + nums[3];
+    return s;
+}
+
+func conditional_array(flag : b8) : i32 {
+    var result : i32 = 0;
+    if (flag) {
+        var a : i32[] = [1, 2, 3];
+        result = a[0] + a[1] + a[2];
+    } else {
+        var b : i32[] = [10, 20, 30];
+        result = b[0] + b[1] + b[2];
+    }
+    return result;
+}
+
+func for_loop_arrays() : i32 {
+    var total : i32 = 0;
+    for (var i : i32 = 0; i < 5; i++) {
+        var row : i32[] = [i, i + 1, i + 2];
+        total = total + row[0] + row[1] + row[2];
+    }
+    return total;
+}
+
+func explicit_free_then_scope() : i32 {
+    var arr : i32[] = [7, 8, 9];
+    var s : i32 = arr[0] + arr[1] + arr[2];
+    free(arr);
+    return s;
+}
+
+func main() : i32 {
+    loop_alloc();
+    println("PASS: scope array loop alloc");
+
+    var s : i32 = make_and_sum();
+    if (s != 100) {
+        return 1;
+    }
+    println("PASS: scope array make and sum");
+
+    var r1 : i32 = conditional_array(true);
+    if (r1 != 6) {
+        return 1;
+    }
+    var r2 : i32 = conditional_array(false);
+    if (r2 != 60) {
+        return 1;
+    }
+    println("PASS: scope array conditional branches");
+
+    var t : i32 = for_loop_arrays();
+    if (t != 45) {
+        return 1;
+    }
+    println("PASS: scope array for loop");
+
+    var ef : i32 = explicit_free_then_scope();
+    if (ef != 24) {
+        return 1;
+    }
+    println("PASS: scope array explicit free no double-free");
+
+    var outer : i32[] = [1, 2, 3];
+    outer.push(4);
+    outer.push(5);
+    if (outer.length() != 5) {
+        return 1;
+    }
+    println("PASS: scope array outer");
+
+    return 0;
+}

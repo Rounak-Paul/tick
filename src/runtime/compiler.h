@@ -7,6 +7,7 @@
 #define MAX_DEFER_SCOPES 64
 #define MAX_DEFERS_PER_SCOPE 64
 #define MAX_RAII_PER_SCOPE 32
+#define MAX_ARRAYS_PER_SCOPE 64
 
 struct RaiiEntry {
     Tick::String var_name;
@@ -40,6 +41,8 @@ private:
     static Tick::String _expected_type;
     static RaiiEntry _raii_scopes[MAX_DEFER_SCOPES][MAX_RAII_PER_SCOPE];
     static int _raii_counts[MAX_DEFER_SCOPES];
+    static Tick::String _array_scopes[MAX_DEFER_SCOPES][MAX_ARRAYS_PER_SCOPE];
+    static int _array_counts[MAX_DEFER_SCOPES];
 
     static Tick::String generate_c_code(Tick::Program* program);
     static void generate_process(CodeBuffer& buf, Tick::ProcessDecl* proc, Tick::Program* program);
@@ -71,4 +74,5 @@ private:
     static Tick::String infer_expr_type(Tick::ExprNode* expr, Tick::Program* program);
     static bool is_string_type(Tick::ExprNode* expr, Tick::Program* program);
     static bool is_array_type_str(const Tick::String& t);
+    static Tick::String mangle(const Tick::String& name);
 };
