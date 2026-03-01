@@ -54,7 +54,8 @@ bool Parser::is_type_keyword() {
         type == TokenType::I32 || type == TokenType::I64 ||
         type == TokenType::F32 || type == TokenType::F64 ||
         type == TokenType::B8 || type == TokenType::STR ||
-        type == TokenType::VOID_TYPE || type == TokenType::PTR) {
+        type == TokenType::VOID_TYPE || type == TokenType::PTR ||
+        type == TokenType::FUNC) {
         return true;
     }
     if (type == TokenType::IDENTIFIER) {
@@ -66,6 +67,28 @@ bool Parser::is_type_keyword() {
 
 Token Parser::parse_type() {
     TokenType type = current_token().type;
+    if (type == TokenType::FUNC) {
+        Token type_token = current_token();
+        advance();
+        consume(TokenType::LPAREN, "Expected '(' after 'func' in function pointer type");
+        char buf[512];
+        int pos = 0;
+        pos += snprintf(buf + pos, sizeof(buf) - pos, "func(");
+        if (!check(TokenType::RPAREN)) {
+            Token pt = parse_type();
+            pos += snprintf(buf + pos, sizeof(buf) - pos, "%s", pt.lexeme.c_str());
+            while (match(TokenType::COMMA)) {
+                pt = parse_type();
+                pos += snprintf(buf + pos, sizeof(buf) - pos, ",%s", pt.lexeme.c_str());
+            }
+        }
+        consume(TokenType::RPAREN, "Expected ')' after function pointer params");
+        consume(TokenType::COLON, "Expected ':' after function pointer params");
+        Token ret = parse_type();
+        pos += snprintf(buf + pos, sizeof(buf) - pos, "):%s", ret.lexeme.c_str());
+        type_token.lexeme = String(buf);
+        return type_token;
+    }
     if (type == TokenType::U8 || type == TokenType::U16 ||
         type == TokenType::U32 || type == TokenType::U64 ||
         type == TokenType::I8 || type == TokenType::I16 ||
@@ -76,6 +99,16 @@ Token Parser::parse_type() {
         type == TokenType::IDENTIFIER) {
         Token type_token = current_token();
         advance();
+        
+        if (type == TokenType::PTR && check(TokenType::LT)) {
+            advance();
+            Token inner = parse_type();
+            consume(TokenType::GT, "Expected '>' after ptr<type");
+            char buf[256];
+            snprintf(buf, sizeof(buf), "ptr<%s>", inner.lexeme.c_str());
+            type_token.lexeme = String(buf);
+            return type_token;
+        }
         
         if (check(TokenType::LBRACKET)) {
             advance();

@@ -31,6 +31,21 @@ bool Compiler::is_array_type_str(const String& t) {
     return t.length() > 2 && t[t.length() - 2] == '[' && t[t.length() - 1] == ']';
 }
 
+bool Compiler::is_typed_ptr_type(const String& t) {
+    return t.length() > 4 && t[0] == 'p' && t[1] == 't' && t[2] == 'r' && t[3] == '<' && t[t.length() - 1] == '>';
+}
+
+String Compiler::typed_ptr_base_type(const String& t) {
+    if (is_typed_ptr_type(t)) {
+        return String(t.c_str() + 4, t.length() - 5);
+    }
+    return t;
+}
+
+bool Compiler::is_func_ptr_type(const String& t) {
+    return t.length() > 6 && t[0] == 'f' && t[1] == 'u' && t[2] == 'n' && t[3] == 'c' && t[4] == '(';
+}
+
 void Compiler::push_defer_scope() {
     _defer_depth++;
     if (_defer_depth < MAX_DEFER_SCOPES) {
@@ -241,6 +256,32 @@ String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
             IdentifierExpr* id = static_cast<IdentifierExpr*>(expr);
             String vt = lookup_var_type(id->name, program);
             if (!vt.empty()) return vt;
+            for (size_t i = 0; i < program->functions.size(); i++) {
+                if (program->functions[i]->name == id->name) {
+                    FunctionDecl* fn = program->functions[i];
+                    char buf[512];
+                    int pos = snprintf(buf, sizeof(buf), "func(");
+                    for (size_t j = 0; j < fn->parameters.size(); j++) {
+                        if (j > 0) pos += snprintf(buf + pos, sizeof(buf) - pos, ",");
+                        pos += snprintf(buf + pos, sizeof(buf) - pos, "%s", fn->parameters[j]->type_name.c_str());
+                    }
+                    snprintf(buf + pos, sizeof(buf) - pos, "):%s", fn->return_type.c_str());
+                    return String(buf);
+                }
+            }
+            for (size_t i = 0; i < program->extern_functions.size(); i++) {
+                if (program->extern_functions[i]->name == id->name) {
+                    ExternFuncDecl* fn = program->extern_functions[i];
+                    char buf[512];
+                    int pos = snprintf(buf, sizeof(buf), "func(");
+                    for (size_t j = 0; j < fn->parameters.size(); j++) {
+                        if (j > 0) pos += snprintf(buf + pos, sizeof(buf) - pos, ",");
+                        pos += snprintf(buf + pos, sizeof(buf) - pos, "%s", fn->parameters[j]->type_name.c_str());
+                    }
+                    snprintf(buf + pos, sizeof(buf) - pos, "):%s", fn->return_type.c_str());
+                    return String(buf);
+                }
+            }
             for (size_t i = 0; i < program->enums.size(); i++) {
                 for (size_t j = 0; j < program->enums[i]->values.size(); j++) {
                     String qualified;
@@ -312,7 +353,26 @@ String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
                     return String("f64");
                 }
                 if (id->name == "abs") return String("i32");
-                if (id->name == "addr") return String("ptr");
+                if (id->name == "addr") {
+                    if (call->arguments.size() > 0) {
+                        String arg_type = infer_expr_type(call->arguments[0], program);
+                        if (!arg_type.empty()) {
+                            char buf[256];
+                            snprintf(buf, sizeof(buf), "ptr<%s>", arg_type.c_str());
+                            return String(buf);
+                        }
+                    }
+                    return String("ptr");
+                }
+                if (id->name == "deref") {
+                    if (call->arguments.size() > 0) {
+                        String arg_type = infer_expr_type(call->arguments[0], program);
+                        if (is_typed_ptr_type(arg_type)) {
+                            return typed_ptr_base_type(arg_type);
+                        }
+                    }
+                    return String("i32");
+                }
                 for (size_t i = 0; i < program->functions.size(); i++) {
                     if (program->functions[i]->name == id->name) {
                         return program->functions[i]->return_type;
@@ -354,6 +414,12 @@ String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
             if (bin->op == "+" && (left_t == "str" || right_t == "str")) {
                 return String("str");
             }
+            if ((bin->op == "+" || bin->op == "-") && (is_typed_ptr_type(left_t) || left_t == "ptr")) {
+                return left_t;
+            }
+            if (bin->op == "+" && (is_typed_ptr_type(right_t) || right_t == "ptr")) {
+                return right_t;
+            }
             return left_t;
         }
         case AstNodeType::INDEX_EXPR: {
@@ -362,6 +428,9 @@ String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
             if (arr_type.length() > 2 &&
                 arr_type[arr_type.length() - 2] == '[' && arr_type[arr_type.length() - 1] == ']') {
                 return String(arr_type.c_str(), arr_type.length() - 2);
+            }
+            if (is_typed_ptr_type(arr_type)) {
+                return typed_ptr_base_type(arr_type);
             }
             return String("i32");
         }
@@ -385,6 +454,57 @@ void Compiler::tick_type_to_c_type(const String& tick_type, Program* program, ch
     if (tick_type == "b8") { snprintf(out, out_size, "bool"); return; }
     if (tick_type == "str") { snprintf(out, out_size, "char*"); return; }
     if (tick_type == "ptr") { snprintf(out, out_size, "void*"); return; }
+
+    if (is_typed_ptr_type(tick_type)) {
+        String inner = typed_ptr_base_type(tick_type);
+        char inner_c[128];
+        tick_type_to_c_type(inner, program, inner_c, sizeof(inner_c));
+        snprintf(out, out_size, "%s*", inner_c);
+        return;
+    }
+
+    if (is_func_ptr_type(tick_type)) {
+        const char* s = tick_type.c_str();
+        int paren_start = 4;
+        int depth = 1;
+        int paren_end = paren_start + 1;
+        while (s[paren_end] && depth > 0) {
+            if (s[paren_end] == '(') depth++;
+            else if (s[paren_end] == ')') depth--;
+            if (depth > 0) paren_end++;
+        }
+        String ret_str(s + paren_end + 2);
+        char ret_c[128];
+        tick_type_to_c_type(ret_str, program, ret_c, sizeof(ret_c));
+        char params_buf[512];
+        int params_pos = 0;
+        if (paren_end > paren_start + 1) {
+            String params_str(s + paren_start + 1, paren_end - paren_start - 1);
+            const char* p = params_str.c_str();
+            int start = 0;
+            int len = (int)params_str.length();
+            int pd = 0;
+            bool first = true;
+            for (int i = 0; i <= len; i++) {
+                if (i < len && p[i] == '(') pd++;
+                else if (i < len && p[i] == ')') pd--;
+                if ((i == len || (p[i] == ',' && pd == 0))) {
+                    String param_type(p + start, i - start);
+                    char param_c[128];
+                    tick_type_to_c_type(param_type, program, param_c, sizeof(param_c));
+                    if (!first) params_pos += snprintf(params_buf + params_pos, sizeof(params_buf) - params_pos, ", ");
+                    params_pos += snprintf(params_buf + params_pos, sizeof(params_buf) - params_pos, "%s", param_c);
+                    first = false;
+                    start = i + 1;
+                }
+            }
+        } else {
+            params_pos += snprintf(params_buf + params_pos, sizeof(params_buf) - params_pos, "void");
+        }
+        params_buf[params_pos] = '\0';
+        snprintf(out, out_size, "%s (*)(%s)", ret_c, params_buf);
+        return;
+    }
 
     if (tick_type.length() > 2 && tick_type[tick_type.length() - 2] == '[' && tick_type[tick_type.length() - 1] == ']') {
         String base_type(tick_type.c_str(), tick_type.length() - 2);
@@ -420,6 +540,52 @@ void Compiler::tick_type_to_c_type(const String& tick_type, Program* program, ch
     }
 
     snprintf(out, out_size, "int32_t");
+}
+
+void Compiler::generate_typed_decl(CodeBuffer& buf, const String& tick_type, const char* name, Program* program) {
+    if (is_func_ptr_type(tick_type)) {
+        const char* s = tick_type.c_str();
+        int paren_start = 4;
+        int depth = 1;
+        int paren_end = paren_start + 1;
+        while (s[paren_end] && depth > 0) {
+            if (s[paren_end] == '(') depth++;
+            else if (s[paren_end] == ')') depth--;
+            if (depth > 0) paren_end++;
+        }
+        String ret_str(s + paren_end + 2);
+        char ret_c[128];
+        tick_type_to_c_type(ret_str, program, ret_c, sizeof(ret_c));
+        buf.append("%s (*%s)(", ret_c, name);
+        if (paren_end > paren_start + 1) {
+            String params_str(s + paren_start + 1, paren_end - paren_start - 1);
+            const char* p = params_str.c_str();
+            int start = 0;
+            int len = (int)params_str.length();
+            int pd = 0;
+            bool first = true;
+            for (int i = 0; i <= len; i++) {
+                if (i < len && p[i] == '(') pd++;
+                else if (i < len && p[i] == ')') pd--;
+                if ((i == len || (p[i] == ',' && pd == 0))) {
+                    String param_type(p + start, i - start);
+                    char param_c[128];
+                    tick_type_to_c_type(param_type, program, param_c, sizeof(param_c));
+                    if (!first) buf.append(", ");
+                    buf.append("%s", param_c);
+                    first = false;
+                    start = i + 1;
+                }
+            }
+        } else {
+            buf.append("void");
+        }
+        buf.append(")");
+    } else {
+        char c_type[128];
+        tick_type_to_c_type(tick_type, program, c_type, sizeof(c_type));
+        buf.append("%s %s", c_type, name);
+    }
 }
 
 bool Compiler::compile_to_native(const char* source_file, const char* output_file, bool keep_c) {
@@ -528,9 +694,7 @@ String Compiler::generate_c_code(Program* program) {
             buf.append("int32_t %s__len;\n", var->name.c_str());
             buf.append("int32_t %s__cap;\n", var->name.c_str());
         } else {
-            char c_type[128];
-            tick_type_to_c_type(var->type_name, program, c_type, sizeof(c_type));
-            buf.append("%s %s", c_type, var->name.c_str());
+            generate_typed_decl(buf, var->type_name, var->name.c_str(), program);
             if (var->initializer) {
                 buf.append(" = ");
                 generate_expression(buf, var->initializer, program);
@@ -571,9 +735,9 @@ String Compiler::generate_c_code(Program* program) {
                     ClassDecl* ancestor = chain[ci - 1];
                     for (size_t j = 0; j < ancestor->fields.size(); j++) {
                         VarDecl* field = ancestor->fields[j];
-                        char field_type[128];
-                        tick_type_to_c_type(field->type_name, program, field_type, sizeof(field_type));
-                        buf.append("    %s %s;\n", field_type, field->name.c_str());
+                        buf.append("    ");
+                        generate_typed_decl(buf, field->type_name, field->name.c_str(), program);
+                        buf.append(";\n");
                     }
                 }
                 break;
@@ -581,9 +745,9 @@ String Compiler::generate_c_code(Program* program) {
         }
         for (size_t j = 0; j < cls->fields.size(); j++) {
             VarDecl* field = cls->fields[j];
-            char field_type[128];
-            tick_type_to_c_type(field->type_name, program, field_type, sizeof(field_type));
-            buf.append("    %s %s;\n", field_type, field->name.c_str());
+            buf.append("    ");
+            generate_typed_decl(buf, field->type_name, field->name.c_str(), program);
+            buf.append(";\n");
         }
         buf.append("} %s;\n\n", cls->name.c_str());
     }
@@ -594,9 +758,9 @@ String Compiler::generate_c_code(Program* program) {
         buf.append("typedef struct %s {\n", dc->name.c_str());
         for (size_t j = 0; j < dc->fields.size(); j++) {
             VarDecl* field = dc->fields[j];
-            char field_type[128];
-            tick_type_to_c_type(field->type_name, program, field_type, sizeof(field_type));
-            buf.append("    %s %s;\n", field_type, field->name.c_str());
+            buf.append("    ");
+            generate_typed_decl(buf, field->type_name, field->name.c_str(), program);
+            buf.append(";\n");
         }
         buf.append("} %s;\n\n", dc->name.c_str());
     }
@@ -615,9 +779,9 @@ String Compiler::generate_c_code(Program* program) {
             if (is_class_field) {
                 buf.append("    %s %s;\n", ud->fields[j]->type_name.c_str(), ud->fields[j]->name.c_str());
             } else {
-                char field_type[128];
-                tick_type_to_c_type(ud->fields[j]->type_name, program, field_type, sizeof(field_type));
-                buf.append("    %s %s;\n", field_type, ud->fields[j]->name.c_str());
+                buf.append("    ");
+                generate_typed_decl(buf, ud->fields[j]->type_name, ud->fields[j]->name.c_str(), program);
+                buf.append(";\n");
             }
         }
         buf.append("} %s;\n\n", ud->name.c_str());
@@ -630,9 +794,7 @@ String Compiler::generate_c_code(Program* program) {
         buf.append("%s %s(", ret_type, ef->name.c_str());
         for (size_t j = 0; j < ef->parameters.size(); j++) {
             if (j > 0) buf.append(", ");
-            char param_type[128];
-            tick_type_to_c_type(ef->parameters[j]->type_name, program, param_type, sizeof(param_type));
-            buf.append("%s %s", param_type, ef->parameters[j]->name.c_str());
+            generate_typed_decl(buf, ef->parameters[j]->type_name, ef->parameters[j]->name.c_str(), program);
         }
         buf.append(");\n");
     }
@@ -664,9 +826,7 @@ String Compiler::generate_c_code(Program* program) {
         buf.append("%s %s(", ret_type, func->name.c_str());
         for (size_t j = 0; j < func->parameters.size(); j++) {
             if (j > 0) buf.append(", ");
-            char param_type[128];
-            tick_type_to_c_type(func->parameters[j]->type_name, program, param_type, sizeof(param_type));
-            buf.append("%s %s", param_type, func->parameters[j]->name.c_str());
+            generate_typed_decl(buf, func->parameters[j]->type_name, func->parameters[j]->name.c_str(), program);
         }
         buf.append(");\n");
     }
@@ -678,9 +838,8 @@ String Compiler::generate_c_code(Program* program) {
         const char* method_c_name = method->is_destructor ? "dtor" : method->name.c_str();
         buf.append("%s %s_%s(%s* self", ret_type, method->class_name.c_str(), method_c_name, method->class_name.c_str());
         for (size_t k = 0; k < method->parameters.size(); k++) {
-            char param_type[128];
-            tick_type_to_c_type(method->parameters[k]->type_name, program, param_type, sizeof(param_type));
-            buf.append(", %s %s", param_type, method->parameters[k]->name.c_str());
+            buf.append(", ");
+            generate_typed_decl(buf, method->parameters[k]->type_name, method->parameters[k]->name.c_str(), program);
         }
         buf.append(");\n");
     }
@@ -709,9 +868,8 @@ String Compiler::generate_c_code(Program* program) {
         const char* method_c_name = method->is_destructor ? "dtor" : method->name.c_str();
         buf.append("%s %s_%s(%s* self", ret_type, method->class_name.c_str(), method_c_name, method->class_name.c_str());
         for (size_t k = 0; k < method->parameters.size(); k++) {
-            char param_type[128];
-            tick_type_to_c_type(method->parameters[k]->type_name, program, param_type, sizeof(param_type));
-            buf.append(", %s %s", param_type, method->parameters[k]->name.c_str());
+            buf.append(", ");
+            generate_typed_decl(buf, method->parameters[k]->type_name, method->parameters[k]->name.c_str(), program);
         }
         buf.append(") {\n");
 
@@ -761,9 +919,7 @@ void Compiler::generate_function(CodeBuffer& buf, FunctionDecl* func, Program* p
     buf.append("%s %s(", ret_type, func->name.c_str());
     for (size_t j = 0; j < func->parameters.size(); j++) {
         if (j > 0) buf.append(", ");
-        char param_type[128];
-        tick_type_to_c_type(func->parameters[j]->type_name, program, param_type, sizeof(param_type));
-        buf.append("%s %s", param_type, func->parameters[j]->name.c_str());
+        generate_typed_decl(buf, func->parameters[j]->type_name, func->parameters[j]->name.c_str(), program);
     }
     buf.append(") {\n");
 
@@ -896,9 +1052,7 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
                 for (int i = 0; i < indent; i++) buf.append("    ");
                 buf.append("int32_t %s__cap = 0;\n", decl->name.c_str());
             } else {
-                char c_type[128];
-                tick_type_to_c_type(decl->type_name, program, c_type, sizeof(c_type));
-                buf.append("%s %s", c_type, decl->name.c_str());
+                generate_typed_decl(buf, decl->type_name, decl->name.c_str(), program);
                 if (decl->initializer) {
                     buf.append(" = ");
                     _expected_type = decl->type_name;
@@ -915,7 +1069,7 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
                     }
                     if (decl->type_name == "str") {
                         buf.append(" = NULL");
-                    } else if (decl->type_name == "ptr") {
+                    } else if (decl->type_name == "ptr" || is_typed_ptr_type(decl->type_name) || is_func_ptr_type(decl->type_name)) {
                         buf.append(" = NULL");
                     } else if (is_union_type || is_class_type) {
                         buf.append(" = {0}");
@@ -1034,9 +1188,7 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
             if (for_stmt->initializer) {
                 if (for_stmt->initializer->type == AstNodeType::VAR_DECL) {
                     VarDecl* decl = static_cast<VarDecl*>(for_stmt->initializer);
-                    char c_type[128];
-                    tick_type_to_c_type(decl->type_name, program, c_type, sizeof(c_type));
-                    buf.append("%s %s", c_type, decl->name.c_str());
+                    generate_typed_decl(buf, decl->type_name, decl->name.c_str(), program);
                     if (decl->initializer) {
                         buf.append(" = ");
                         generate_expression(buf, decl->initializer, program);
@@ -1171,8 +1323,8 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
             {
                 char catch_c_type[128];
                 tick_type_to_c_type(String(tc->catch_type), program, catch_c_type, sizeof(catch_c_type));
-                buf.append("%s %s = (%s)_tick_try_msg[_tick_try_depth];\n",
-                    catch_c_type, tc->catch_var.c_str(), catch_c_type);
+                generate_typed_decl(buf, String(tc->catch_type), tc->catch_var.c_str(), program);
+                buf.append(" = (%s)_tick_try_msg[_tick_try_depth];\n", catch_c_type);
             }
             push_defer_scope();
             if (tc->catch_body) {
@@ -1706,10 +1858,23 @@ void Compiler::generate_expression(CodeBuffer& buf, ExprNode* expr, Program* pro
                 } else if (ident->name == "gc_cleanup") {
                     buf.append("tick_gc_cleanup()");
                 } else if (ident->name == "addr") {
-                    buf.append("(void*)&");
+                    if (call->arguments.size() > 0) {
+                        String arg_type = infer_expr_type(call->arguments[0], program);
+                        if (!arg_type.empty() && arg_type != "i32") {
+                            char c_type[128];
+                            tick_type_to_c_type(arg_type, program, c_type, sizeof(c_type));
+                            buf.append("(%s*)&", c_type);
+                        } else {
+                            buf.append("(void*)&");
+                        }
+                        generate_expression(buf, call->arguments[0], program);
+                    }
+                } else if (ident->name == "deref") {
+                    buf.append("(*");
                     if (call->arguments.size() > 0) {
                         generate_expression(buf, call->arguments[0], program);
                     }
+                    buf.append(")");
                 } else if (ident->name == "str_concat") {
                     buf.append("tick_str_concat(");
                     for (size_t i = 0; i < call->arguments.size(); i++) {

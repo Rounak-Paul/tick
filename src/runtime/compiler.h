@@ -56,6 +56,10 @@ private:
     static void write_to_file(const char* filename, const char* content);
     static bool invoke_gcc(const char* c_file, const char* output_file, const char* extra_flags);
     static void tick_type_to_c_type(const Tick::String& tick_type, Tick::Program* program, char* out, size_t out_size);
+    static bool is_typed_ptr_type(const Tick::String& t);
+    static Tick::String typed_ptr_base_type(const Tick::String& t);
+    static bool is_func_ptr_type(const Tick::String& t);
+    static void generate_typed_decl(CodeBuffer& buf, const Tick::String& tick_type, const char* name, Tick::Program* program);
     static Tick::String lookup_var_type(const Tick::String& name, Tick::Program* program);
     static void lookup_var_type_in_block(const Tick::String& name, Tick::BlockStmt* block, Tick::String& result);
     static Tick::String infer_expr_type(Tick::ExprNode* expr, Tick::Program* program);

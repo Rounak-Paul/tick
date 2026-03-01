@@ -100,6 +100,10 @@ private:
     bool is_float_type(const String& t);
     bool is_array_type(const String& t);
     String array_base_type(const String& t);
+    bool is_typed_ptr_type(const String& t);
+    String typed_ptr_base_type(const String& t);
+    bool is_any_ptr_type(const String& t);
+    bool is_func_ptr_type(const String& t);
     bool types_compatible(const String& expected, const String& actual);
     bool is_builtin_function(const String& name);
 };

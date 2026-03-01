@@ -98,6 +98,25 @@ String SemanticAnalyzer::array_base_type(const String& t) {
     return t;
 }
 
+bool SemanticAnalyzer::is_typed_ptr_type(const String& t) {
+    return t.length() > 4 && t[0] == 'p' && t[1] == 't' && t[2] == 'r' && t[3] == '<' && t[t.length() - 1] == '>';
+}
+
+String SemanticAnalyzer::typed_ptr_base_type(const String& t) {
+    if (is_typed_ptr_type(t)) {
+        return String(t.c_str() + 4, t.length() - 5);
+    }
+    return t;
+}
+
+bool SemanticAnalyzer::is_any_ptr_type(const String& t) {
+    return t == "ptr" || is_typed_ptr_type(t);
+}
+
+bool SemanticAnalyzer::is_func_ptr_type(const String& t) {
+    return t.length() > 6 && t[0] == 'f' && t[1] == 'u' && t[2] == 'n' && t[3] == 'c' && t[4] == '(';
+}
+
 bool SemanticAnalyzer::types_compatible(const String& expected, const String& actual) {
     if (expected == actual) return true;
     if (expected.empty() || actual.empty()) return true;
@@ -111,9 +130,13 @@ bool SemanticAnalyzer::types_compatible(const String& expected, const String& ac
     }
     if (expected == "b8" && actual == "b8") return true;
     if (expected == "str" && actual == "str") return true;
-    if (expected == "ptr" && actual == "ptr") return true;
-    if (expected == "ptr" && actual == "null") return true;
-    if (actual == "null" && expected == "ptr") return true;
+    if (is_any_ptr_type(expected) && is_any_ptr_type(actual)) return true;
+    if (is_any_ptr_type(expected) && actual == "null") return true;
+    if (actual == "null" && is_any_ptr_type(expected)) return true;
+    if (is_any_ptr_type(expected) && is_func_ptr_type(actual)) return true;
+    if (is_func_ptr_type(expected) && is_any_ptr_type(actual)) return true;
+    if (is_func_ptr_type(expected) && actual == "null") return true;
+    if (is_func_ptr_type(expected) && is_func_ptr_type(actual)) return true;
     if (actual == "null" && expected == "str") return true;
     if (actual == "null") {
         if (_program) {
@@ -123,7 +146,7 @@ bool SemanticAnalyzer::types_compatible(const String& expected, const String& ac
         }
         return false;
     }
-    if (expected == "ptr" || actual == "ptr") return true;
+    if (is_any_ptr_type(expected) || is_any_ptr_type(actual)) return true;
     if (_program) {
         String base = actual;
         for (int depth = 0; depth < 32; depth++) {
@@ -157,7 +180,7 @@ bool SemanticAnalyzer::is_builtin_function(const String& name) {
            name == "file_exists" ||
            name == "free" || name == "array_length" ||
            name == "gc_collect" || name == "gc_cleanup" ||
-           name == "addr" || name == "sizeof";
+           name == "addr" || name == "sizeof" || name == "deref";
 }
 
 String SemanticAnalyzer::infer_type(ExprNode* node) {
@@ -177,7 +200,37 @@ String SemanticAnalyzer::infer_type(ExprNode* node) {
         case AstNodeType::IDENTIFIER_EXPR: {
             IdentifierExpr* id = static_cast<IdentifierExpr*>(node);
             Symbol** sym = _symbols.find(id->name.c_str());
-            if (sym) return (*sym)->data_type;
+            if (sym) {
+                if ((*sym)->type == SymbolType::FUNCTION && _program) {
+                    for (size_t i = 0; i < _program->functions.size(); i++) {
+                        if (_program->functions[i]->name == id->name) {
+                            FunctionDecl* fn = _program->functions[i];
+                            char buf[512];
+                            int pos = snprintf(buf, sizeof(buf), "func(");
+                            for (size_t j = 0; j < fn->parameters.size(); j++) {
+                                if (j > 0) pos += snprintf(buf + pos, sizeof(buf) - pos, ",");
+                                pos += snprintf(buf + pos, sizeof(buf) - pos, "%s", fn->parameters[j]->type_name.c_str());
+                            }
+                            snprintf(buf + pos, sizeof(buf) - pos, "):%s", fn->return_type.c_str());
+                            return String(buf);
+                        }
+                    }
+                    for (size_t i = 0; i < _program->extern_functions.size(); i++) {
+                        if (_program->extern_functions[i]->name == id->name) {
+                            ExternFuncDecl* fn = _program->extern_functions[i];
+                            char buf[512];
+                            int pos = snprintf(buf, sizeof(buf), "func(");
+                            for (size_t j = 0; j < fn->parameters.size(); j++) {
+                                if (j > 0) pos += snprintf(buf + pos, sizeof(buf) - pos, ",");
+                                pos += snprintf(buf + pos, sizeof(buf) - pos, "%s", fn->parameters[j]->type_name.c_str());
+                            }
+                            snprintf(buf + pos, sizeof(buf) - pos, "):%s", fn->return_type.c_str());
+                            return String(buf);
+                        }
+                    }
+                }
+                return (*sym)->data_type;
+            }
             return String("");
         }
         case AstNodeType::MEMBER_EXPR: {
@@ -218,7 +271,26 @@ String SemanticAnalyzer::infer_type(ExprNode* node) {
                 if (id->name == "parse") return String("");
                 if (id->name == "str_char_at") return String("u8");
                 if (id->name == "file_exists") return String("b8");
-                if (id->name == "addr") return String("ptr");
+                if (id->name == "addr") {
+                    if (call->arguments.size() > 0) {
+                        String arg_type = infer_type(call->arguments[0]);
+                        if (!arg_type.empty()) {
+                            char buf[256];
+                            snprintf(buf, sizeof(buf), "ptr<%s>", arg_type.c_str());
+                            return String(buf);
+                        }
+                    }
+                    return String("ptr");
+                }
+                if (id->name == "deref") {
+                    if (call->arguments.size() > 0) {
+                        String arg_type = infer_type(call->arguments[0]);
+                        if (is_typed_ptr_type(arg_type)) {
+                            return typed_ptr_base_type(arg_type);
+                        }
+                    }
+                    return String("");
+                }
                 if (id->name == "sizeof") return String("u64");
                 if (id->name == "sqrt" || id->name == "pow" ||
                     id->name == "sin" || id->name == "cos" ||
@@ -297,6 +369,12 @@ String SemanticAnalyzer::infer_type(ExprNode* node) {
             if (bin->op == "+" && (left == "str" || right == "str")) {
                 return String("str");
             }
+            if ((bin->op == "+" || bin->op == "-") && is_any_ptr_type(left)) {
+                return left;
+            }
+            if (bin->op == "+" && is_any_ptr_type(right)) {
+                return right;
+            }
             if (is_float_type(left) || is_float_type(right)) {
                 if (left == "f64" || right == "f64") return String("f64");
                 return String("f32");
@@ -316,6 +394,7 @@ String SemanticAnalyzer::infer_type(ExprNode* node) {
             IndexExpr* idx = static_cast<IndexExpr*>(node);
             String arr_type = infer_type(idx->array);
             if (is_array_type(arr_type)) return array_base_type(arr_type);
+            if (is_typed_ptr_type(arr_type)) return typed_ptr_base_type(arr_type);
             if (arr_type == "str") return String("u8");
             return String("");
         }
