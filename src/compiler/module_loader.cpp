@@ -43,6 +43,11 @@ String ModuleLoader::resolve_module_path(const char* module_name, const char* cu
     if (stat(path_buf, &st) == 0) {
         return String(path_buf);
     }
+
+    snprintf(path_buf, sizeof(path_buf), "%s/modules/%s.tick", dir.c_str(), module_name);
+    if (stat(path_buf, &st) == 0) {
+        return String(path_buf);
+    }
     
     snprintf(path_buf, sizeof(path_buf), "./%s.tick", module_name);
     if (stat(path_buf, &st) == 0) {

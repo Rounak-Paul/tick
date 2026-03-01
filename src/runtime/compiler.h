@@ -27,10 +27,13 @@ struct CodeBuffer {
 class Compiler {
 public:
     static bool compile_to_native(const char* source_file, const char* output_file, bool keep_c = false);
+    static void add_define(const char* name);
     
 private:
     static Tick::FunctionDecl* _current_func;
     static Tick::ClassDecl* _current_class;
+    static char _defines[64][128];
+    static int _define_count;
     static Tick::StmtNode* _defer_scopes[MAX_DEFER_SCOPES][MAX_DEFERS_PER_SCOPE];
     static int _defer_counts[MAX_DEFER_SCOPES];
     static int _defer_depth;
@@ -59,6 +62,9 @@ private:
     static bool is_typed_ptr_type(const Tick::String& t);
     static Tick::String typed_ptr_base_type(const Tick::String& t);
     static bool is_func_ptr_type(const Tick::String& t);
+    static bool is_fixed_array_type(const Tick::String& t);
+    static Tick::String fixed_array_base_type(const Tick::String& t);
+    static Tick::String fixed_array_size_str(const Tick::String& t);
     static void generate_typed_decl(CodeBuffer& buf, const Tick::String& tick_type, const char* name, Tick::Program* program);
     static Tick::String lookup_var_type(const Tick::String& name, Tick::Program* program);
     static void lookup_var_type_in_block(const Tick::String& name, Tick::BlockStmt* block, Tick::String& result);

@@ -180,7 +180,9 @@ bool SemanticAnalyzer::is_builtin_function(const String& name) {
            name == "file_exists" ||
            name == "free" || name == "array_length" ||
            name == "gc_collect" || name == "gc_cleanup" ||
-           name == "addr" || name == "sizeof" || name == "deref";
+           name == "addr" || name == "sizeof" || name == "deref" ||
+           name == "malloc" || name == "memset" || name == "memcpy" ||
+           name == "memcmp" || name == "memmove";
 }
 
 String SemanticAnalyzer::infer_type(ExprNode* node) {
@@ -527,7 +529,34 @@ void SemanticAnalyzer::analyze_import_decl(ImportDecl* node, Program* program) {
         return;
     }
 
+    const char* saved_path = _current_file_path;
+    String module_path = _module_loader->resolve_module_path(node->module_path.c_str(), _current_file_path);
+    if (module_path.length() > 0) {
+        _current_file_path = module_path.c_str();
+    }
+    for (size_t i = 0; i < imported_module->imports.size(); i++) {
+        if (imported_module->imports[i]) {
+            analyze_import_decl(imported_module->imports[i], imported_module);
+        }
+    }
+    _current_file_path = saved_path;
+
     if (node->import_all) {
+        for (size_t i = 0; i < imported_module->globals.size(); i++) {
+            if (imported_module->globals[i]) {
+                program->globals.push(imported_module->globals[i]);
+                imported_module->globals[i] = nullptr;
+            }
+        }
+        for (size_t i = 0; i < imported_module->extern_functions.size(); i++) {
+            if (imported_module->extern_functions[i]) {
+                program->extern_functions.push(imported_module->extern_functions[i]);
+                imported_module->extern_functions[i] = nullptr;
+            }
+        }
+        for (size_t i = 0; i < imported_module->link_flags.size(); i++) {
+            program->link_flags.push(imported_module->link_flags[i]);
+        }
         for (size_t i = 0; i < imported_module->functions.size(); i++) {
             if (imported_module->functions[i]) {
                 program->functions.push(imported_module->functions[i]);
@@ -538,6 +567,24 @@ void SemanticAnalyzer::analyze_import_decl(ImportDecl* node, Program* program) {
             if (imported_module->classes[i]) {
                 program->classes.push(imported_module->classes[i]);
                 imported_module->classes[i] = nullptr;
+            }
+        }
+        for (size_t i = 0; i < imported_module->enums.size(); i++) {
+            if (imported_module->enums[i]) {
+                program->enums.push(imported_module->enums[i]);
+                imported_module->enums[i] = nullptr;
+            }
+        }
+        for (size_t i = 0; i < imported_module->unions.size(); i++) {
+            if (imported_module->unions[i]) {
+                program->unions.push(imported_module->unions[i]);
+                imported_module->unions[i] = nullptr;
+            }
+        }
+        for (size_t i = 0; i < imported_module->interfaces.size(); i++) {
+            if (imported_module->interfaces[i]) {
+                program->interfaces.push(imported_module->interfaces[i]);
+                imported_module->interfaces[i] = nullptr;
             }
         }
         for (size_t i = 0; i < imported_module->events.size(); i++) {
@@ -552,26 +599,70 @@ void SemanticAnalyzer::analyze_import_decl(ImportDecl* node, Program* program) {
                 imported_module->signals[i] = nullptr;
             }
         }
+        for (size_t i = 0; i < imported_module->methods.size(); i++) {
+            if (imported_module->methods[i]) {
+                program->methods.push(imported_module->methods[i]);
+                imported_module->methods[i] = nullptr;
+            }
+        }
+        for (size_t i = 0; i < imported_module->processes.size(); i++) {
+            if (imported_module->processes[i]) {
+                program->processes.push(imported_module->processes[i]);
+                imported_module->processes[i] = nullptr;
+            }
+        }
     } else if (node->imported_names.size() > 0) {
         for (size_t i = 0; i < node->imported_names.size(); i++) {
             const char* name = node->imported_names[i].c_str();
             bool found = false;
-            for (size_t j = 0; j < imported_module->functions.size(); j++) {
+
+            for (size_t j = 0; !found && j < imported_module->globals.size(); j++) {
+                if (imported_module->globals[j] && strcmp(imported_module->globals[j]->name.c_str(), name) == 0) {
+                    program->globals.push(imported_module->globals[j]);
+                    imported_module->globals[j] = nullptr;
+                    found = true;
+                }
+            }
+            for (size_t j = 0; !found && j < imported_module->functions.size(); j++) {
                 if (imported_module->functions[j] && strcmp(imported_module->functions[j]->name.c_str(), name) == 0) {
                     program->functions.push(imported_module->functions[j]);
                     imported_module->functions[j] = nullptr;
                     found = true;
-                    break;
                 }
             }
-            if (!found) {
-                for (size_t j = 0; j < imported_module->classes.size(); j++) {
-                    if (imported_module->classes[j] && strcmp(imported_module->classes[j]->name.c_str(), name) == 0) {
-                        program->classes.push(imported_module->classes[j]);
-                        imported_module->classes[j] = nullptr;
-                        found = true;
-                        break;
-                    }
+            for (size_t j = 0; !found && j < imported_module->extern_functions.size(); j++) {
+                if (imported_module->extern_functions[j] && strcmp(imported_module->extern_functions[j]->name.c_str(), name) == 0) {
+                    program->extern_functions.push(imported_module->extern_functions[j]);
+                    imported_module->extern_functions[j] = nullptr;
+                    found = true;
+                }
+            }
+            for (size_t j = 0; !found && j < imported_module->classes.size(); j++) {
+                if (imported_module->classes[j] && strcmp(imported_module->classes[j]->name.c_str(), name) == 0) {
+                    program->classes.push(imported_module->classes[j]);
+                    imported_module->classes[j] = nullptr;
+                    found = true;
+                }
+            }
+            for (size_t j = 0; !found && j < imported_module->enums.size(); j++) {
+                if (imported_module->enums[j] && strcmp(imported_module->enums[j]->name.c_str(), name) == 0) {
+                    program->enums.push(imported_module->enums[j]);
+                    imported_module->enums[j] = nullptr;
+                    found = true;
+                }
+            }
+            for (size_t j = 0; !found && j < imported_module->unions.size(); j++) {
+                if (imported_module->unions[j] && strcmp(imported_module->unions[j]->name.c_str(), name) == 0) {
+                    program->unions.push(imported_module->unions[j]);
+                    imported_module->unions[j] = nullptr;
+                    found = true;
+                }
+            }
+            for (size_t j = 0; !found && j < imported_module->interfaces.size(); j++) {
+                if (imported_module->interfaces[j] && strcmp(imported_module->interfaces[j]->name.c_str(), name) == 0) {
+                    program->interfaces.push(imported_module->interfaces[j]);
+                    imported_module->interfaces[j] = nullptr;
+                    found = true;
                 }
             }
             if (!found) {

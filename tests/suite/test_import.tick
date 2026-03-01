@@ -1,0 +1,71 @@
+from test_import_module import *;
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Import Test ===");
+
+    if (MOD_CONST_A == 42) {
+        println("PASS: imported const i32");
+        pass = pass + 1;
+    } else {
+        println("FAIL: imported const i32");
+        fail = fail + 1;
+    }
+
+    if (MOD_CONST_B == "hello from module") {
+        println("PASS: imported const str");
+        pass = pass + 1;
+    } else {
+        println("FAIL: imported const str");
+        fail = fail + 1;
+    }
+
+    if (mod_add(10, 32) == 42) {
+        println("PASS: imported function call");
+        pass = pass + 1;
+    } else {
+        println("FAIL: imported function call");
+        fail = fail + 1;
+    }
+
+    if (mod_greet("world") == "Hi, world!") {
+        println("PASS: imported function string result");
+        pass = pass + 1;
+    } else {
+        println("FAIL: imported function string result");
+        fail = fail + 1;
+    }
+
+    if (mod_color_name(0) == "Red") {
+        println("PASS: imported function with switch");
+        pass = pass + 1;
+    } else {
+        println("FAIL: imported function with switch");
+        fail = fail + 1;
+    }
+
+    var pt : ModPoint;
+    pt.x = 3.0;
+    pt.y = 4.0;
+    if (pt.x == 3.0 && pt.y == 4.0) {
+        println("PASS: imported @dataclass");
+        pass = pass + 1;
+    } else {
+        println("FAIL: imported @dataclass");
+        fail = fail + 1;
+    }
+
+    var c : i32 = ModColor.Green;
+    if (c == 1) {
+        println("PASS: imported enum value");
+        pass = pass + 1;
+    } else {
+        println("FAIL: imported enum value");
+        fail = fail + 1;
+    }
+
+    println("=== Results: " + to_str(pass) + " passed, " + to_str(fail) + " failed ===");
+    return fail;
+}

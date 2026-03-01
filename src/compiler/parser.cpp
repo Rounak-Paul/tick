@@ -112,15 +112,31 @@ Token Parser::parse_type() {
         
         if (check(TokenType::LBRACKET)) {
             advance();
-            consume(TokenType::RBRACKET, "Expected ']' after '['");
-            size_t base_len = type_token.lexeme.length();
-            char* array_type = (char*)malloc(base_len + 3);
-            memcpy(array_type, type_token.lexeme.c_str(), base_len);
-            array_type[base_len] = '[';
-            array_type[base_len + 1] = ']';
-            array_type[base_len + 2] = '\0';
-            type_token.lexeme = String(array_type);
-            free(array_type);
+            if (check(TokenType::INTEGER)) {
+                Token size_tok = current_token();
+                advance();
+                consume(TokenType::RBRACKET, "Expected ']' after array size");
+                size_t base_len = type_token.lexeme.length();
+                size_t size_len = size_tok.lexeme.length();
+                char* array_type = (char*)malloc(base_len + size_len + 3);
+                memcpy(array_type, type_token.lexeme.c_str(), base_len);
+                array_type[base_len] = '[';
+                memcpy(array_type + base_len + 1, size_tok.lexeme.c_str(), size_len);
+                array_type[base_len + 1 + size_len] = ']';
+                array_type[base_len + 2 + size_len] = '\0';
+                type_token.lexeme = String(array_type);
+                free(array_type);
+            } else {
+                consume(TokenType::RBRACKET, "Expected ']' after '['");
+                size_t base_len = type_token.lexeme.length();
+                char* array_type = (char*)malloc(base_len + 3);
+                memcpy(array_type, type_token.lexeme.c_str(), base_len);
+                array_type[base_len] = '[';
+                array_type[base_len + 1] = ']';
+                array_type[base_len + 2] = '\0';
+                type_token.lexeme = String(array_type);
+                free(array_type);
+            }
         }
         
         return type_token;
@@ -134,50 +150,7 @@ Program* Parser::parse() {
     Program* program = new Program();
     
     while (!check(TokenType::END_OF_FILE)) {
-        if (check(TokenType::IMPORT) || check(TokenType::FROM)) {
-            program->imports.push(parse_import_decl());
-        }
-        else if (check(TokenType::VAR) || check(TokenType::CONST)) {
-            program->globals.push((VarDecl*)parse_var_decl());
-        }
-        else if (check(TokenType::EVENT)) {
-            program->events.push(parse_event_decl());
-        }
-        else if (check(TokenType::SIGNAL)) {
-            program->signals.push(parse_signal_decl());
-        }
-        else if (check(TokenType::DATACLASS)) {
-            advance();
-            parse_class_decl(program, true);
-        }
-        else if (check(TokenType::AT)) {
-            program->processes.push(parse_process_decl());
-        }
-        else if (check(TokenType::CLASS)) {
-            parse_class_decl(program);
-        }
-        else if (check(TokenType::FUNC)) {
-            program->functions.push(parse_function_decl());
-        }
-        else if (check(TokenType::ENUM)) {
-            program->enums.push(parse_enum_decl());
-        }
-        else if (check(TokenType::UNION)) {
-            program->unions.push(parse_union_decl());
-        }
-        else if (check(TokenType::INTERFACE)) {
-            parse_interface_decl(program);
-        }
-        else if (check(TokenType::EXTERN)) {
-            program->extern_functions.push(parse_extern_func_decl());
-        }
-        else if (check(TokenType::LINK)) {
-            advance();
-            Token flag = consume(TokenType::STRING, "Expected string after 'link'");
-            consume(TokenType::SEMICOLON, "Expected ';' after link directive");
-            program->link_flags.push(flag.lexeme);
-        }
-        else {
+        if (!parse_top_level_decl(program)) {
             fprintf(stderr, "Parse error at line %d: Unexpected token at top level\n", current_token().line);
             exit(1);
         }
@@ -1263,6 +1236,113 @@ StmtNode* Parser::parse_throw_stmt() {
     ThrowStmt* stmt = new ThrowStmt(value);
     stmt->line = ln;
     return stmt;
+}
+
+void Parser::add_define(const char* name) {
+    _defines.push(String(name));
+}
+
+bool Parser::has_define(const char* name) const {
+    for (size_t i = 0; i < _defines.size(); i++) {
+        if (_defines[i] == name) return true;
+    }
+    return false;
+}
+
+void Parser::skip_to_matching_brace() {
+    int depth = 1;
+    while (!check(TokenType::END_OF_FILE)) {
+        if (check(TokenType::LBRACE)) depth++;
+        else if (check(TokenType::RBRACE)) {
+            depth--;
+            if (depth == 0) { advance(); return; }
+        }
+        advance();
+    }
+}
+
+bool Parser::parse_top_level_decl(Program* program) {
+    if (check(TokenType::IMPORT) || check(TokenType::FROM)) {
+        program->imports.push(parse_import_decl());
+    } else if (check(TokenType::VAR) || check(TokenType::CONST)) {
+        program->globals.push((VarDecl*)parse_var_decl());
+    } else if (check(TokenType::EVENT)) {
+        program->events.push(parse_event_decl());
+    } else if (check(TokenType::SIGNAL)) {
+        program->signals.push(parse_signal_decl());
+    } else if (check(TokenType::DATACLASS)) {
+        advance();
+        parse_class_decl(program, true);
+    } else if (check(TokenType::AT)) {
+        if (peek_token(1).type == TokenType::IF) {
+            parse_conditional_compile(program);
+        } else {
+            program->processes.push(parse_process_decl());
+        }
+    } else if (check(TokenType::CLASS)) {
+        parse_class_decl(program);
+    } else if (check(TokenType::FUNC)) {
+        program->functions.push(parse_function_decl());
+    } else if (check(TokenType::ENUM)) {
+        program->enums.push(parse_enum_decl());
+    } else if (check(TokenType::UNION)) {
+        program->unions.push(parse_union_decl());
+    } else if (check(TokenType::INTERFACE)) {
+        parse_interface_decl(program);
+    } else if (check(TokenType::EXTERN)) {
+        program->extern_functions.push(parse_extern_func_decl());
+    } else if (check(TokenType::LINK)) {
+        advance();
+        Token flag = consume(TokenType::STRING, "Expected string after 'link'");
+        consume(TokenType::SEMICOLON, "Expected ';' after link directive");
+        program->link_flags.push(flag.lexeme);
+    } else {
+        return false;
+    }
+    return true;
+}
+
+void Parser::parse_conditional_compile(Program* program) {
+    consume(TokenType::AT, "Expected '@'");
+    consume(TokenType::IF, "Expected 'if' after '@'");
+    consume(TokenType::LPAREN, "Expected '(' after '@if'");
+    Token define_name = consume(TokenType::IDENTIFIER, "Expected define name");
+    consume(TokenType::RPAREN, "Expected ')' after define name");
+    consume(TokenType::LBRACE, "Expected '{' after '@if(...)'");
+
+    bool active = has_define(define_name.lexeme.c_str());
+
+    if (active) {
+        while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
+            if (!parse_top_level_decl(program)) {
+                fprintf(stderr, "Parse error at line %d: Unexpected token inside @if block\n",
+                        current_token().line);
+                exit(1);
+            }
+        }
+        consume(TokenType::RBRACE, "Expected '}' to close @if block");
+    } else {
+        skip_to_matching_brace();
+    }
+
+    if (check(TokenType::AT) && peek_token(1).type == TokenType::ELSE) {
+        consume(TokenType::AT, "Expected '@'");
+        consume(TokenType::ELSE, "Expected 'else' after '@'");
+        consume(TokenType::LBRACE, "Expected '{' after '@else'");
+
+        if (!active) {
+            while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
+                if (!parse_top_level_decl(program)) {
+                    fprintf(stderr, "Parse error at line %d: Unexpected token inside @else block\n",
+                            current_token().line);
+                    exit(1);
+                }
+            }
+            consume(TokenType::RBRACE, "Expected '}' to close @else block");
+        } else {
+            skip_to_matching_brace();
+        }
+    }
 }
 
 }
