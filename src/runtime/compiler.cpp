@@ -27,6 +27,8 @@ RaiiEntry Compiler::_raii_scopes[MAX_DEFER_SCOPES][MAX_RAII_PER_SCOPE] = {};
 int Compiler::_raii_counts[MAX_DEFER_SCOPES] = {};
 String Compiler::_array_scopes[MAX_DEFER_SCOPES][MAX_ARRAYS_PER_SCOPE] = {};
 int Compiler::_array_counts[MAX_DEFER_SCOPES] = {};
+int Compiler::_loop_scope_stack[MAX_LOOP_DEPTH] = {};
+int Compiler::_loop_depth = 0;
 
 bool Compiler::is_string_type(ExprNode* expr, Program* program) {
     return infer_expr_type(expr, program) == "str";
@@ -119,6 +121,27 @@ void Compiler::generate_deferred(CodeBuffer& buf, int indent, Program* program) 
     int count = _defer_counts[_defer_depth];
     for (int i = count - 1; i >= 0; i--) {
         generate_statement(buf, _defer_scopes[_defer_depth][i], indent, program);
+    }
+}
+
+void Compiler::generate_deferred_to_depth(CodeBuffer& buf, int indent, Program* program, int target_depth) {
+    for (int s = _defer_depth; s >= target_depth; s--) {
+        int rc = _raii_counts[s];
+        for (int i = rc - 1; i >= 0; i--) {
+            RaiiEntry& entry = _raii_scopes[s][i];
+            for (int t = 0; t < indent; t++) buf.append("    ");
+            buf.append("if (%s) { %s_dtor(%s); free(%s); %s = NULL; }\n", entry.var_name.c_str(), entry.class_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str(), entry.var_name.c_str());
+        }
+        int ac = _array_counts[s];
+        for (int i = ac - 1; i >= 0; i--) {
+            const char* n = _array_scopes[s][i].c_str();
+            for (int t = 0; t < indent; t++) buf.append("    ");
+            buf.append("if (%s.ptr) { free(%s.ptr); %s.ptr = NULL; }\n", n, n, n);
+        }
+        int count = _defer_counts[s];
+        for (int i = count - 1; i >= 0; i--) {
+            generate_statement(buf, _defer_scopes[s][i], indent, program);
+        }
     }
 }
 
@@ -1265,6 +1288,7 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
             buf.append(") {\n");
 
             push_defer_scope();
+            _loop_scope_stack[_loop_depth++] = _defer_depth;
             if (while_stmt->body->type == AstNodeType::BLOCK_STMT) {
                 BlockStmt* block = static_cast<BlockStmt*>(while_stmt->body);
                 for (size_t i = 0; i < block->statements.size(); i++) {
@@ -1274,6 +1298,7 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
                 generate_statement(buf, while_stmt->body, indent + 1, program);
             }
             generate_deferred(buf, indent + 1, program);
+            _loop_depth--;
             pop_defer_scope();
 
             for (int i = 0; i < indent; i++) buf.append("    ");
@@ -1313,6 +1338,7 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
             buf.append(") {\n");
 
             push_defer_scope();
+            _loop_scope_stack[_loop_depth++] = _defer_depth;
             if (for_stmt->body->type == AstNodeType::BLOCK_STMT) {
                 BlockStmt* block = static_cast<BlockStmt*>(for_stmt->body);
                 for (size_t i = 0; i < block->statements.size(); i++) {
@@ -1322,6 +1348,7 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
                 generate_statement(buf, for_stmt->body, indent + 1, program);
             }
             generate_deferred(buf, indent + 1, program);
+            _loop_depth--;
             pop_defer_scope();
 
             for (int i = 0; i < indent; i++) buf.append("    ");
@@ -1330,12 +1357,18 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
         }
 
         case AstNodeType::BREAK_STMT: {
+            if (_loop_depth > 0) {
+                generate_deferred_to_depth(buf, indent, program, _loop_scope_stack[_loop_depth - 1]);
+            }
             for (int i = 0; i < indent; i++) buf.append("    ");
             buf.append("break;\n");
             break;
         }
 
         case AstNodeType::CONTINUE_STMT: {
+            if (_loop_depth > 0) {
+                generate_deferred_to_depth(buf, indent, program, _loop_scope_stack[_loop_depth - 1]);
+            }
             for (int i = 0; i < indent; i++) buf.append("    ");
             buf.append("continue;\n");
             break;

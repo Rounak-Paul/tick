@@ -8,6 +8,7 @@
 #define MAX_DEFERS_PER_SCOPE 64
 #define MAX_RAII_PER_SCOPE 32
 #define MAX_ARRAYS_PER_SCOPE 64
+#define MAX_LOOP_DEPTH 32
 
 struct RaiiEntry {
     Tick::String var_name;
@@ -44,6 +45,8 @@ private:
     static int _raii_counts[MAX_DEFER_SCOPES];
     static Tick::String _array_scopes[MAX_DEFER_SCOPES][MAX_ARRAYS_PER_SCOPE];
     static int _array_counts[MAX_DEFER_SCOPES];
+    static int _loop_scope_stack[MAX_LOOP_DEPTH];
+    static int _loop_depth;
 
     static Tick::String generate_c_code(Tick::Program* program);
     static void generate_process(CodeBuffer& buf, Tick::ProcessDecl* proc, Tick::Program* program);
@@ -52,6 +55,7 @@ private:
     static void generate_expression(CodeBuffer& buf, Tick::ExprNode* expr, Tick::Program* program);
     static void generate_print_arg(CodeBuffer& buf, Tick::ExprNode* arg, Tick::Program* program);
     static void generate_deferred(CodeBuffer& buf, int indent, Tick::Program* program);
+    static void generate_deferred_to_depth(CodeBuffer& buf, int indent, Tick::Program* program, int target_depth);
     static void generate_all_deferred(CodeBuffer& buf, int indent, Tick::Program* program);
     static void generate_raii_cleanup(CodeBuffer& buf, int indent, Tick::Program* program);
     static void generate_all_raii_cleanup(CodeBuffer& buf, int indent, Tick::Program* program);
