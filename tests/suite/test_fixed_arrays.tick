@@ -1,0 +1,147 @@
+@dataclass
+class FixedBuf {
+    var magic   : u32;
+    var payload : u8[8];
+    var count   : i32;
+}
+
+@dataclass
+class NamedRecord {
+    var id   : u32;
+    var name : u8[16];
+    var age  : u32;
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Fixed-Size Array Test ===");
+
+    var fb : FixedBuf;
+    fb.magic   = 12345;
+    fb.count   = 5;
+    fb.payload[0] = 10;
+    fb.payload[1] = 20;
+    fb.payload[2] = 30;
+    fb.payload[3] = 40;
+    fb.payload[4] = 50;
+
+    if (fb.magic == 12345) {
+        println("PASS: @dataclass fixed-array struct magic field");
+        pass = pass + 1;
+    } else {
+        println("FAIL: @dataclass fixed-array struct magic field");
+        fail = fail + 1;
+    }
+
+    if (fb.count == 5) {
+        println("PASS: @dataclass fixed-array struct count field");
+        pass = pass + 1;
+    } else {
+        println("FAIL: @dataclass fixed-array struct count field");
+        fail = fail + 1;
+    }
+
+    if (fb.payload[0] == 10) {
+        println("PASS: @dataclass fixed-array element [0]");
+        pass = pass + 1;
+    } else {
+        println("FAIL: @dataclass fixed-array element [0]");
+        fail = fail + 1;
+    }
+
+    if (fb.payload[4] == 50) {
+        println("PASS: @dataclass fixed-array element [4]");
+        pass = pass + 1;
+    } else {
+        println("FAIL: @dataclass fixed-array element [4]");
+        fail = fail + 1;
+    }
+
+    var rec : NamedRecord;
+    rec.id  = 42;
+    rec.age = 30;
+    rec.name[0] = 65;
+    rec.name[1] = 108;
+    rec.name[2] = 105;
+    rec.name[3] = 99;
+    rec.name[4] = 101;
+    rec.name[5] = 0;
+
+    if (rec.id == 42) {
+        println("PASS: NamedRecord id");
+        pass = pass + 1;
+    } else {
+        println("FAIL: NamedRecord id");
+        fail = fail + 1;
+    }
+
+    if (rec.age == 30) {
+        println("PASS: NamedRecord age");
+        pass = pass + 1;
+    } else {
+        println("FAIL: NamedRecord age");
+        fail = fail + 1;
+    }
+
+    if (rec.name[0] == 65) {
+        println("PASS: NamedRecord name[0] = 'A'");
+        pass = pass + 1;
+    } else {
+        println("FAIL: NamedRecord name[0] = 'A'");
+        fail = fail + 1;
+    }
+
+    var local_buf : u8[16];
+    local_buf[0] = 255;
+    local_buf[1] = 128;
+    local_buf[15] = 7;
+
+    if (local_buf[0] == 255) {
+        println("PASS: local fixed-size array [0]");
+        pass = pass + 1;
+    } else {
+        println("FAIL: local fixed-size array [0]");
+        fail = fail + 1;
+    }
+
+    if (local_buf[1] == 128) {
+        println("PASS: local fixed-size array [1]");
+        pass = pass + 1;
+    } else {
+        println("FAIL: local fixed-size array [1]");
+        fail = fail + 1;
+    }
+
+    if (local_buf[15] == 7) {
+        println("PASS: local fixed-size array last element");
+        pass = pass + 1;
+    } else {
+        println("FAIL: local fixed-size array last element");
+        fail = fail + 1;
+    }
+
+    var int_buf : i32[4];
+    int_buf[0] = -1000;
+    int_buf[3] = 999;
+
+    if (int_buf[0] == -1000) {
+        println("PASS: i32 fixed-size array negative value");
+        pass = pass + 1;
+    } else {
+        println("FAIL: i32 fixed-size array negative value");
+        fail = fail + 1;
+    }
+
+    if (int_buf[3] == 999) {
+        println("PASS: i32 fixed-size array positive value");
+        pass = pass + 1;
+    } else {
+        println("FAIL: i32 fixed-size array positive value");
+        fail = fail + 1;
+    }
+
+    println("=== Results: " + to_str(pass) + " passed, " + to_str(fail) + " failed ===");
+    return fail;
+}

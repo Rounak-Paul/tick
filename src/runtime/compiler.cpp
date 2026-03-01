@@ -16,6 +16,8 @@ using namespace Tick;
 
 FunctionDecl* Compiler::_current_func = nullptr;
 ClassDecl* Compiler::_current_class = nullptr;
+char Compiler::_defines[64][128] = {};
+int Compiler::_define_count = 0;
 StmtNode* Compiler::_defer_scopes[MAX_DEFER_SCOPES][MAX_DEFERS_PER_SCOPE] = {};
 int Compiler::_defer_counts[MAX_DEFER_SCOPES] = {};
 int Compiler::_defer_depth = -1;
@@ -25,6 +27,34 @@ int Compiler::_raii_counts[MAX_DEFER_SCOPES] = {};
 
 bool Compiler::is_string_type(ExprNode* expr, Program* program) {
     return infer_expr_type(expr, program) == "str";
+}
+
+void Compiler::add_define(const char* name) {
+    if (_define_count < 64) {
+        snprintf(_defines[_define_count], 128, "%s", name);
+        _define_count++;
+    }
+}
+
+bool Compiler::is_fixed_array_type(const String& t) {
+    int len = (int)t.length();
+    if (len < 4) return false;
+    if (t[len - 1] != ']') return false;
+    int i = len - 2;
+    while (i > 0 && t[i] >= '0' && t[i] <= '9') i--;
+    return t[i] == '[' && i > 0 && i < len - 2;
+}
+
+String Compiler::fixed_array_base_type(const String& t) {
+    int i = (int)t.length() - 1;
+    while (i > 0 && t[i] != '[') i--;
+    return String(t.c_str(), i);
+}
+
+String Compiler::fixed_array_size_str(const String& t) {
+    int i = (int)t.length() - 1;
+    while (i > 0 && t[i] != '[') i--;
+    return String(t.c_str() + i + 1, t.length() - i - 2);
 }
 
 bool Compiler::is_array_type_str(const String& t) {
@@ -429,6 +459,9 @@ String Compiler::infer_expr_type(ExprNode* expr, Program* program) {
                 arr_type[arr_type.length() - 2] == '[' && arr_type[arr_type.length() - 1] == ']') {
                 return String(arr_type.c_str(), arr_type.length() - 2);
             }
+            if (is_fixed_array_type(arr_type)) {
+                return fixed_array_base_type(arr_type);
+            }
             if (is_typed_ptr_type(arr_type)) {
                 return typed_ptr_base_type(arr_type);
             }
@@ -506,6 +539,12 @@ void Compiler::tick_type_to_c_type(const String& tick_type, Program* program, ch
         return;
     }
 
+    if (is_fixed_array_type(tick_type)) {
+        String base = fixed_array_base_type(tick_type);
+        tick_type_to_c_type(base, program, out, out_size);
+        return;
+    }
+
     if (tick_type.length() > 2 && tick_type[tick_type.length() - 2] == '[' && tick_type[tick_type.length() - 1] == ']') {
         String base_type(tick_type.c_str(), tick_type.length() - 2);
         char base_c[128];
@@ -543,6 +582,14 @@ void Compiler::tick_type_to_c_type(const String& tick_type, Program* program, ch
 }
 
 void Compiler::generate_typed_decl(CodeBuffer& buf, const String& tick_type, const char* name, Program* program) {
+    if (is_fixed_array_type(tick_type)) {
+        String base = fixed_array_base_type(tick_type);
+        String size = fixed_array_size_str(tick_type);
+        char c_base[128];
+        tick_type_to_c_type(base, program, c_base, sizeof(c_base));
+        buf.append("%s %s[%s]", c_base, name, size.c_str());
+        return;
+    }
     if (is_func_ptr_type(tick_type)) {
         const char* s = tick_type.c_str();
         int paren_start = 4;
@@ -608,6 +655,9 @@ bool Compiler::compile_to_native(const char* source_file, const char* output_fil
     DynamicArray<Token> tokens = lexer.tokenize();
 
     Parser parser(tokens);
+    for (int i = 0; i < _define_count; i++) {
+        parser.add_define(_defines[i]);
+    }
     Program* program = parser.parse();
 
     if (!program) {
@@ -789,6 +839,12 @@ String Compiler::generate_c_code(Program* program) {
 
     for (size_t i = 0; i < program->extern_functions.size(); i++) {
         ExternFuncDecl* ef = program->extern_functions[i];
+        const char* n = ef->name.c_str();
+        if (strcmp(n, "malloc") == 0 || strcmp(n, "free") == 0 ||
+            strcmp(n, "memset") == 0 || strcmp(n, "memcpy") == 0 ||
+            strcmp(n, "memcmp") == 0 || strcmp(n, "memmove") == 0) {
+            continue;
+        }
         char ret_type[128];
         tick_type_to_c_type(ef->return_type, program, ret_type, sizeof(ret_type));
         buf.append("%s %s(", ret_type, ef->name.c_str());
@@ -1071,7 +1127,7 @@ void Compiler::generate_statement(CodeBuffer& buf, StmtNode* stmt, int indent, P
                         buf.append(" = NULL");
                     } else if (decl->type_name == "ptr" || is_typed_ptr_type(decl->type_name) || is_func_ptr_type(decl->type_name)) {
                         buf.append(" = NULL");
-                    } else if (is_union_type || is_class_type) {
+                    } else if (is_fixed_array_type(decl->type_name) || is_union_type || is_class_type) {
                         buf.append(" = {0}");
                     } else {
                         buf.append(" = 0");

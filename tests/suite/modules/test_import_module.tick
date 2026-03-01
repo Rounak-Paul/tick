@@ -1,0 +1,32 @@
+const MOD_CONST_A : i32 = 42;
+const MOD_CONST_B : str = "hello from module";
+
+enum ModColor {
+    Red,
+    Green,
+    Blue
+}
+
+@dataclass
+class ModPoint {
+    var x : f64;
+    var y : f64;
+}
+
+func mod_add(a : i32, b : i32) : i32 {
+    return a + b;
+}
+
+func mod_greet(name : str) : str {
+    return "Hi, " + name + "!";
+}
+
+func mod_color_name(c : i32) : str {
+    switch (c) {
+        case 0: return "Red";
+        case 1: return "Green";
+        case 2: return "Blue";
+        default: return "Unknown";
+    }
+}
+

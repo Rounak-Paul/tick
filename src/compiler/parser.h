@@ -11,10 +11,13 @@ class Parser {
 public:
     Parser(const DynamicArray<Token>& tokens);
     Program* parse();
+    void add_define(const char* name);
+    bool has_define(const char* name) const;
 
 private:
     const DynamicArray<Token>& _tokens;
     size_t _current;
+    DynamicArray<String> _defines;
     
     Token current_token();
     Token peek_token(int offset = 1);
@@ -67,6 +70,9 @@ private:
     
     bool is_type_keyword();
     Token parse_type();
+    bool parse_top_level_decl(Program* program);
+    void skip_to_matching_brace();
+    void parse_conditional_compile(Program* program);
 };
 
 }

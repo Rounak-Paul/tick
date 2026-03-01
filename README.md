@@ -17,6 +17,8 @@ This produces `./build/tick`.
 ./build/tick source.tick                # compiles to ./a.out
 ./build/tick source.tick -o myprogram   # custom output name
 ./build/tick source.tick --keep-c       # keep the generated .c file
+./build/tick source.tick -D MACOS       # define a compile-time symbol
+./build/tick source.tick -DMACOS        # same, no space form
 ```
 
 The compiler pipeline: **Tick source → Lexer → Parser → Semantic Analyzer → C codegen → GCC (`gcc -O2 ... -pthread -lm`)**.
@@ -106,6 +108,7 @@ func main() : i32 {
 | `ptr<T>` | `T*` | pointer | Typed pointer to `T` |
 | `void` | `void` | — | No return value |
 | `T[]` | `T*` | pointer | Dynamic array of `T` |
+| `T[N]` | `T name[N]` | inline | Fixed-size inline array of `T` (value, not pointer) |
 | `func(A, B) : R` | `R (*)(A, B)` | pointer | Function pointer type |
 
 Numeric types are implicitly convertible between each other. Explicit conversion uses `cast()`.
@@ -351,6 +354,37 @@ var points : Vec2[] = [v1, v2, v3];
 var strs : str[] = ["a", "b", "c"];
 points[0].x = 10.0;
 ```
+
+#### Fixed-Size Inline Arrays
+
+The `type[N]` syntax declares a fixed-size C array embedded by value. These can appear as `@dataclass` fields (preserving exact C struct layout for FFI) or as local variables.
+
+```
+var buf : u8[64];         // stack-allocated 64-byte buffer
+buf[0] = 255;
+buf[63] = 1;
+
+var ints : i32[4];
+ints[0] = -1;
+ints[3] = 999;
+```
+
+In a `@dataclass` this maps directly to the C struct field, making struct layouts ABI-compatible with C libraries:
+
+```
+@dataclass
+class VkPhysicalDeviceProperties {
+    var apiVersion        : u32;
+    var driverVersion     : u32;
+    var vendorID          : u32;
+    var deviceID          : u32;
+    var deviceType        : u32;
+    var deviceName        : u8[256];          // char deviceName[256]
+    var pipelineCacheUUID : u8[16];           // uint8_t pipelineCacheUUID[16]
+}
+```
+
+Fixed-size arrays are **not** dynamic — they have no `.push()`, `.pop()`, or `.length()`. They are zero-initialised by default.
 
 ---
 
@@ -970,6 +1004,39 @@ Block comments using `/* ... */`. These can be single-line, multi-line, or inlin
 
 ---
 
+### Conditional Compilation
+
+Use `@if(DEFINE)` / `@else` blocks to include or exclude top-level declarations at compile time. Define symbols on the command line with `-D` or `-DNAME`.
+
+```
+@if(MACOS) {
+    link "-lMoltenVK";
+    const PORTABILITY_EXT : str = "VK_KHR_portability_enumeration";
+} @else {
+    const PORTABILITY_EXT : str = "";
+}
+
+@if(DEBUG) {
+    func log(msg : str) : void { println("[DEBUG] " + msg); }
+} @else {
+    func log(msg : str) : void { }
+}
+```
+
+Compile:
+
+```bash
+tick src.tick -DMACOS -DDEBUG -o out
+tick src.tick -D MACOS -D DEBUG -o out   # space form also accepted
+```
+
+- Both the `@if` and `@else` blocks may contain any number of top-level declarations (functions, consts, classes, extern declarations, link directives, etc.).
+- `@else` is optional.
+- Nesting is not supported.
+- Only a single identifier is tested — there are no `&&`/`||` combinator expressions.
+
+---
+
 ### Builtin Functions Reference
 
 #### I/O
@@ -1014,8 +1081,13 @@ Block comments using `/* ... */`. These can be single-line, multi-line, or inlin
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `addr(x)` | `T → ptr<T>` | Address of variable |
-| `deref(p)` | `ptr<T> → T` | Dereference typed pointer |
-| `free(x)` | `any → void` | Free allocated memory |
+| `deref(p)` | `ptr<T> → T` | Dereference typed pointer (rvalue and lvalue) |
+| `free(x)` | `any → void` | Free GC-managed memory |
+| `malloc(n)` | `u64 → ptr` | Allocate `n` bytes (raw, unmanaged) |
+| `memset(dst, c, n)` | `ptr, i32, u64 → ptr` | Fill memory with byte value |
+| `memcpy(dst, src, n)` | `ptr, ptr, u64 → ptr` | Copy `n` bytes (no overlap) |
+| `memmove(dst, src, n)` | `ptr, ptr, u64 → ptr` | Copy `n` bytes (overlap-safe) |
+| `memcmp(a, b, n)` | `ptr, ptr, u64 → i32` | Compare `n` bytes (0 = equal) |
 | `gc_collect()` | `→ void` | Trigger garbage collection |
 | `gc_cleanup()` | `→ void` | Final GC cleanup |
 
@@ -1116,7 +1188,8 @@ func main() : i32 {
 ```
 program        → (import | link | global_var | const | extern_func |
                    class | dataclass | enum | union | interface |
-                   event | signal | process | function)*
+                   event | signal | process | function |
+                   conditional_compile)*
 
 import         → "import" IDENTIFIER ";"
                | "from" IDENTIFIER "import" ("*" | IDENTIFIER ("," IDENTIFIER)*) ";"
@@ -1150,13 +1223,18 @@ signal         → "signal" IDENTIFIER ("[" INTEGER "]")? ":" type ";"
 event          → "event" IDENTIFIER ";"
 process        → "@" IDENTIFIER "process" IDENTIFIER block
 
+conditional_compile
+               → "@" "if" "(" IDENTIFIER ")" "{" program_decl* "}"
+                   ("@" "else" "{" program_decl* "}")?
+
 type           → "i8" | "i16" | "i32" | "i64"
                | "u8" | "u16" | "u32" | "u64"
                | "f32" | "f64" | "b8" | "str"
                | "void" | "ptr" | "ptr" "<" type ">"
                | "func" "(" type_list? ")" ":" type
                | IDENTIFIER
-               | type "[]"
+               | type "[" "]"
+               | type "[" INTEGER "]"
 
 block          → "{" statement* "}"
 

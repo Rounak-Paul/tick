@@ -16,11 +16,10 @@ public:
     Program* load_module(const char* module_name, const char* current_file_path);
     bool is_module_loaded(const char* module_name);
     Program* get_loaded_module(const char* module_name);
-    
+    String resolve_module_path(const char* module_name, const char* current_file_path);
+
 private:
     HashMap<const char*, Program*> _loaded_modules;
-    
-    String resolve_module_path(const char* module_name, const char* current_file_path);
     char* read_file(const char* path);
     Program* parse_module(const char* path);
 };

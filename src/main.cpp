@@ -4,7 +4,7 @@
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        fprintf(stderr, "Usage: tick <source.tick> [-o output] [--keep-c]\n");
+        fprintf(stderr, "Usage: tick <source.tick> [-o output] [--keep-c] [-D DEFINE]\n");
         return 1;
     }
     
@@ -18,6 +18,12 @@ int main(int argc, char** argv) {
             i++;
         } else if (strcmp(argv[i], "--keep-c") == 0) {
             keep_c = true;
+        } else if (strncmp(argv[i], "-D", 2) == 0) {
+            const char* define_name = argv[i] + 2;
+            if (*define_name == '\0' && i + 1 < argc) {
+                define_name = argv[++i];
+            }
+            Compiler::add_define(define_name);
         }
     }
     

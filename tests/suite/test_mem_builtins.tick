@@ -1,0 +1,93 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Memory Builtins Test ===");
+
+    var buf1 : ptr = malloc(64);
+    if (buf1 != null) {
+        println("PASS: malloc returns non-null");
+        pass = pass + 1;
+    } else {
+        println("FAIL: malloc returns non-null");
+        fail = fail + 1;
+    }
+
+    var res : ptr = memset(buf1, 0, 64);
+    var p : ptr<u8> = cast(buf1, ptr<u8>);
+    if (deref(p) == 0 && deref(p + 31) == 0) {
+        println("PASS: memset zeroes memory");
+        pass = pass + 1;
+    } else {
+        println("FAIL: memset zeroes memory");
+        fail = fail + 1;
+    }
+
+    var src : ptr = malloc(8);
+    var ps : ptr<u8> = cast(src, ptr<u8>);
+    deref(ps)       = 1;
+    deref(ps + 1)   = 2;
+    deref(ps + 2)   = 3;
+    deref(ps + 3)   = 4;
+    deref(ps + 4)   = 5;
+    deref(ps + 5)   = 6;
+    deref(ps + 6)   = 7;
+    deref(ps + 7)   = 8;
+
+    var dst : ptr = malloc(8);
+    memcpy(dst, src, 8);
+    var pd : ptr<u8> = cast(dst, ptr<u8>);
+    if (deref(pd) == 1 && deref(pd + 3) == 4 && deref(pd + 7) == 8) {
+        println("PASS: memcpy copies bytes correctly");
+        pass = pass + 1;
+    } else {
+        println("FAIL: memcpy copies bytes correctly");
+        fail = fail + 1;
+    }
+
+    var cmp_eq : i32 = memcmp(src, dst, 8);
+    if (cmp_eq == 0) {
+        println("PASS: memcmp equal buffers returns 0");
+        pass = pass + 1;
+    } else {
+        println("FAIL: memcmp equal buffers returns 0");
+        fail = fail + 1;
+    }
+
+    deref(ps) = 99;
+    var cmp_ne : i32 = memcmp(src, dst, 8);
+    if (cmp_ne != 0) {
+        println("PASS: memcmp unequal buffers returns non-zero");
+        pass = pass + 1;
+    } else {
+        println("FAIL: memcmp unequal buffers returns non-zero");
+        fail = fail + 1;
+    }
+
+    var mv_buf : ptr = malloc(16);
+    var pmv : ptr<u8> = cast(mv_buf, ptr<u8>);
+    deref(pmv)     = 10;
+    deref(pmv + 1) = 20;
+    deref(pmv + 2) = 30;
+    deref(pmv + 3) = 40;
+
+    var mv_dst : ptr = malloc(16);
+    memmove(mv_dst, mv_buf, 4);
+    var pmd : ptr<u8> = cast(mv_dst, ptr<u8>);
+    if (deref(pmd) == 10 && deref(pmd + 3) == 40) {
+        println("PASS: memmove copies bytes correctly");
+        pass = pass + 1;
+    } else {
+        println("FAIL: memmove copies bytes correctly");
+        fail = fail + 1;
+    }
+
+    free(buf1);
+    free(src);
+    free(dst);
+    free(mv_buf);
+    free(mv_dst);
+
+    println("=== Results: " + to_str(pass) + " passed, " + to_str(fail) + " failed ===");
+    return fail;
+}

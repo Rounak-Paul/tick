@@ -1,0 +1,65 @@
+@if(DISABLED_DEFINE_THAT_DOES_NOT_EXIST) {
+const PLATFORM_VAL : i32 = 999;
+extern func should_not_exist() : void;
+}
+
+@if(ALSO_NOT_DEFINED) {
+const PLATFORM_VAL : i32 = 888;
+} @else {
+const PLATFORM_VAL : i32 = 42;
+}
+
+@if(DISABLED_DEFINE) {
+const ACTIVE_FLAG : str = "disabled";
+} @else {
+const ACTIVE_FLAG : str = "active";
+}
+
+const BASE_CONST : i32 = 10;
+const DERIVED_CONST : i32 = (BASE_CONST * 4) + 2;
+
+const VERSION_MAJOR : u32 = 1;
+const VERSION_MINOR : u32 = 2;
+const VERSION_PACKED : u32 = (VERSION_MAJOR << 16) | VERSION_MINOR;
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Conditional Compilation Test ===");
+
+    if (PLATFORM_VAL == 42) {
+        println("PASS: @else branch active when define absent");
+        pass = pass + 1;
+    } else {
+        println("FAIL: @else branch active when define absent");
+        fail = fail + 1;
+    }
+
+    if (ACTIVE_FLAG == "active") {
+        println("PASS: @else string const correct");
+        pass = pass + 1;
+    } else {
+        println("FAIL: @else string const correct");
+        fail = fail + 1;
+    }
+
+    if (DERIVED_CONST == 42) {
+        println("PASS: const arithmetic expression");
+        pass = pass + 1;
+    } else {
+        println("FAIL: const arithmetic expression");
+        fail = fail + 1;
+    }
+
+    if (VERSION_PACKED == 65538) {
+        println("PASS: const bitwise expression (1 << 16 | 2 = 65538)");
+        pass = pass + 1;
+    } else {
+        println("FAIL: const bitwise expression (got " + to_str(cast(VERSION_PACKED, i32)) + ")");
+        fail = fail + 1;
+    }
+
+    println("=== Results: " + to_str(pass) + " passed, " + to_str(fail) + " failed ===");
+    return fail;
+}
