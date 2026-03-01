@@ -34,6 +34,32 @@ func first_elem(arr : i32[]) : i32 {
     return arr[0];
 }
 
+func fill_sequential(arr : i32[], count : i32) : void {
+    var i : i32 = 0;
+    while (i < count) {
+        arr.push(i * 3);
+        i = i + 1;
+    }
+}
+
+func double_all(arr : i32[]) : void {
+    var i : i32 = 0;
+    while (i < arr.length()) {
+        arr[i] = arr[i] * 2;
+        i = i + 1;
+    }
+}
+
+func sum_large(arr : i32[]) : i32 {
+    var total : i32 = 0;
+    var i : i32 = 0;
+    while (i < arr.length()) {
+        total = total + arr[i];
+        i = i + 1;
+    }
+    return total;
+}
+
 func main() : i32 {
     var nums : i32[] = [10, 20, 30, 40, 50];
 
@@ -60,16 +86,83 @@ func main() : i32 {
 
     var pc : i32 = pop_count(nums);
     if (pc == 4) {
-        println("PASS: pop inside callee updates local len");
+        println("PASS: pop in callee returns updated len");
     } else {
-        println("FAIL: pop inside callee updates local len");
+        println("FAIL: pop in callee returns updated len");
+    }
+
+    if (nums.length() == 4) {
+        println("PASS: caller sees pop from callee");
+    } else {
+        println("FAIL: caller sees pop from callee");
     }
 
     var ppl : i32 = push_local_len(nums, 99);
-    if (ppl == 6) {
-        println("PASS: push inside callee updates local len");
+    if (ppl == 5) {
+        println("PASS: push in callee returns updated len");
     } else {
-        println("FAIL: push inside callee updates local len");
+        println("FAIL: push in callee returns updated len");
+    }
+
+    if (nums.length() == 5) {
+        println("PASS: caller sees push from callee");
+    } else {
+        println("FAIL: caller sees push from callee");
+    }
+
+    var big : i32[];
+    fill_sequential(big, 1000);
+
+    if (big.length() == 1000) {
+        println("PASS: large array filled via callee");
+    } else {
+        println("FAIL: large array filled via callee");
+    }
+
+    if (big[0] == 0) {
+        println("PASS: large array first element");
+    } else {
+        println("FAIL: large array first element");
+    }
+
+    if (big[999] == 2997) {
+        println("PASS: large array last element");
+    } else {
+        println("FAIL: large array last element");
+    }
+
+    var s2 : i32 = sum_large(big);
+    if (s2 == 1498500) {
+        println("PASS: large array sum");
+    } else {
+        println("FAIL: large array sum");
+    }
+
+    double_all(big);
+
+    if (big[0] == 0) {
+        println("PASS: large array doubled first");
+    } else {
+        println("FAIL: large array doubled first");
+    }
+
+    if (big[500] == 3000) {
+        println("PASS: large array doubled middle");
+    } else {
+        println("FAIL: large array doubled middle");
+    }
+
+    if (big[999] == 5994) {
+        println("PASS: large array doubled last");
+    } else {
+        println("FAIL: large array doubled last");
+    }
+
+    var s3 : i32 = sum_large(big);
+    if (s3 == 2997000) {
+        println("PASS: large array doubled sum");
+    } else {
+        println("FAIL: large array doubled sum");
     }
 
     return 0;

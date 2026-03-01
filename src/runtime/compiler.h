@@ -75,5 +75,6 @@ private:
     static Tick::String infer_expr_type(Tick::ExprNode* expr, Tick::Program* program);
     static bool is_string_type(Tick::ExprNode* expr, Tick::Program* program);
     static bool is_array_type_str(const Tick::String& t);
+    static bool is_array_param(const Tick::String& name);
     static Tick::String mangle(const Tick::String& name);
 };
