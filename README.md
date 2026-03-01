@@ -107,7 +107,7 @@ func main() : i32 {
 | `ptr` | `void*` | pointer | Untyped (void) pointer |
 | `ptr<T>` | `T*` | pointer | Typed pointer to `T` |
 | `void` | `void` | — | No return value |
-| `T[]` | `T*` | pointer | Dynamic array of `T` |
+| `T[]` | `TickArray` | 16 bytes | Dynamic array of `T` (pointer + length + capacity) |
 | `T[N]` | `T name[N]` | inline | Fixed-size inline array of `T` (value, not pointer) |
 | `func(A, B) : R` | `R (*)(A, B)` | pointer | Function pointer type |
 
@@ -345,6 +345,29 @@ nums.length()                  // returns i32 length
 nums.push(42)                  // append element
 var last : i32 = nums.pop()   // remove and return last element
 free(nums)                     // deallocate array memory
+```
+
+Arrays are automatically freed when they go out of scope (RAII). Use `free()` only when you need to release memory earlier.
+
+#### Pass by Reference
+
+When arrays are passed to functions, they are passed by pointer — no copy is made. The callee operates directly on the caller's array:
+
+```
+func fill(arr : i32[], n : i32) : void {
+    var i : i32 = 0;
+    while (i < n) {
+        arr.push(i);
+        i = i + 1;
+    }
+}
+
+func main() : i32 {
+    var data : i32[];
+    fill(data, 100);          // data now has 100 elements
+    println(to_str(data.length()));  // 100
+    return 0;
+}
 ```
 
 #### Arrays of Any Type
@@ -1082,14 +1105,12 @@ tick src.tick -D MACOS -D DEBUG -o out   # space form also accepted
 |----------|-----------|-------------|
 | `addr(x)` | `T → ptr<T>` | Address of variable |
 | `deref(p)` | `ptr<T> → T` | Dereference typed pointer (rvalue and lvalue) |
-| `free(x)` | `any → void` | Free GC-managed memory |
-| `malloc(n)` | `u64 → ptr` | Allocate `n` bytes (raw, unmanaged) |
+| `free(x)` | `any → void` | Free memory (arrays or heap-allocated objects) |
+| `malloc(n)` | `u64 → ptr` | Allocate `n` bytes (raw) |
 | `memset(dst, c, n)` | `ptr, i32, u64 → ptr` | Fill memory with byte value |
 | `memcpy(dst, src, n)` | `ptr, ptr, u64 → ptr` | Copy `n` bytes (no overlap) |
 | `memmove(dst, src, n)` | `ptr, ptr, u64 → ptr` | Copy `n` bytes (overlap-safe) |
 | `memcmp(a, b, n)` | `ptr, ptr, u64 → i32` | Compare `n` bytes (0 = equal) |
-| `gc_collect()` | `→ void` | Trigger garbage collection |
-| `gc_cleanup()` | `→ void` | Final GC cleanup |
 
 #### Strings
 
@@ -1295,10 +1316,11 @@ Tick transpiles to C, then compiles with GCC:
 4. **C Code Generator** produces a `.c` file
 5. **GCC** compiles the C file with the tick runtime (`tick_runtime.c`) using `-O2 -pthread -lm`
 
-The tick runtime provides: GC (`tick_gc_*`), signal queues (`TickSignal`), string operations (`tick_str_*`), file I/O (`tick_file_*`), and event dispatch (`TickEvent`).
+The tick runtime provides: signal queues (`TickSignal`), dynamic arrays (`TickArray`), string operations (`tick_str_*`), file I/O (`tick_file_*`), and event dispatch (`TickEvent`).
 
-Classes (non-dataclass) are heap-allocated and GC-managed (`void*` pointers in C).  
-Dataclasses are stack-allocated structs (value types in C).
+Classes (non-dataclass) are heap-allocated with RAII lifetime — destructors run and memory is freed automatically at scope exit.  
+Dataclasses are stack-allocated structs (value types in C).  
+Dynamic arrays are scope-tracked `TickArray` structs — their backing memory is freed at scope exit, on `break`/`continue`, and on early `return`.
 
 ### File Extension
 
