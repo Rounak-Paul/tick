@@ -92,11 +92,11 @@ char* tick_str_concat(const char* a, const char* b) {
 }
 
 char* tick_str_substring(const char* s, int32_t start, int32_t end) {
-    if (!s) return (char*)calloc(1, 1);
+    if (!s) { char* r = (char*)malloc(1); r[0] = '\0'; return r; }
     int32_t len = (int32_t)strlen(s);
     if (start < 0) start = 0;
     if (end > len) end = len;
-    if (start >= end) return (char*)calloc(1, 1);
+    if (start >= end) { char* r = (char*)malloc(1); r[0] = '\0'; return r; }
     int32_t sub_len = end - start;
     char* result = (char*)malloc(sub_len + 1);
     memcpy(result, s + start, sub_len);
@@ -192,7 +192,7 @@ TickFile* tick_file_open(const char* path, const char* mode) {
 }
 
 char* tick_file_read(TickFile* f) {
-    if (!f || !f->handle) return (char*)calloc(1, 1);
+    if (!f || !f->handle) { char* r = (char*)malloc(1); r[0] = '\0'; return r; }
     fseek(f->handle, 0, SEEK_END);
     long size = ftell(f->handle);
     fseek(f->handle, 0, SEEK_SET);
@@ -219,57 +219,15 @@ bool tick_file_exists(const char* path) {
     return stat(path, &st) == 0;
 }
 
-void* tick_array_push(void* arr, int32_t* len, int32_t* cap, int32_t elem_size) {
-    if (*len >= *cap) {
-        int32_t new_cap = (*cap == 0) ? 4 : (*cap * 2);
-        arr = realloc(arr, new_cap * elem_size);
-        *cap = new_cap;
+void tick_array_push(TickArray* arr, size_t elem_size) {
+    if (arr->len >= arr->cap) {
+        int32_t new_cap = (arr->cap == 0) ? 4 : (arr->cap * 2);
+        arr->ptr = realloc(arr->ptr, (size_t)new_cap * elem_size);
+        arr->cap = new_cap;
     }
-    (*len)++;
-    return arr;
+    arr->len++;
 }
 
-void tick_array_pop(int32_t* len) {
-    if (*len > 0) (*len)--;
-}
-
-static TickGC _tick_gc = {{NULL}, 0};
-
-void tick_gc_init(void) {
-    _tick_gc.count = 0;
-}
-
-void* tick_gc_alloc(size_t size) {
-    void* ptr = malloc(size);
-    if (ptr && _tick_gc.count < TICK_GC_MAX_OBJECTS) {
-        _tick_gc.ptrs[_tick_gc.count++] = ptr;
-    }
-    return ptr;
-}
-
-void tick_gc_free(void* ptr) {
-    if (!ptr) return;
-    for (int i = 0; i < _tick_gc.count; i++) {
-        if (_tick_gc.ptrs[i] == ptr) {
-            _tick_gc.ptrs[i] = _tick_gc.ptrs[_tick_gc.count - 1];
-            _tick_gc.count--;
-            free(ptr);
-            return;
-        }
-    }
-    free(ptr);
-}
-
-void tick_gc_collect(void) {
-    tick_gc_cleanup();
-}
-
-void tick_gc_cleanup(void) {
-    for (int i = 0; i < _tick_gc.count; i++) {
-        if (_tick_gc.ptrs[i]) {
-            free(_tick_gc.ptrs[i]);
-            _tick_gc.ptrs[i] = NULL;
-        }
-    }
-    _tick_gc.count = 0;
+void tick_array_pop(TickArray* arr) {
+    if (arr->len > 0) arr->len--;
 }

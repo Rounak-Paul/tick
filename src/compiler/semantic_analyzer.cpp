@@ -179,7 +179,6 @@ bool SemanticAnalyzer::is_builtin_function(const String& name) {
            name == "file_write" || name == "file_close" ||
            name == "file_exists" ||
            name == "free" || name == "array_length" ||
-           name == "gc_collect" || name == "gc_cleanup" ||
            name == "addr" || name == "sizeof" || name == "deref" ||
            name == "malloc" || name == "memset" || name == "memcpy" ||
            name == "memcmp" || name == "memmove";
