@@ -1,0 +1,87 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Cast and Sizeof Test ===");
+
+    var x : i32 = 65;
+    var y : f64 = cast(x, f64);
+    if (y == 65.0) {
+        println("PASS: cast i32 to f64");
+        pass = pass + 1;
+    } else {
+        println("FAIL: cast i32 to f64");
+        fail = fail + 1;
+    }
+
+    var a : f64 = 3.99;
+    var b : i32 = cast(a, i32);
+    if (b == 3) {
+        println("PASS: cast f64 to i32 truncates");
+        pass = pass + 1;
+    } else {
+        println("FAIL: cast f64 to i32 truncates");
+        fail = fail + 1;
+    }
+
+    var big : i64 = 100000;
+    var small : i32 = cast(big, i32);
+    if (small == 100000) {
+        println("PASS: cast i64 to i32");
+        pass = pass + 1;
+    } else {
+        println("FAIL: cast i64 to i32");
+        fail = fail + 1;
+    }
+
+    var s1 : u64 = sizeof(i32);
+    if (s1 == 4) {
+        println("PASS: sizeof i32 == 4");
+        pass = pass + 1;
+    } else {
+        println("FAIL: sizeof i32 == 4");
+        fail = fail + 1;
+    }
+
+    var s2 : u64 = sizeof(f64);
+    if (s2 == 8) {
+        println("PASS: sizeof f64 == 8");
+        pass = pass + 1;
+    } else {
+        println("FAIL: sizeof f64 == 8");
+        fail = fail + 1;
+    }
+
+    var s3 : u64 = sizeof(u8);
+    if (s3 == 1) {
+        println("PASS: sizeof u8 == 1");
+        pass = pass + 1;
+    } else {
+        println("FAIL: sizeof u8 == 1");
+        fail = fail + 1;
+    }
+
+    var s4 : u64 = sizeof(ptr);
+    if (s4 == 8) {
+        println("PASS: sizeof ptr == 8");
+        pass = pass + 1;
+    } else {
+        println("FAIL: sizeof ptr == 8");
+        fail = fail + 1;
+    }
+
+    var u : u8 = 200;
+    var w : i32 = cast(u, i32);
+    if (w == 200) {
+        println("PASS: cast u8 to i32");
+        pass = pass + 1;
+    } else {
+        println("FAIL: cast u8 to i32");
+        fail = fail + 1;
+    }
+
+    println("");
+    println("Passed: " + to_str(pass));
+    println("Failed: " + to_str(fail));
+    return fail;
+}

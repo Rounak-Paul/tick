@@ -1,0 +1,105 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Array Builtins Test ===");
+
+    var arr : i32[] = [10, 20, 30];
+
+    if (arr.length() == 3) {
+        println("PASS: array length");
+        pass = pass + 1;
+    } else {
+        println("FAIL: array length");
+        fail = fail + 1;
+    }
+
+    arr.push(40);
+    if (arr.length() == 4) {
+        println("PASS: push increases length");
+        pass = pass + 1;
+    } else {
+        println("FAIL: push increases length");
+        fail = fail + 1;
+    }
+
+    if (arr[3] == 40) {
+        println("PASS: push value correct");
+        pass = pass + 1;
+    } else {
+        println("FAIL: push value correct");
+        fail = fail + 1;
+    }
+
+    var popped : i32 = arr.pop();
+    if (popped == 40) {
+        println("PASS: pop returns last");
+        pass = pass + 1;
+    } else {
+        println("FAIL: pop returns last");
+        fail = fail + 1;
+    }
+
+    if (arr.length() == 3) {
+        println("PASS: pop decreases length");
+        pass = pass + 1;
+    } else {
+        println("FAIL: pop decreases length");
+        fail = fail + 1;
+    }
+
+    arr.push(50);
+    arr.push(60);
+    arr.push(70);
+    if (arr.length() == 6) {
+        println("PASS: multiple push");
+        pass = pass + 1;
+    } else {
+        println("FAIL: multiple push");
+        fail = fail + 1;
+    }
+
+    if (arr[5] == 70) {
+        println("PASS: push past initial cap");
+        pass = pass + 1;
+    } else {
+        println("FAIL: push past initial cap");
+        fail = fail + 1;
+    }
+
+    var empty : i32[] = [];
+    if (empty.length() == 0) {
+        println("PASS: empty array length");
+        pass = pass + 1;
+    } else {
+        println("FAIL: empty array length");
+        fail = fail + 1;
+    }
+
+    empty.push(1);
+    empty.push(2);
+    if (empty.length() == 2) {
+        println("PASS: push to empty array");
+        pass = pass + 1;
+    } else {
+        println("FAIL: push to empty array");
+        fail = fail + 1;
+    }
+
+    if (empty[0] == 1) {
+        println("PASS: empty push value");
+        pass = pass + 1;
+    } else {
+        println("FAIL: empty push value");
+        fail = fail + 1;
+    }
+
+    free(arr);
+    free(empty);
+
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    return fail;
+}

@@ -1,0 +1,41 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Multiline String Test ===");
+    
+    var s : str = `hello world`;
+    if (s == "hello world") {
+        println("PASS: backtick simple string");
+        pass = pass + 1;
+    } else {
+        println("FAIL: backtick simple string");
+        fail = fail + 1;
+    }
+    
+    var empty : str = ``;
+    if (empty == "") {
+        println("PASS: backtick empty string");
+        pass = pass + 1;
+    } else {
+        println("FAIL: backtick empty string");
+        fail = fail + 1;
+    }
+    
+    var quoted : str = `he said "hi"`;
+    var idx : i32 = quoted.index_of("said");
+    if (idx == 3) {
+        println("PASS: backtick with quotes");
+        pass = pass + 1;
+    } else {
+        println("FAIL: backtick with quotes");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

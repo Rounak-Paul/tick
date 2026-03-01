@@ -1,0 +1,86 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Edge Cases Test ===");
+    
+    var zero : i32 = 0;
+    if (zero == 0) {
+        println("PASS: zero value");
+        pass = pass + 1;
+    } else {
+        println("FAIL: zero value");
+        fail = fail + 1;
+    }
+    
+    var negative : i32 = -42;
+    if (negative == -42) {
+        println("PASS: negative number");
+        pass = pass + 1;
+    } else {
+        println("FAIL: negative number");
+        fail = fail + 1;
+    }
+    
+    var large : i32 = 1000000;
+    if (large == 1000000) {
+        println("PASS: large number");
+        pass = pass + 1;
+    } else {
+        println("FAIL: large number");
+        fail = fail + 1;
+    }
+    
+    var div_zero_safe : i32 = 10 / 2;
+    if (div_zero_safe == 5) {
+        println("PASS: division");
+        pass = pass + 1;
+    } else {
+        println("FAIL: division");
+        fail = fail + 1;
+    }
+    
+    var empty_arr : i32[] = [];
+    println("PASS: empty array creation");
+    pass = pass + 1;
+    
+    var single : i32[] = [99];
+    if (single[0] == 99) {
+        println("PASS: single element array");
+        pass = pass + 1;
+    } else {
+        println("FAIL: single element array");
+        fail = fail + 1;
+    }
+    
+    var bool_int : i32 = 0;
+    if (false) {
+        bool_int = 1;
+    }
+    if (bool_int == 0) {
+        println("PASS: false branch not taken");
+        pass = pass + 1;
+    } else {
+        println("FAIL: false branch not taken");
+        fail = fail + 1;
+    }
+    
+    var count : i32 = 0;
+    while (false) {
+        count = count + 1;
+    }
+    if (count == 0) {
+        println("PASS: false while loop");
+        pass = pass + 1;
+    } else {
+        println("FAIL: false while loop");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

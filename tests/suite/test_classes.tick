@@ -1,0 +1,140 @@
+class Point {
+    var x : i32;
+    var y : i32;
+    
+    func Point(px : i32, py : i32) : void {
+        this.x = px;
+        this.y = py;
+    }
+    
+    func dist_from_origin() : i32 {
+        return this.x * this.x + this.y * this.y;
+    }
+    
+    func move_point(dx : i32, dy : i32) : void {
+        this.x = this.x + dx;
+        this.y = this.y + dy;
+    }
+}
+
+class Counter {
+    var count : i32;
+    
+    func Counter() : void {
+        this.count = 0;
+    }
+    
+    func inc_counter() : void {
+        this.count = this.count + 1;
+    }
+    
+    func get_count() : i32 {
+        return this.count;
+    }
+}
+
+class Rectangle {
+    var width : i32;
+    var height : i32;
+    
+    func Rectangle(w : i32, h : i32) : void {
+        this.width = w;
+        this.height = h;
+    }
+    
+    func rect_area() : i32 {
+        return this.width * this.height;
+    }
+}
+
+func create_point(px : i32, py : i32) : Point {
+    return Point(px, py);
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Classes Test ===");
+    
+    var p : Point = Point(3, 4);
+    if (p.x == 3) {
+        println("PASS: class construction");
+        pass = pass + 1;
+    } else {
+        println("FAIL: class construction");
+        fail = fail + 1;
+    }
+    
+    if (p.y == 4) {
+        println("PASS: member access");
+        pass = pass + 1;
+    } else {
+        println("FAIL: member access");
+        fail = fail + 1;
+    }
+    
+    var dist : i32 = p.dist_from_origin();
+    if (dist == 25) {
+        println("PASS: method call");
+        pass = pass + 1;
+    } else {
+        println("FAIL: method call");
+        fail = fail + 1;
+    }
+    
+    p.move_point(1, 1);
+    if (p.x == 4 && p.y == 5) {
+        println("PASS: method with params");
+        pass = pass + 1;
+    } else {
+        println("FAIL: method with params");
+        fail = fail + 1;
+    }
+    
+    var c : Counter = Counter();
+    c.inc_counter();
+    c.inc_counter();
+    c.inc_counter();
+    if (c.get_count() == 3) {
+        println("PASS: stateful methods");
+        pass = pass + 1;
+    } else {
+        println("FAIL: stateful methods");
+        fail = fail + 1;
+    }
+    
+    var r : Rectangle = Rectangle(5, 10);
+    if (r.rect_area() == 50) {
+        println("PASS: complex method");
+        pass = pass + 1;
+    } else {
+        println("FAIL: complex method");
+        fail = fail + 1;
+    }
+    
+    var p2 : Point = create_point(10, 20);
+    if (p2.x == 10 && p2.y == 20) {
+        println("PASS: class return value");
+        pass = pass + 1;
+    } else {
+        println("FAIL: class return value");
+        fail = fail + 1;
+    }
+    
+    var arr : Point[] = [Point(1, 2), Point(3, 4), Point(5, 6)];
+    if (arr[1].x == 3 && arr[1].y == 4) {
+        println("PASS: class array");
+        pass = pass + 1;
+    } else {
+        println("FAIL: class array");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

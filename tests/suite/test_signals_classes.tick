@@ -1,0 +1,67 @@
+class Point {
+    var x : i32;
+    var y : i32;
+    
+    func Point(px : i32, py : i32) : void {
+        this.x = px;
+        this.y = py;
+    }
+}
+
+signal point_signal : Point;
+signal done : i32;
+event worker_event;
+
+var result_x : i32 = 0;
+var result_y : i32 = 0;
+
+@worker_event process point_receiver {
+    var p : Point = point_signal.recv();
+    result_x = p.x;
+    result_y = p.y;
+    done.emit(1);
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Signal Class Types Test ===");
+    
+    var point : Point = Point(42, 84);
+    point_signal.emit(point);
+    worker_event.execute();
+    var sync : i32 = done.recv();
+    
+    if (result_x == 42) {
+        println("PASS: class signal x");
+        pass = pass + 1;
+    } else {
+        println("FAIL: class signal x");
+        fail = fail + 1;
+    }
+    
+    if (result_y == 84) {
+        println("PASS: class signal y");
+        pass = pass + 1;
+    } else {
+        println("FAIL: class signal y");
+        fail = fail + 1;
+    }
+    
+    var sum : i32 = result_x + result_y;
+    if (sum == 126) {
+        println("PASS: class signal sum");
+        pass = pass + 1;
+    } else {
+        println("FAIL: class signal sum");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

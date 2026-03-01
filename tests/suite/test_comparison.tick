@@ -1,0 +1,64 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Comparison Operations Test ===");
+    
+    var a : i32 = 10;
+    var b : i32 = 5;
+    
+    if (a == 10) {
+        println("PASS: equality");
+        pass = pass + 1;
+    } else {
+        println("FAIL: equality");
+        fail = fail + 1;
+    }
+    
+    if (a != b) {
+        println("PASS: inequality");
+        pass = pass + 1;
+    } else {
+        println("FAIL: inequality");
+        fail = fail + 1;
+    }
+    
+    if (a > b) {
+        println("PASS: greater than");
+        pass = pass + 1;
+    } else {
+        println("FAIL: greater than");
+        fail = fail + 1;
+    }
+    
+    if (b < a) {
+        println("PASS: less than");
+        pass = pass + 1;
+    } else {
+        println("FAIL: less than");
+        fail = fail + 1;
+    }
+    
+    if (a >= 10) {
+        println("PASS: greater or equal");
+        pass = pass + 1;
+    } else {
+        println("FAIL: greater or equal");
+        fail = fail + 1;
+    }
+    
+    if (b <= 5) {
+        println("PASS: less or equal");
+        pass = pass + 1;
+    } else {
+        println("FAIL: less or equal");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

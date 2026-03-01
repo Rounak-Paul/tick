@@ -1,0 +1,96 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Control Flow Test ===");
+    
+    var x : i32 = 10;
+    if (x == 10) {
+        println("PASS: if statement");
+        pass = pass + 1;
+    } else {
+        println("FAIL: if statement");
+        fail = fail + 1;
+    }
+    
+    if (x == 5) {
+        println("FAIL: if-else branch");
+        fail = fail + 1;
+    } else {
+        println("PASS: if-else branch");
+        pass = pass + 1;
+    }
+    
+    var sum : i32 = 0;
+    var i : i32 = 0;
+    while (i < 5) {
+        sum = sum + i;
+        i = i + 1;
+    }
+    if (sum == 10) {
+        println("PASS: while loop");
+        pass = pass + 1;
+    } else {
+        println("FAIL: while loop");
+        fail = fail + 1;
+    }
+    
+    sum = 0;
+    i = 0;
+    while (i < 10) {
+        if (i == 5) {
+            break;
+        }
+        sum = sum + i;
+        i = i + 1;
+    }
+    if (sum == 10) {
+        println("PASS: break statement");
+        pass = pass + 1;
+    } else {
+        println("FAIL: break statement");
+        fail = fail + 1;
+    }
+    
+    sum = 0;
+    i = 0;
+    while (i < 5) {
+        i = i + 1;
+        if (i == 3) {
+            continue;
+        }
+        sum = sum + i;
+    }
+    if (sum == 12) {
+        println("PASS: continue statement");
+        pass = pass + 1;
+    } else {
+        println("FAIL: continue statement");
+        fail = fail + 1;
+    }
+    
+    var nested : i32 = 0;
+    i = 0;
+    while (i < 3) {
+        var j : i32 = 0;
+        while (j < 3) {
+            nested = nested + 1;
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    if (nested == 9) {
+        println("PASS: nested loops");
+        pass = pass + 1;
+    } else {
+        println("FAIL: nested loops");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

@@ -1,0 +1,59 @@
+const MAX : i32 = 100;
+const PI : f64 = 3.14159;
+const DEBUG : b8 = true;
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Const Variables Test ===");
+    
+    if (MAX == 100) {
+        println("PASS: global const int");
+        pass = pass + 1;
+    } else {
+        println("FAIL: global const int");
+        fail = fail + 1;
+    }
+    
+    if (PI > 3.0 && PI < 4.0) {
+        println("PASS: global const float");
+        pass = pass + 1;
+    } else {
+        println("FAIL: global const float");
+        fail = fail + 1;
+    }
+    
+    if (DEBUG == true) {
+        println("PASS: global const bool");
+        pass = pass + 1;
+    } else {
+        println("FAIL: global const bool");
+        fail = fail + 1;
+    }
+    
+    const LOCAL : i32 = 42;
+    if (LOCAL == 42) {
+        println("PASS: local const");
+        pass = pass + 1;
+    } else {
+        println("FAIL: local const");
+        fail = fail + 1;
+    }
+    
+    const CALC : i32 = MAX / 2;
+    if (CALC == 50) {
+        println("PASS: const with expression");
+        pass = pass + 1;
+    } else {
+        println("FAIL: const with expression");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

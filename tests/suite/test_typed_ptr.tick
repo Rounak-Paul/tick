@@ -1,0 +1,164 @@
+func add(a : i32, b : i32) : i32 {
+    return a + b;
+}
+
+func multiply(a : i32, b : i32) : i32 {
+    return a * b;
+}
+
+func apply(fn : func(i32, i32) : i32, x : i32, y : i32) : i32 {
+    return fn(x, y);
+}
+
+@dataclass
+class Vec2 {
+    var x : f32;
+    var y : f32;
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Typed Pointer Test ===");
+
+    var x : i32 = 42;
+    var p : ptr<i32> = addr(x);
+    if (p != null) {
+        println("PASS: typed ptr addr non-null");
+        pass = pass + 1;
+    } else {
+        println("FAIL: typed ptr addr non-null");
+        fail = fail + 1;
+    }
+
+    var val : i32 = deref(p);
+    if (val == 42) {
+        println("PASS: deref typed ptr");
+        pass = pass + 1;
+    } else {
+        println("FAIL: deref typed ptr");
+        fail = fail + 1;
+    }
+
+    deref(p) = 100;
+    if (x == 100) {
+        println("PASS: deref assign");
+        pass = pass + 1;
+    } else {
+        println("FAIL: deref assign");
+        fail = fail + 1;
+    }
+
+    var p2 : ptr<i32> = null;
+    if (p2 == null) {
+        println("PASS: typed ptr null init");
+        pass = pass + 1;
+    } else {
+        println("FAIL: typed ptr null init");
+        fail = fail + 1;
+    }
+
+    var a : i32 = 10;
+    var b : i32 = 20;
+    var pa : ptr<i32> = addr(a);
+    var pb : ptr<i32> = addr(b);
+    if (deref(pa) == 10) {
+        println("PASS: deref pa");
+        pass = pass + 1;
+    } else {
+        println("FAIL: deref pa");
+        fail = fail + 1;
+    }
+    if (deref(pb) == 20) {
+        println("PASS: deref pb");
+        pass = pass + 1;
+    } else {
+        println("FAIL: deref pb");
+        fail = fail + 1;
+    }
+
+    var d : f64 = 3.14;
+    var pd : ptr<f64> = addr(d);
+    deref(pd) = 2.71;
+    if (d > 2.70) {
+        println("PASS: f64 typed ptr");
+        pass = pass + 1;
+    } else {
+        println("FAIL: f64 typed ptr");
+        fail = fail + 1;
+    }
+
+    var raw : ptr = cast(p, ptr);
+    if (raw != null) {
+        println("PASS: typed ptr to void ptr cast");
+        pass = pass + 1;
+    } else {
+        println("FAIL: typed ptr to void ptr cast");
+        fail = fail + 1;
+    }
+
+    var p3 : ptr<i32> = cast(raw, ptr<i32>);
+    if (deref(p3) == 100) {
+        println("PASS: void ptr to typed ptr cast");
+        pass = pass + 1;
+    } else {
+        println("FAIL: void ptr to typed ptr cast");
+        fail = fail + 1;
+    }
+
+    var fp : func(i32, i32) : i32 = add;
+    var result : i32 = fp(3, 4);
+    if (result == 7) {
+        println("PASS: func ptr call add");
+        pass = pass + 1;
+    } else {
+        println("FAIL: func ptr call add");
+        fail = fail + 1;
+    }
+
+    fp = multiply;
+    result = fp(5, 6);
+    if (result == 30) {
+        println("PASS: func ptr reassign multiply");
+        pass = pass + 1;
+    } else {
+        println("FAIL: func ptr reassign multiply");
+        fail = fail + 1;
+    }
+
+    result = apply(add, 10, 20);
+    if (result == 30) {
+        println("PASS: func ptr as param add");
+        pass = pass + 1;
+    } else {
+        println("FAIL: func ptr as param add");
+        fail = fail + 1;
+    }
+
+    result = apply(multiply, 10, 20);
+    if (result == 200) {
+        println("PASS: func ptr as param multiply");
+        pass = pass + 1;
+    } else {
+        println("FAIL: func ptr as param multiply");
+        fail = fail + 1;
+    }
+
+    var v : Vec2;
+    v.x = cast(1, f32);
+    v.y = cast(2, f32);
+    var pv : ptr<Vec2> = addr(v);
+    if (pv != null) {
+        println("PASS: ptr to dataclass");
+        pass = pass + 1;
+    } else {
+        println("FAIL: ptr to dataclass");
+        fail = fail + 1;
+    }
+
+    println("");
+    println("Passed: " + to_str(pass));
+    println("Failed: " + to_str(fail));
+    return fail;
+}

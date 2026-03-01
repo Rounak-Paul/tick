@@ -22,7 +22,8 @@
         "valarray": "cpp",
         "regex": "cpp",
         "future": "cpp",
-        "istream": "cpp"
+        "istream": "cpp",
+        "__locale": "cpp"
     },
     "cmake.options.statusBarVisibility": "visible",
     "cmake.options.advanced": {

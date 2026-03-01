@@ -1,0 +1,69 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Compound Operations Test ===");
+    
+    var a : i32 = 10;
+    a += 5;
+    if (a == 15) {
+        println("PASS: += operator");
+        pass = pass + 1;
+    } else {
+        println("FAIL: += operator");
+        fail = fail + 1;
+    }
+    
+    a -= 3;
+    if (a == 12) {
+        println("PASS: -= operator");
+        pass = pass + 1;
+    } else {
+        println("FAIL: -= operator");
+        fail = fail + 1;
+    }
+    
+    a *= 2;
+    if (a == 24) {
+        println("PASS: *= operator");
+        pass = pass + 1;
+    } else {
+        println("FAIL: *= operator");
+        fail = fail + 1;
+    }
+    
+    a /= 4;
+    if (a == 6) {
+        println("PASS: /= operator");
+        pass = pass + 1;
+    } else {
+        println("FAIL: /= operator");
+        fail = fail + 1;
+    }
+    
+    a %= 4;
+    if (a == 2) {
+        println("PASS: %= operator");
+        pass = pass + 1;
+    } else {
+        println("FAIL: %= operator");
+        fail = fail + 1;
+    }
+    
+    var f : f64 = 10.0;
+    f += 5.5;
+    if (f > 15.0 && f < 16.0) {
+        println("PASS: f64 += operator");
+        pass = pass + 1;
+    } else {
+        println("FAIL: f64 += operator");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

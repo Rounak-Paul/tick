@@ -1,0 +1,66 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Arithmetic Operations Test ===");
+    
+    var a : i32 = 10;
+    var b : i32 = 5;
+    
+    if (a + b == 15) {
+        println("PASS: addition");
+        pass = pass + 1;
+    } else {
+        println("FAIL: addition");
+        fail = fail + 1;
+    }
+    
+    if (a - b == 5) {
+        println("PASS: subtraction");
+        pass = pass + 1;
+    } else {
+        println("FAIL: subtraction");
+        fail = fail + 1;
+    }
+    
+    if (a * b == 50) {
+        println("PASS: multiplication");
+        pass = pass + 1;
+    } else {
+        println("FAIL: multiplication");
+        fail = fail + 1;
+    }
+    
+    if (a / b == 2) {
+        println("PASS: division");
+        pass = pass + 1;
+    } else {
+        println("FAIL: division");
+        fail = fail + 1;
+    }
+    
+    if (a % 3 == 1) {
+        println("PASS: modulo");
+        pass = pass + 1;
+    } else {
+        println("FAIL: modulo");
+        fail = fail + 1;
+    }
+    
+    var f1 : f64 = 10.5;
+    var f2 : f64 = 2.0;
+    if (f1 + f2 > 12.0 && f1 + f2 < 13.0) {
+        println("PASS: f64 addition");
+        pass = pass + 1;
+    } else {
+        println("FAIL: f64 addition");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

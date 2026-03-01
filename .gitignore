@@ -10,5 +10,8 @@ bin/
 *~
 .vscode/
 .idea/
-cmake-build-*/.tickcache/
-.tickcache/
+cmake-build-*/
+a.out
+fib
+/tmp/tick_*.c
+.cache/

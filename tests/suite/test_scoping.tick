@@ -1,0 +1,84 @@
+var global : i32 = 100;
+
+func modify_global() : void {
+    global = 200;
+}
+
+func local_scope() : i32 {
+    var local : i32 = 50;
+    return local;
+}
+
+func shadowing() : i32 {
+    var global : i32 = 300;
+    return global;
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Scoping Test ===");
+    
+    if (global == 100) {
+        println("PASS: global access");
+        pass = pass + 1;
+    } else {
+        println("FAIL: global access");
+        fail = fail + 1;
+    }
+    
+    modify_global();
+    if (global == 200) {
+        println("PASS: global modification");
+        pass = pass + 1;
+    } else {
+        println("FAIL: global modification");
+        fail = fail + 1;
+    }
+    
+    var result : i32 = local_scope();
+    if (result == 50) {
+        println("PASS: local scope");
+        pass = pass + 1;
+    } else {
+        println("FAIL: local scope");
+        fail = fail + 1;
+    }
+    
+    result = shadowing();
+    if (result == 300 && global == 200) {
+        println("PASS: variable shadowing");
+        pass = pass + 1;
+    } else {
+        println("FAIL: variable shadowing");
+        fail = fail + 1;
+    }
+    
+    var x : i32 = 10;
+    if (x == 10) {
+        var x : i32 = 20;
+        if (x == 20) {
+            println("PASS: nested scope");
+            pass = pass + 1;
+        } else {
+            println("FAIL: nested scope");
+            fail = fail + 1;
+        }
+    }
+    
+    if (x == 10) {
+        println("PASS: scope restoration");
+        pass = pass + 1;
+    } else {
+        println("FAIL: scope restoration");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

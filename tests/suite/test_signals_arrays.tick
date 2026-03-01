@@ -1,0 +1,65 @@
+signal data[3] : i32;
+signal done : i32;
+event worker_event;
+
+var results : i32[] = [0, 0, 0];
+
+@worker_event process receiver {
+    results[0] = data[0].recv();
+    results[1] = data[1].recv();
+    results[2] = data[2].recv();
+    done.emit(1);
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Signal Arrays Test ===");
+    
+    data[0].emit(10);
+    data[1].emit(20);
+    data[2].emit(30);
+    worker_event.execute();
+    var sync : i32 = done.recv();
+    
+    if (results[0] == 10) {
+        println("PASS: signal array [0]");
+        pass = pass + 1;
+    } else {
+        println("FAIL: signal array [0]");
+        fail = fail + 1;
+    }
+    
+    if (results[1] == 20) {
+        println("PASS: signal array [1]");
+        pass = pass + 1;
+    } else {
+        println("FAIL: signal array [1]");
+        fail = fail + 1;
+    }
+    
+    if (results[2] == 30) {
+        println("PASS: signal array [2]");
+        pass = pass + 1;
+    } else {
+        println("FAIL: signal array [2]");
+        fail = fail + 1;
+    }
+    
+    var sum : i32 = results[0] + results[1] + results[2];
+    if (sum == 60) {
+        println("PASS: signal array sum");
+        pass = pass + 1;
+    } else {
+        println("FAIL: signal array sum");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

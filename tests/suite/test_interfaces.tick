@@ -1,0 +1,57 @@
+interface Printable {
+    func describe() : str;
+}
+
+interface HasArea {
+    func area() : i32;
+}
+
+class Box implements Printable, HasArea {
+    var w : i32;
+    var h : i32;
+
+    func Box(width : i32, height : i32) : void {
+        this.w = width;
+        this.h = height;
+    }
+
+    func describe() : str {
+        return "box";
+    }
+
+    func area() : i32 {
+        return this.w * this.h;
+    }
+}
+
+class Label implements Printable {
+    var text : str;
+
+    func Label(t : str) : void {
+        this.text = t;
+    }
+
+    func describe() : str {
+        return this.text;
+    }
+}
+
+func main() : i32 {
+    var b : Box = Box(3, 4);
+    if (b.area() != 12) {
+        return 1;
+    }
+
+    var desc : str = b.describe();
+    if (desc != "box") {
+        return 1;
+    }
+
+    var l : Label = Label("hello");
+    if (l.describe() != "hello") {
+        return 1;
+    }
+
+    println("PASS: interfaces");
+    return 0;
+}

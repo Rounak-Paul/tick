@@ -1,0 +1,71 @@
+class Vec2 {
+    var x : i32 = 0;
+    var y : i32 = 0;
+
+    func Vec2(px : i32, py : i32) : void {
+        self.x = px;
+        self.y = py;
+    }
+
+    func get_x() : i32 {
+        return self.x;
+    }
+
+    func get_y() : i32 {
+        return self.y;
+    }
+
+    func sum() : i32 {
+        return self.x + self.y;
+    }
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Chained Access Test ===");
+
+    var v : Vec2 = Vec2(3, 7);
+
+    if (v.get_x() == 3) {
+        println("PASS: method call on object");
+        pass = pass + 1;
+    } else {
+        println("FAIL: method call on object");
+        fail = fail + 1;
+    }
+
+    if (v.sum() == 10) {
+        println("PASS: method using self fields");
+        pass = pass + 1;
+    } else {
+        println("FAIL: method using self fields");
+        fail = fail + 1;
+    }
+
+    var arr : i32[] = [10, 20, 30, 40, 50];
+    if (arr[2] + arr[4] == 80) {
+        println("PASS: array index in expression");
+        pass = pass + 1;
+    } else {
+        println("FAIL: array index in expression");
+        fail = fail + 1;
+    }
+
+    var idx : i32 = 1;
+    if (arr[idx] == 20) {
+        println("PASS: variable as array index");
+        pass = pass + 1;
+    } else {
+        println("FAIL: variable as array index");
+        fail = fail + 1;
+    }
+
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+
+    return fail;
+}

@@ -1,0 +1,97 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== String Operations Test ===");
+
+    var a : str = "hello";
+    var b : str = " world";
+    var c : str = a + b;
+
+    if (c == "hello world") {
+        println("PASS: string concat");
+        pass = pass + 1;
+    } else {
+        println("FAIL: string concat");
+        fail = fail + 1;
+    }
+
+    if (a != b) {
+        println("PASS: string inequality");
+        pass = pass + 1;
+    } else {
+        println("FAIL: string inequality");
+        fail = fail + 1;
+    }
+
+    var same1 : str = "test";
+    var same2 : str = "test";
+    if (same1 == same2) {
+        println("PASS: string equality");
+        pass = pass + 1;
+    } else {
+        println("FAIL: string equality");
+        fail = fail + 1;
+    }
+
+    var len : i32 = a.length();
+    if (len == 5) {
+        println("PASS: string length");
+        pass = pass + 1;
+    } else {
+        println("FAIL: string length");
+        fail = fail + 1;
+    }
+
+    var sub : str = c.substring(0, 5);
+    if (sub == "hello") {
+        println("PASS: string substring");
+        pass = pass + 1;
+    } else {
+        println("FAIL: string substring");
+        fail = fail + 1;
+    }
+
+    var idx : i32 = c.index_of("world");
+    if (idx == 6) {
+        println("PASS: string index_of");
+        pass = pass + 1;
+    } else {
+        println("FAIL: string index_of");
+        fail = fail + 1;
+    }
+
+    var not_found : i32 = c.index_of("xyz");
+    if (not_found == -1) {
+        println("PASS: string index_of not found");
+        pass = pass + 1;
+    } else {
+        println("FAIL: string index_of not found");
+        fail = fail + 1;
+    }
+
+    var empty : str = "";
+    var elen : i32 = empty.length();
+    if (elen == 0) {
+        println("PASS: empty string length");
+        pass = pass + 1;
+    } else {
+        println("FAIL: empty string length");
+        fail = fail + 1;
+    }
+
+    var multi : str = "a" + "b" + "c";
+    if (multi == "abc") {
+        println("PASS: multi concat");
+        pass = pass + 1;
+    } else {
+        println("FAIL: multi concat");
+        fail = fail + 1;
+    }
+
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    return fail;
+}

@@ -1,0 +1,78 @@
+signal int_signal : i32;
+signal bool_signal : b8;
+signal done : i32;
+
+event int_event;
+event bool_event;
+
+var int_result : i32 = 0;
+var bool_result : b8 = false;
+
+@int_event process int_receiver {
+    int_result = int_signal.recv();
+    done.emit(1);
+}
+
+@bool_event process bool_receiver {
+    bool_result = bool_signal.recv();
+    done.emit(1);
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Signals Basic Test ===");
+    
+    int_signal.emit(100);
+    int_event.execute();
+    var sync : i32 = done.recv();
+    if (int_result == 100) {
+        println("PASS: i32 signal");
+        pass = pass + 1;
+    } else {
+        println("FAIL: i32 signal");
+        fail = fail + 1;
+    }
+    
+    bool_signal.emit(true);
+    bool_event.execute();
+    sync = done.recv();
+    if (bool_result == true) {
+        println("PASS: b8 signal");
+        pass = pass + 1;
+    } else {
+        println("FAIL: b8 signal");
+        fail = fail + 1;
+    }
+    
+    int_signal.emit(50);
+    int_signal.emit(75);
+    int_event.execute();
+    sync = done.recv();
+    if (int_result == 50) {
+        println("PASS: signal queue");
+        pass = pass + 1;
+    } else {
+        println("FAIL: signal queue");
+        fail = fail + 1;
+    }
+    
+    bool_signal.emit(false);
+    bool_event.execute();
+    sync = done.recv();
+    if (bool_result == false) {
+        println("PASS: b8 false signal");
+        pass = pass + 1;
+    } else {
+        println("FAIL: b8 false signal");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

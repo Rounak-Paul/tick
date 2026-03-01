@@ -1,0 +1,49 @@
+extern func abs(x : i32) : i32;
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Extern Functions Test ===");
+
+    var result : i32 = abs(-42);
+    if (result == 42) {
+        println("PASS: extern abs(-42)");
+        pass = pass + 1;
+    } else {
+        println("FAIL: extern abs(-42)");
+        fail = fail + 1;
+    }
+
+    var r2 : i32 = abs(0);
+    if (r2 == 0) {
+        println("PASS: extern abs(0)");
+        pass = pass + 1;
+    } else {
+        println("FAIL: extern abs(0)");
+        fail = fail + 1;
+    }
+
+    var r3 : i32 = abs(100);
+    if (r3 == 100) {
+        println("PASS: extern abs(100)");
+        pass = pass + 1;
+    } else {
+        println("FAIL: extern abs(100)");
+        fail = fail + 1;
+    }
+
+    var r4 : i32 = abs(-1);
+    if (r4 == 1) {
+        println("PASS: extern abs(-1)");
+        pass = pass + 1;
+    } else {
+        println("FAIL: extern abs(-1)");
+        fail = fail + 1;
+    }
+
+    println("");
+    println("Passed: " + to_str(pass));
+    println("Failed: " + to_str(fail));
+    return fail;
+}

@@ -1,0 +1,95 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Else If Test ===");
+    
+    var x : i32 = 5;
+    if (x == 1) {
+        println("FAIL: else if basic");
+        fail = fail + 1;
+    } else if (x == 5) {
+        println("PASS: else if basic");
+        pass = pass + 1;
+    } else {
+        println("FAIL: else if basic");
+        fail = fail + 1;
+    }
+    
+    if (x == 1) {
+        println("FAIL: else if chain first");
+        fail = fail + 1;
+    } else if (x == 2) {
+        println("FAIL: else if chain second");
+        fail = fail + 1;
+    } else if (x == 3) {
+        println("FAIL: else if chain third");
+        fail = fail + 1;
+    } else if (x == 5) {
+        println("PASS: else if chain match");
+        pass = pass + 1;
+    } else {
+        println("FAIL: else if chain fallthrough");
+        fail = fail + 1;
+    }
+    
+    if (x == 1) {
+        println("FAIL: else if falls to else");
+        fail = fail + 1;
+    } else if (x == 2) {
+        println("FAIL: else if falls to else");
+        fail = fail + 1;
+    } else {
+        println("PASS: else if falls to else");
+        pass = pass + 1;
+    }
+    
+    var y : i32 = 10;
+    var result : i32 = 0;
+    if (y < 5) {
+        result = 1;
+    } else if (y < 10) {
+        result = 2;
+    } else if (y == 10) {
+        result = 3;
+    } else {
+        result = 4;
+    }
+    if (result == 3) {
+        println("PASS: else if with comparisons");
+        pass = pass + 1;
+    } else {
+        println("FAIL: else if with comparisons");
+        fail = fail + 1;
+    }
+    
+    if (x == 5) {
+        println("PASS: if without else if");
+        pass = pass + 1;
+    }
+    
+    var nested : i32 = 0;
+    if (x == 5) {
+        if (y == 10) {
+            nested = 1;
+        } else if (y == 20) {
+            nested = 2;
+        }
+    } else if (x == 10) {
+        nested = 3;
+    }
+    if (nested == 1) {
+        println("PASS: nested else if");
+        pass = pass + 1;
+    } else {
+        println("FAIL: nested else if");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

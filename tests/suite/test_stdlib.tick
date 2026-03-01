@@ -1,0 +1,120 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Standard Library Test ===");
+
+    var root : f64 = sqrt(16.0);
+    if (root == 4.0) {
+        println("PASS: sqrt");
+        pass = pass + 1;
+    } else {
+        println("FAIL: sqrt");
+        fail = fail + 1;
+    }
+
+    var p : f64 = pow(2.0, 10.0);
+    if (p == 1024.0) {
+        println("PASS: pow");
+        pass = pass + 1;
+    } else {
+        println("FAIL: pow");
+        fail = fail + 1;
+    }
+
+    var fl : f64 = floor(3.7);
+    if (fl == 3.0) {
+        println("PASS: floor");
+        pass = pass + 1;
+    } else {
+        println("FAIL: floor");
+        fail = fail + 1;
+    }
+
+    var ce : f64 = ceil(3.2);
+    if (ce == 4.0) {
+        println("PASS: ceil");
+        pass = pass + 1;
+    } else {
+        println("FAIL: ceil");
+        fail = fail + 1;
+    }
+
+    var a : i32 = abs(-42);
+    if (a == 42) {
+        println("PASS: abs");
+        pass = pass + 1;
+    } else {
+        println("FAIL: abs");
+        fail = fail + 1;
+    }
+
+    var s : str = to_str(42);
+    if (s == "42") {
+        println("PASS: to_str i32");
+        pass = pass + 1;
+    } else {
+        println("FAIL: to_str i32");
+        fail = fail + 1;
+    }
+
+    var sf : str = to_str(3.14);
+    if (sf == "3.140000") {
+        println("PASS: to_str f64");
+        pass = pass + 1;
+    } else {
+        println("FAIL: to_str f64");
+        fail = fail + 1;
+    }
+
+    var sb : str = to_str(true);
+    if (sb == "true") {
+        println("PASS: to_str b8");
+        pass = pass + 1;
+    } else {
+        println("FAIL: to_str b8");
+        fail = fail + 1;
+    }
+
+    var n : i64 = parse("123");
+    if (n == 123) {
+        println("PASS: parse i64");
+        pass = pass + 1;
+    } else {
+        println("FAIL: parse i64");
+        fail = fail + 1;
+    }
+
+    var pf : f64 = parse("2.5");
+    if (pf == 2.5) {
+        println("PASS: parse f64");
+        pass = pass + 1;
+    } else {
+        println("FAIL: parse f64");
+        fail = fail + 1;
+    }
+
+    var pb : b8 = parse("true");
+    if (pb == true) {
+        println("PASS: parse b8");
+        pass = pass + 1;
+    } else {
+        println("FAIL: parse b8");
+        fail = fail + 1;
+    }
+
+    var pi : i32 = parse("99");
+    if (pi == 99) {
+        println("PASS: parse i32");
+        pass = pass + 1;
+    } else {
+        println("FAIL: parse i32");
+        fail = fail + 1;
+    }
+
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    return fail;
+}

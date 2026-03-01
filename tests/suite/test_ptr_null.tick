@@ -1,0 +1,49 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Ptr and Null Test ===");
+
+    var p : ptr = null;
+    if (p == null) {
+        println("PASS: ptr null init");
+        pass = pass + 1;
+    } else {
+        println("FAIL: ptr null init");
+        fail = fail + 1;
+    }
+
+    var x : i32 = 42;
+    var px : ptr = addr(x);
+    if (px != null) {
+        println("PASS: addr returns non-null");
+        pass = pass + 1;
+    } else {
+        println("FAIL: addr returns non-null");
+        fail = fail + 1;
+    }
+
+    var p2 : ptr;
+    if (p2 == null) {
+        println("PASS: ptr default null");
+        pass = pass + 1;
+    } else {
+        println("FAIL: ptr default null");
+        fail = fail + 1;
+    }
+
+    var y : f64 = 3.14;
+    var py : ptr = addr(y);
+    if (py != null) {
+        println("PASS: addr of f64");
+        pass = pass + 1;
+    } else {
+        println("FAIL: addr of f64");
+        fail = fail + 1;
+    }
+
+    println("");
+    println("Passed: " + to_str(pass));
+    println("Failed: " + to_str(fail));
+    return fail;
+}

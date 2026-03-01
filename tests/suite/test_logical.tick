@@ -1,0 +1,74 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Logical Operations Test ===");
+    
+    var t : b8 = true;
+    var f : b8 = false;
+    
+    if (t && t) {
+        println("PASS: AND true");
+        pass = pass + 1;
+    } else {
+        println("FAIL: AND true");
+        fail = fail + 1;
+    }
+    
+    if (t && f) {
+        println("FAIL: AND false");
+        fail = fail + 1;
+    } else {
+        println("PASS: AND false");
+        pass = pass + 1;
+    }
+    
+    if (t || f) {
+        println("PASS: OR true");
+        pass = pass + 1;
+    } else {
+        println("FAIL: OR true");
+        fail = fail + 1;
+    }
+    
+    if (f || f) {
+        println("FAIL: OR false");
+        fail = fail + 1;
+    } else {
+        println("PASS: OR false");
+        pass = pass + 1;
+    }
+    
+    if (!f) {
+        println("PASS: NOT false");
+        pass = pass + 1;
+    } else {
+        println("FAIL: NOT false");
+        fail = fail + 1;
+    }
+    
+    if (!t) {
+        println("FAIL: NOT true");
+        fail = fail + 1;
+    } else {
+        println("PASS: NOT true");
+        pass = pass + 1;
+    }
+    
+    var a : i32 = 10;
+    var b : i32 = 5;
+    if (a > 5 && b < 10) {
+        println("PASS: complex AND");
+        pass = pass + 1;
+    } else {
+        println("FAIL: complex AND");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

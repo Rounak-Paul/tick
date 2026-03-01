@@ -8,11 +8,16 @@ namespace Tick {
 
 enum class AstNodeType {
     PROGRAM,
+    IMPORT_DECL,
     EVENT_DECL,
     SIGNAL_DECL,
     PROCESS_DECL,
     FUNCTION_DECL,
     CLASS_DECL,
+    ENUM_DECL,
+    UNION_DECL,
+    INTERFACE_DECL,
+    EXTERN_FUNC_DECL,
     VAR_DECL,
     
     BLOCK_STMT,
@@ -22,9 +27,17 @@ enum class AstNodeType {
     FOR_STMT,
     RETURN_STMT,
     BREAK_STMT,
+    CONTINUE_STMT,
+    DEFER_STMT,
+    SWITCH_STMT,
+    TRY_CATCH_STMT,
+    THROW_STMT,
     
     BINARY_EXPR,
     UNARY_EXPR,
+    ASSIGN_EXPR,
+    COMPOUND_ASSIGN_EXPR,
+    POSTFIX_EXPR,
     CALL_EXPR,
     MEMBER_EXPR,
     INDEX_EXPR,
@@ -36,13 +49,17 @@ enum class AstNodeType {
     FLOAT_LITERAL,
     DOUBLE_LITERAL,
     BOOL_LITERAL,
-    STRING_LITERAL
+    STRING_LITERAL,
+    NULL_LITERAL,
+    CAST_EXPR,
+    SIZEOF_EXPR
 };
 
 struct AstNode {
     AstNodeType type;
+    int line;
     
-    AstNode(AstNodeType t) : type(t) {}
+    AstNode(AstNodeType t) : type(t), line(0) {}
     virtual ~AstNode() {}
 };
 
@@ -119,6 +136,33 @@ struct UnaryExpr : public ExprNode {
     
     ~UnaryExpr() {
         delete operand;
+    }
+};
+
+struct AssignExpr : public ExprNode {
+    ExprNode* target;
+    ExprNode* value;
+    
+    AssignExpr(ExprNode* t, ExprNode* v)
+        : ExprNode(AstNodeType::ASSIGN_EXPR), target(t), value(v) {}
+    
+    ~AssignExpr() {
+        delete target;
+        delete value;
+    }
+};
+
+struct CompoundAssignExpr : public ExprNode {
+    ExprNode* target;
+    String op;
+    ExprNode* value;
+    
+    CompoundAssignExpr(ExprNode* t, const String& o, ExprNode* v)
+        : ExprNode(AstNodeType::COMPOUND_ASSIGN_EXPR), target(t), op(o), value(v) {}
+    
+    ~CompoundAssignExpr() {
+        delete target;
+        delete value;
     }
 };
 
@@ -219,9 +263,10 @@ struct VarDecl : public StmtNode {
     String type_name;
     String name;
     ExprNode* initializer;
+    bool is_const;
     
-    VarDecl(const String& type, const String& n, ExprNode* init)
-        : StmtNode(AstNodeType::VAR_DECL), type_name(type), name(n), initializer(init) {}
+    VarDecl(const String& type, const String& n, ExprNode* init, bool const_flag = false)
+        : StmtNode(AstNodeType::VAR_DECL), type_name(type), name(n), initializer(init), is_const(const_flag) {}
     
     ~VarDecl() {
         if (initializer) delete initializer;
@@ -271,6 +316,84 @@ struct BreakStmt : public StmtNode {
     BreakStmt() : StmtNode(AstNodeType::BREAK_STMT) {}
 };
 
+struct ContinueStmt : public StmtNode {
+    ContinueStmt() : StmtNode(AstNodeType::CONTINUE_STMT) {}
+};
+
+struct DeferStmt : public StmtNode {
+    StmtNode* statement;
+    
+    DeferStmt(StmtNode* stmt)
+        : StmtNode(AstNodeType::DEFER_STMT), statement(stmt) {}
+    
+    ~DeferStmt() {
+        delete statement;
+    }
+};
+
+struct SwitchCase {
+    DynamicArray<ExprNode*> values;
+    BlockStmt* body;
+    bool is_default;
+    
+    SwitchCase() : body(nullptr), is_default(false) {}
+    ~SwitchCase() {
+        for (size_t i = 0; i < values.size(); i++) delete values[i];
+        if (body) delete body;
+    }
+};
+
+struct SwitchStmt : public StmtNode {
+    ExprNode* subject;
+    DynamicArray<SwitchCase*> cases;
+    
+    SwitchStmt(ExprNode* subj)
+        : StmtNode(AstNodeType::SWITCH_STMT), subject(subj) {}
+    
+    ~SwitchStmt() {
+        delete subject;
+        for (size_t i = 0; i < cases.size(); i++) delete cases[i];
+    }
+};
+
+struct PostfixExpr : public ExprNode {
+    ExprNode* operand;
+    String op;
+    
+    PostfixExpr(ExprNode* opnd, const String& o)
+        : ExprNode(AstNodeType::POSTFIX_EXPR), operand(opnd), op(o) {}
+    
+    ~PostfixExpr() {
+        delete operand;
+    }
+};
+
+struct ForStmt : public StmtNode {
+    StmtNode* initializer;
+    ExprNode* condition;
+    ExprNode* increment;
+    StmtNode* body;
+    
+    ForStmt(StmtNode* init, ExprNode* cond, ExprNode* incr, StmtNode* b)
+        : StmtNode(AstNodeType::FOR_STMT), initializer(init), condition(cond), increment(incr), body(b) {}
+    
+    ~ForStmt() {
+        if (initializer) delete initializer;
+        if (condition) delete condition;
+        if (increment) delete increment;
+        delete body;
+    }
+};
+
+struct ImportDecl : public AstNode {
+    String module_path;
+    DynamicArray<String> imported_names;
+    bool import_all;
+    
+    ImportDecl(const String& path) 
+        : AstNode(AstNodeType::IMPORT_DECL), module_path(path), import_all(true) {}
+};
+
 struct EventDecl : public AstNode {
     String name;
     
@@ -281,9 +404,10 @@ struct EventDecl : public AstNode {
 struct SignalDecl : public AstNode {
     String type_param;
     String name;
+    int array_size;
     
-    SignalDecl(const String& type, const String& n)
-        : AstNode(AstNodeType::SIGNAL_DECL), type_param(type), name(n) {}
+    SignalDecl(const String& type, const String& n, int size = 0)
+        : AstNode(AstNodeType::SIGNAL_DECL), type_param(type), name(n), array_size(size) {}
 };
 
 struct ProcessDecl : public AstNode {
@@ -310,11 +434,13 @@ struct Parameter {
 struct FunctionDecl : public AstNode {
     String return_type;
     String name;
+    String class_name;
+    bool is_destructor;
     DynamicArray<Parameter*> parameters;
     BlockStmt* body;
     
     FunctionDecl(const String& ret_type, const String& n, BlockStmt* b)
-        : AstNode(AstNodeType::FUNCTION_DECL), return_type(ret_type), name(n), body(b) {}
+        : AstNode(AstNodeType::FUNCTION_DECL), return_type(ret_type), name(n), is_destructor(false), body(b) {}
     
     ~FunctionDecl() {
         for (size_t i = 0; i < parameters.size(); i++) {
@@ -326,37 +452,199 @@ struct FunctionDecl : public AstNode {
 
 struct ClassDecl : public AstNode {
     String name;
+    String base_class;
+    DynamicArray<String> interfaces;
     DynamicArray<VarDecl*> fields;
-    DynamicArray<FunctionDecl*> methods;
+    bool is_dataclass;
     
     ClassDecl(const String& n)
-        : AstNode(AstNodeType::CLASS_DECL), name(n) {}
+        : AstNode(AstNodeType::CLASS_DECL), name(n), is_dataclass(false) {}
     
     ~ClassDecl() {
         for (size_t i = 0; i < fields.size(); i++) {
             delete fields[i];
         }
-        for (size_t i = 0; i < methods.size(); i++) {
-            delete methods[i];
-        }
     }
 };
 
+struct EnumValue {
+    String name;
+    int value;
+    bool has_value;
+    
+    EnumValue(const String& n) : name(n), value(0), has_value(false) {}
+    EnumValue(const String& n, int v) : name(n), value(v), has_value(true) {}
+};
+
+struct EnumDecl : public AstNode {
+    String name;
+    DynamicArray<EnumValue*> values;
+    
+    EnumDecl(const String& n)
+        : AstNode(AstNodeType::ENUM_DECL), name(n) {}
+    
+    ~EnumDecl() {
+        for (size_t i = 0; i < values.size(); i++) delete values[i];
+    }
+};
+
+struct UnionField {
+    String type_name;
+    String name;
+    
+    UnionField(const String& type, const String& n) : type_name(type), name(n) {}
+};
+
+struct UnionDecl : public AstNode {
+    String name;
+    DynamicArray<UnionField*> fields;
+    
+    UnionDecl(const String& n)
+        : AstNode(AstNodeType::UNION_DECL), name(n) {}
+    
+    ~UnionDecl() {
+        for (size_t i = 0; i < fields.size(); i++) delete fields[i];
+    }
+};
+
+struct InterfaceMethod {
+    String name;
+    String return_type;
+    DynamicArray<Parameter*> parameters;
+    
+    InterfaceMethod(const String& n, const String& ret)
+        : name(n), return_type(ret) {}
+    
+    ~InterfaceMethod() {
+        for (size_t i = 0; i < parameters.size(); i++) delete parameters[i];
+    }
+};
+
+struct InterfaceDecl : public AstNode {
+    String name;
+    DynamicArray<InterfaceMethod*> methods;
+    
+    InterfaceDecl(const String& n)
+        : AstNode(AstNodeType::INTERFACE_DECL), name(n) {}
+    
+    ~InterfaceDecl() {
+        for (size_t i = 0; i < methods.size(); i++) delete methods[i];
+    }
+};
+
+struct TryCatchStmt : public StmtNode {
+    BlockStmt* try_body;
+    String catch_var;
+    String catch_type;
+    BlockStmt* catch_body;
+    
+    TryCatchStmt(BlockStmt* tb, const String& cv, const String& ct, BlockStmt* cb)
+        : StmtNode(AstNodeType::TRY_CATCH_STMT), try_body(tb),
+          catch_var(cv), catch_type(ct), catch_body(cb) {}
+    
+    ~TryCatchStmt() {
+        delete try_body;
+        delete catch_body;
+    }
+};
+
+struct ThrowStmt : public StmtNode {
+    ExprNode* value;
+    
+    ThrowStmt(ExprNode* v)
+        : StmtNode(AstNodeType::THROW_STMT), value(v) {}
+    
+    ~ThrowStmt() { delete value; }
+};
+
+struct ExternFuncDecl : public AstNode {
+    String return_type;
+    String name;
+    DynamicArray<Parameter*> parameters;
+    
+    ExternFuncDecl(const String& ret_type, const String& n)
+        : AstNode(AstNodeType::EXTERN_FUNC_DECL), return_type(ret_type), name(n) {}
+    
+    ~ExternFuncDecl() {
+        for (size_t i = 0; i < parameters.size(); i++) delete parameters[i];
+    }
+};
+
+struct CastExpr : public ExprNode {
+    ExprNode* expression;
+    String target_type;
+    
+    CastExpr(ExprNode* expr, const String& type)
+        : ExprNode(AstNodeType::CAST_EXPR), expression(expr), target_type(type) {}
+    
+    ~CastExpr() { delete expression; }
+};
+
+struct NullLiteral : public ExprNode {
+    NullLiteral() : ExprNode(AstNodeType::NULL_LITERAL) {}
+};
+
+struct SizeofExpr : public ExprNode {
+    String target_type;
+    
+    SizeofExpr(const String& type)
+        : ExprNode(AstNodeType::SIZEOF_EXPR), target_type(type) {}
+};
+
 struct Program : public AstNode {
+    DynamicArray<ImportDecl*> imports;
+    DynamicArray<VarDecl*> globals;
     DynamicArray<EventDecl*> events;
     DynamicArray<SignalDecl*> signals;
     DynamicArray<ProcessDecl*> processes;
     DynamicArray<FunctionDecl*> functions;
+    DynamicArray<FunctionDecl*> methods;
     DynamicArray<ClassDecl*> classes;
+    DynamicArray<EnumDecl*> enums;
+    DynamicArray<UnionDecl*> unions;
+    DynamicArray<InterfaceDecl*> interfaces;
+    DynamicArray<ExternFuncDecl*> extern_functions;
+    DynamicArray<String> link_flags;
     
     Program() : AstNode(AstNodeType::PROGRAM) {}
     
     ~Program() {
-        for (size_t i = 0; i < events.size(); i++) delete events[i];
-        for (size_t i = 0; i < signals.size(); i++) delete signals[i];
-        for (size_t i = 0; i < processes.size(); i++) delete processes[i];
-        for (size_t i = 0; i < functions.size(); i++) delete functions[i];
-        for (size_t i = 0; i < classes.size(); i++) delete classes[i];
+        for (size_t i = 0; i < imports.size(); i++) {
+            if (imports[i]) delete imports[i];
+        }
+        for (size_t i = 0; i < globals.size(); i++) {
+            if (globals[i]) delete globals[i];
+        }
+        for (size_t i = 0; i < events.size(); i++) {
+            if (events[i]) delete events[i];
+        }
+        for (size_t i = 0; i < signals.size(); i++) {
+            if (signals[i]) delete signals[i];
+        }
+        for (size_t i = 0; i < processes.size(); i++) {
+            if (processes[i]) delete processes[i];
+        }
+        for (size_t i = 0; i < functions.size(); i++) {
+            if (functions[i]) delete functions[i];
+        }
+        for (size_t i = 0; i < methods.size(); i++) {
+            if (methods[i]) delete methods[i];
+        }
+        for (size_t i = 0; i < classes.size(); i++) {
+            if (classes[i]) delete classes[i];
+        }
+        for (size_t i = 0; i < enums.size(); i++) {
+            if (enums[i]) delete enums[i];
+        }
+        for (size_t i = 0; i < unions.size(); i++) {
+            if (unions[i]) delete unions[i];
+        }
+        for (size_t i = 0; i < interfaces.size(); i++) {
+            if (interfaces[i]) delete interfaces[i];
+        }
+        for (size_t i = 0; i < extern_functions.size(); i++) {
+            if (extern_functions[i]) delete extern_functions[i];
+        }
     }
 };
 

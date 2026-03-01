@@ -1,0 +1,32 @@
+class Item {
+    var value : i32;
+
+    func Item(v : i32) : void {
+        this.value = v;
+    }
+
+    func get_value() : i32 {
+        return this.value;
+    }
+}
+
+func main() : i32 {
+    var a : Item = Item(10);
+    var b : Item = Item(20);
+    var c : Item = Item(30);
+
+    if (a.get_value() != 10) {
+        return 1;
+    }
+    if (b.get_value() != 20) {
+        return 1;
+    }
+    if (c.get_value() != 30) {
+        return 1;
+    }
+
+    gc_collect();
+
+    println("PASS: gc");
+    return 0;
+}

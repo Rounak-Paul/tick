@@ -1,8 +1,0 @@
-class Test {
-    var x : int = 10;
-}
-
-func main() : int {
-    var t : Test = new Test();
-    return 0;
-}

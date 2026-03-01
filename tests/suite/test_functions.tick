@@ -1,0 +1,99 @@
+func add(a : i32, b : i32) : i32 {
+    return a + b;
+}
+
+func multiply(x : f64, y : f64) : f64 {
+    return x * y;
+}
+
+func is_positive(n : i32) : b8 {
+    if (n > 0) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+func void_func() : void {
+    println("void function called");
+}
+
+func factorial(n : i32) : i32 {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    }
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+    
+    println("=== Functions Test ===");
+    
+    var sum : i32 = add(5, 3);
+    if (sum == 8) {
+        println("PASS: function call");
+        pass = pass + 1;
+    } else {
+        println("FAIL: function call");
+        fail = fail + 1;
+    }
+    
+    var product : f64 = multiply(2.5, 4.0);
+    if (product > 9.0 && product < 11.0) {
+        println("PASS: f64 function");
+        pass = pass + 1;
+    } else {
+        println("FAIL: f64 function");
+        fail = fail + 1;
+    }
+    
+    var check : b8 = is_positive(10);
+    if (check == true) {
+        println("PASS: b8 return");
+        pass = pass + 1;
+    } else {
+        println("FAIL: b8 return");
+        fail = fail + 1;
+    }
+    
+    check = is_positive(-5);
+    if (check == false) {
+        println("PASS: b8 false return");
+        pass = pass + 1;
+    } else {
+        println("FAIL: b8 false return");
+        fail = fail + 1;
+    }
+    
+    void_func();
+    println("PASS: void function");
+    pass = pass + 1;
+    
+    var fact : i32 = factorial(5);
+    if (fact == 120) {
+        println("PASS: recursion");
+        pass = pass + 1;
+    } else {
+        println("FAIL: recursion");
+        fail = fail + 1;
+    }
+    
+    var nested_result : i32 = add(add(1, 2), add(3, 4));
+    if (nested_result == 10) {
+        println("PASS: nested calls");
+        pass = pass + 1;
+    } else {
+        println("FAIL: nested calls");
+        fail = fail + 1;
+    }
+    
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    
+    return fail;
+}

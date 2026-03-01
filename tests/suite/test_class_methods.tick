@@ -1,0 +1,100 @@
+class Counter {
+    var count : i32 = 0;
+
+    func Counter() : void {
+        self.count = 0;
+    }
+
+    func increment() : void {
+        self.count = self.count + 1;
+    }
+
+    func get() : i32 {
+        return self.count;
+    }
+
+    func add(n : i32) : void {
+        self.count = self.count + n;
+    }
+}
+
+class Pair {
+    var first : i32 = 0;
+    var second : i32 = 0;
+
+    func Pair(a : i32, b : i32) : void {
+        self.first = a;
+        self.second = b;
+    }
+
+    func sum() : i32 {
+        return self.first + self.second;
+    }
+
+    func diff() : i32 {
+        return self.first - self.second;
+    }
+}
+
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Class Methods Test ===");
+
+    var c : Counter = Counter();
+    c.increment();
+    c.increment();
+    c.increment();
+
+    if (c.get() == 3) {
+        println("PASS: counter increments");
+        pass = pass + 1;
+    } else {
+        println("FAIL: counter increments");
+        fail = fail + 1;
+    }
+
+    c.add(10);
+    if (c.get() == 13) {
+        println("PASS: counter add");
+        pass = pass + 1;
+    } else {
+        println("FAIL: counter add");
+        fail = fail + 1;
+    }
+
+    var p : Pair = Pair(15, 5);
+    if (p.sum() == 20) {
+        println("PASS: pair sum");
+        pass = pass + 1;
+    } else {
+        println("FAIL: pair sum");
+        fail = fail + 1;
+    }
+
+    if (p.diff() == 10) {
+        println("PASS: pair diff");
+        pass = pass + 1;
+    } else {
+        println("FAIL: pair diff");
+        fail = fail + 1;
+    }
+
+    var c2 : Counter = Counter();
+    c2.add(100);
+    if (c.get() == 13 && c2.get() == 100) {
+        println("PASS: separate instances");
+        pass = pass + 1;
+    } else {
+        println("FAIL: separate instances");
+        fail = fail + 1;
+    }
+
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+
+    return fail;
+}

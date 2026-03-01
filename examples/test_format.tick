@@ -1,8 +1,0 @@
-func main() : int {
-    var x : int = 42;
-    var y : float = 3.14;
-    println(format("Integer: {}", x));
-    println(format("Float: {}", y));
-    println(format("Both: {} and {}", x, y));
-    return 0;
-}

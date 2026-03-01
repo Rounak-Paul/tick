@@ -1,5 +1,7 @@
 #include "lexer.h"
+#include <cstdio>
 #include <cstring>
+#include <cctype>
 
 namespace Tick {
 
@@ -11,6 +13,9 @@ char Lexer::current_char() {
 }
 
 char Lexer::peek_char(int offset) {
+    for (int i = 0; i < offset; i++) {
+        if (_source[_position + i] == '\0') return '\0';
+    }
     return _source[_position + offset];
 }
 
@@ -36,6 +41,17 @@ void Lexer::skip_comment() {
         while (current_char() != '\n' && current_char() != '\0') {
             advance();
         }
+    } else if (current_char() == '/' && peek_char() == '*') {
+        advance();
+        advance();
+        while (current_char() != '\0') {
+            if (current_char() == '*' && peek_char() == '/') {
+                advance();
+                advance();
+                return;
+            }
+            advance();
+        }
     }
 }
 
@@ -49,27 +65,67 @@ Token Lexer::make_token(TokenType type, const char* start, size_t length) {
 }
 
 TokenType Lexer::check_keyword(const char* str, size_t length) {
-    if (length == 3 && memcmp(str, "var", 3) == 0) return TokenType::VAR;
-    if (length == 4 && memcmp(str, "func", 4) == 0) return TokenType::FUNC;
-    if (length == 5 && memcmp(str, "event", 5) == 0) return TokenType::EVENT;
-    if (length == 6 && memcmp(str, "signal", 6) == 0) return TokenType::SIGNAL;
-    if (length == 7 && memcmp(str, "process", 7) == 0) return TokenType::PROCESS;
-    if (length == 5 && memcmp(str, "class", 5) == 0) return TokenType::CLASS;
-    if (length == 3 && memcmp(str, "new", 3) == 0) return TokenType::NEW;
-    if (length == 4 && memcmp(str, "this", 4) == 0) return TokenType::THIS;
-    if (length == 3 && memcmp(str, "int", 3) == 0) return TokenType::INT;
-    if (length == 4 && memcmp(str, "bool", 4) == 0) return TokenType::BOOL;
-    if (length == 5 && memcmp(str, "float", 5) == 0) return TokenType::FLOAT;
-    if (length == 6 && memcmp(str, "double", 6) == 0) return TokenType::DOUBLE;
-    if (length == 6 && memcmp(str, "string", 6) == 0) return TokenType::STRING_TYPE;
-    if (length == 5 && memcmp(str, "while", 5) == 0) return TokenType::WHILE;
-    if (length == 3 && memcmp(str, "for", 3) == 0) return TokenType::FOR;
-    if (length == 2 && memcmp(str, "if", 2) == 0) return TokenType::IF;
-    if (length == 4 && memcmp(str, "else", 4) == 0) return TokenType::ELSE;
-    if (length == 6 && memcmp(str, "return", 6) == 0) return TokenType::RETURN;
-    if (length == 5 && memcmp(str, "break", 5) == 0) return TokenType::BREAK;
-    if (length == 4 && memcmp(str, "true", 4) == 0) return TokenType::TRUE;
-    if (length == 5 && memcmp(str, "false", 5) == 0) return TokenType::FALSE;
+    if (length == 2) {
+        if (memcmp(str, "if", 2) == 0) return TokenType::IF;
+        if (memcmp(str, "u8", 2) == 0) return TokenType::U8;
+        if (memcmp(str, "i8", 2) == 0) return TokenType::I8;
+        if (memcmp(str, "b8", 2) == 0) return TokenType::B8;
+    }
+    if (length == 3) {
+        if (memcmp(str, "var", 3) == 0) return TokenType::VAR;
+        if (memcmp(str, "for", 3) == 0) return TokenType::FOR;
+        if (memcmp(str, "str", 3) == 0) return TokenType::STR;
+        if (memcmp(str, "try", 3) == 0) return TokenType::TRY;
+        if (memcmp(str, "ptr", 3) == 0) return TokenType::PTR;
+        if (memcmp(str, "u16", 3) == 0) return TokenType::U16;
+        if (memcmp(str, "u32", 3) == 0) return TokenType::U32;
+        if (memcmp(str, "u64", 3) == 0) return TokenType::U64;
+        if (memcmp(str, "i16", 3) == 0) return TokenType::I16;
+        if (memcmp(str, "i32", 3) == 0) return TokenType::I32;
+        if (memcmp(str, "i64", 3) == 0) return TokenType::I64;
+        if (memcmp(str, "f32", 3) == 0) return TokenType::F32;
+        if (memcmp(str, "f64", 3) == 0) return TokenType::F64;
+    }
+    if (length == 4) {
+        if (memcmp(str, "func", 4) == 0) return TokenType::FUNC;
+        if (memcmp(str, "this", 4) == 0) return TokenType::THIS;
+        if (memcmp(str, "from", 4) == 0) return TokenType::FROM;
+        if (memcmp(str, "void", 4) == 0) return TokenType::VOID_TYPE;
+        if (memcmp(str, "else", 4) == 0) return TokenType::ELSE;
+        if (memcmp(str, "true", 4) == 0) return TokenType::TRUE;
+        if (memcmp(str, "case", 4) == 0) return TokenType::CASE;
+        if (memcmp(str, "enum", 4) == 0) return TokenType::ENUM;
+        if (memcmp(str, "cast", 4) == 0) return TokenType::CAST;
+        if (memcmp(str, "null", 4) == 0) return TokenType::NULL_LIT;
+        if (memcmp(str, "link", 4) == 0) return TokenType::LINK;
+    }
+    if (length == 5) {
+        if (memcmp(str, "event", 5) == 0) return TokenType::EVENT;
+        if (memcmp(str, "class", 5) == 0) return TokenType::CLASS;
+        if (memcmp(str, "const", 5) == 0) return TokenType::CONST;
+        if (memcmp(str, "while", 5) == 0) return TokenType::WHILE;
+        if (memcmp(str, "break", 5) == 0) return TokenType::BREAK;
+        if (memcmp(str, "false", 5) == 0) return TokenType::FALSE;
+        if (memcmp(str, "defer", 5) == 0) return TokenType::DEFER;
+        if (memcmp(str, "union", 5) == 0) return TokenType::UNION;
+        if (memcmp(str, "catch", 5) == 0) return TokenType::CATCH;
+        if (memcmp(str, "throw", 5) == 0) return TokenType::THROW;
+    }
+    if (length == 6) {
+        if (memcmp(str, "signal", 6) == 0) return TokenType::SIGNAL;
+        if (memcmp(str, "import", 6) == 0) return TokenType::IMPORT;
+        if (memcmp(str, "return", 6) == 0) return TokenType::RETURN;
+        if (memcmp(str, "switch", 6) == 0) return TokenType::SWITCH;
+        if (memcmp(str, "extern", 6) == 0) return TokenType::EXTERN;
+        if (memcmp(str, "sizeof", 6) == 0) return TokenType::SIZEOF;
+    }
+    if (length == 7) {
+        if (memcmp(str, "process", 7) == 0) return TokenType::PROCESS;
+        if (memcmp(str, "default", 7) == 0) return TokenType::DEFAULT;
+    }
+    if (length == 8 && memcmp(str, "continue", 8) == 0) return TokenType::CONTINUE;
+    if (length == 9 && memcmp(str, "interface", 9) == 0) return TokenType::INTERFACE;
+    if (length == 10 && memcmp(str, "implements", 10) == 0) return TokenType::IMPLEMENTS;
     return TokenType::IDENTIFIER;
 }
 
@@ -147,12 +203,33 @@ Token Lexer::read_string() {
     return make_token(TokenType::STRING, start, length);
 }
 
+Token Lexer::read_multiline_string() {
+    advance();
+    const char* start = &_source[_position];
+    size_t length = 0;
+    
+    while (current_char() != '`' && current_char() != '\0') {
+        advance();
+        length++;
+    }
+    
+    if (current_char() == '`') {
+        advance();
+    }
+    
+    return make_token(TokenType::STRING, start, length);
+}
+
 DynamicArray<Token> Lexer::tokenize() {
     DynamicArray<Token> tokens;
     
     while (current_char() != '\0') {
         skip_whitespace();
-        skip_comment();
+        
+        while (current_char() == '/' && (peek_char() == '/' || peek_char() == '*')) {
+            skip_comment();
+            skip_whitespace();
+        }
         
         if (current_char() == '\0') break;
         
@@ -167,9 +244,23 @@ DynamicArray<Token> Lexer::tokenize() {
         else if (c == '"') {
             tokens.push(read_string());
         }
+        else if (c == '`') {
+            tokens.push(read_multiline_string());
+        }
         else if (c == '@') {
             advance();
-            tokens.push(make_token(TokenType::AT, "@", 1));
+            if (memcmp(_source + _position, "dataclass", 9) == 0) {
+                char after = _source[_position + 9];
+                if (!isalnum(after) && after != '_') {
+                    _position += 9;
+                    _column += 9;
+                    tokens.push(make_token(TokenType::DATACLASS, "@dataclass", 10));
+                } else {
+                    tokens.push(make_token(TokenType::AT, "@", 1));
+                }
+            } else {
+                tokens.push(make_token(TokenType::AT, "@", 1));
+            }
         }
         else if (c == '(') {
             advance();
@@ -197,20 +288,36 @@ DynamicArray<Token> Lexer::tokenize() {
         }
         else if (c == '<') {
             advance();
-            if (current_char() == '=') {
+            if (current_char() == '<') {
+                advance();
+                if (current_char() == '=') {
+                    advance();
+                    tokens.push(make_token(TokenType::LSHIFT_ASSIGN, "<<=", 3));
+                } else {
+                    tokens.push(make_token(TokenType::LSHIFT, "<<", 2));
+                }
+            } else if (current_char() == '=') {
                 advance();
                 tokens.push(make_token(TokenType::LTE, "<=", 2));
             } else {
-                tokens.push(make_token(TokenType::LANGLE, "<", 1));
+                tokens.push(make_token(TokenType::LT, "<", 1));
             }
         }
         else if (c == '>') {
             advance();
-            if (current_char() == '=') {
+            if (current_char() == '>') {
+                advance();
+                if (current_char() == '=') {
+                    advance();
+                    tokens.push(make_token(TokenType::RSHIFT_ASSIGN, ">>=", 3));
+                } else {
+                    tokens.push(make_token(TokenType::RSHIFT, ">>", 2));
+                }
+            } else if (current_char() == '=') {
                 advance();
                 tokens.push(make_token(TokenType::GTE, ">=", 2));
             } else {
-                tokens.push(make_token(TokenType::RANGLE, ">", 1));
+                tokens.push(make_token(TokenType::GT, ">", 1));
             }
         }
         else if (c == ',') {
@@ -249,35 +356,95 @@ DynamicArray<Token> Lexer::tokenize() {
         }
         else if (c == '+') {
             advance();
-            tokens.push(make_token(TokenType::PLUS, "+", 1));
+            if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::PLUS_ASSIGN, "+=", 2));
+            } else if (current_char() == '+') {
+                advance();
+                tokens.push(make_token(TokenType::INCREMENT, "++", 2));
+            } else {
+                tokens.push(make_token(TokenType::PLUS, "+", 1));
+            }
         }
         else if (c == '-') {
             advance();
-            tokens.push(make_token(TokenType::MINUS, "-", 1));
+            if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::MINUS_ASSIGN, "-=", 2));
+            } else if (current_char() == '-') {
+                advance();
+                tokens.push(make_token(TokenType::DECREMENT, "--", 2));
+            } else {
+                tokens.push(make_token(TokenType::MINUS, "-", 1));
+            }
         }
         else if (c == '*') {
             advance();
-            tokens.push(make_token(TokenType::STAR, "*", 1));
+            if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::STAR_ASSIGN, "*=", 2));
+            } else {
+                tokens.push(make_token(TokenType::STAR, "*", 1));
+            }
         }
         else if (c == '/') {
             advance();
-            tokens.push(make_token(TokenType::SLASH, "/", 1));
+            if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::SLASH_ASSIGN, "/=", 2));
+            } else {
+                tokens.push(make_token(TokenType::SLASH, "/", 1));
+            }
         }
         else if (c == '%') {
             advance();
-            tokens.push(make_token(TokenType::PERCENT, "%", 1));
+            if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::PERCENT_ASSIGN, "%=", 2));
+            } else {
+                tokens.push(make_token(TokenType::PERCENT, "%", 1));
+            }
         }
-        else if (c == '&' && peek_char() == '&') {
+        else if (c == '&') {
             advance();
-            advance();
-            tokens.push(make_token(TokenType::AND, "&&", 2));
+            if (current_char() == '&') {
+                advance();
+                tokens.push(make_token(TokenType::AND, "&&", 2));
+            } else if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::AMPERSAND_ASSIGN, "&=", 2));
+            } else {
+                tokens.push(make_token(TokenType::AMPERSAND, "&", 1));
+            }
         }
-        else if (c == '|' && peek_char() == '|') {
+        else if (c == '|') {
             advance();
+            if (current_char() == '|') {
+                advance();
+                tokens.push(make_token(TokenType::OR, "||", 2));
+            } else if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::PIPE_ASSIGN, "|=", 2));
+            } else {
+                tokens.push(make_token(TokenType::PIPE, "|", 1));
+            }
+        }
+        else if (c == '^') {
             advance();
-            tokens.push(make_token(TokenType::OR, "||", 2));
+            if (current_char() == '=') {
+                advance();
+                tokens.push(make_token(TokenType::CARET_ASSIGN, "^=", 2));
+            } else {
+                tokens.push(make_token(TokenType::CARET, "^", 1));
+            }
+        }
+        else if (c == '~') {
+            advance();
+            tokens.push(make_token(TokenType::TILDE, "~", 1));
         }
         else {
+            fprintf(stderr, "Lexer error: unexpected character '%c' at line %zu, column %zu\n", 
+                c, _line, _column);
             advance();
         }
     }

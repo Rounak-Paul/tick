@@ -1,0 +1,39 @@
+func main() : i32 {
+    var pass : i32 = 0;
+    var fail : i32 = 0;
+
+    println("=== Input Test ===");
+
+    var line : str = input();
+    if (str_compare(line, "hello") == 0) {
+        println("PASS: input no prompt");
+        pass = pass + 1;
+    } else {
+        println("FAIL: input no prompt");
+        fail = fail + 1;
+    }
+
+    var line2 : str = input("prompt: ");
+    if (str_compare(line2, "world") == 0) {
+        println("PASS: input with prompt");
+        pass = pass + 1;
+    } else {
+        println("FAIL: input with prompt");
+        fail = fail + 1;
+    }
+
+    var empty : str = input();
+    if (str_compare(empty, "") == 0) {
+        println("PASS: input empty line");
+        pass = pass + 1;
+    } else {
+        println("FAIL: input empty line");
+        fail = fail + 1;
+    }
+
+    println("Passed: ");
+    println(pass);
+    println("Failed: ");
+    println(fail);
+    return fail;
+}

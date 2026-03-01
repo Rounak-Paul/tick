@@ -1,8 +1,0 @@
-func main() : int {
-    println("Hello, World!");
-    println("Testing string literals");
-    
-    println("String with escape: \n\tNewline and tab");
-    
-    return 0;
-}
