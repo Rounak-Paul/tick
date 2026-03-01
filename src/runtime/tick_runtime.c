@@ -84,7 +84,7 @@ char* tick_str_concat(const char* a, const char* b) {
     if (!b) b = "";
     size_t la = strlen(a);
     size_t lb = strlen(b);
-    char* result = (char*)tick_gc_alloc(la + lb + 1);
+    char* result = (char*)malloc(la + lb + 1);
     memcpy(result, a, la);
     memcpy(result + la, b, lb);
     result[la + lb] = '\0';
@@ -92,13 +92,13 @@ char* tick_str_concat(const char* a, const char* b) {
 }
 
 char* tick_str_substring(const char* s, int32_t start, int32_t end) {
-    if (!s) { char* r = (char*)tick_gc_alloc(1); r[0] = '\0'; return r; }
+    if (!s) { char* r = (char*)malloc(1); r[0] = '\0'; return r; }
     int32_t len = (int32_t)strlen(s);
     if (start < 0) start = 0;
     if (end > len) end = len;
-    if (start >= end) { char* r = (char*)tick_gc_alloc(1); r[0] = '\0'; return r; }
+    if (start >= end) { char* r = (char*)malloc(1); r[0] = '\0'; return r; }
     int32_t sub_len = end - start;
-    char* result = (char*)tick_gc_alloc(sub_len + 1);
+    char* result = (char*)malloc(sub_len + 1);
     memcpy(result, s + start, sub_len);
     result[sub_len] = '\0';
     return result;
@@ -124,7 +124,7 @@ char tick_str_char_at(const char* s, int32_t index) {
 }
 
 char* tick_str_from_i64(int64_t val) {
-    char* buf = (char*)tick_gc_alloc(32);
+    char* buf = (char*)malloc(32);
     snprintf(buf, 32, "%lld", (long long)val);
     return buf;
 }
@@ -135,13 +135,13 @@ int64_t tick_str_to_i64(const char* s) {
 }
 
 char* tick_str_from_u64(uint64_t val) {
-    char* buf = (char*)tick_gc_alloc(32);
+    char* buf = (char*)malloc(32);
     snprintf(buf, 32, "%llu", (unsigned long long)val);
     return buf;
 }
 
 char* tick_str_from_f64(double val) {
-    char* buf = (char*)tick_gc_alloc(64);
+    char* buf = (char*)malloc(64);
     snprintf(buf, 64, "%f", val);
     return buf;
 }
@@ -152,7 +152,7 @@ double tick_str_to_f64(const char* s) {
 }
 
 char* tick_str_from_b8(bool val) {
-    char* buf = (char*)tick_gc_alloc(6);
+    char* buf = (char*)malloc(6);
     snprintf(buf, 6, "%s", val ? "true" : "false");
     return buf;
 }
@@ -169,12 +169,12 @@ char* tick_input_readline(const char* prompt) {
     }
     size_t cap = 128;
     size_t len = 0;
-    char* buf = (char*)tick_gc_alloc(cap);
+    char* buf = (char*)malloc(cap);
     int c;
     while ((c = fgetc(stdin)) != EOF && c != '\n') {
         if (len + 1 >= cap) {
             cap *= 2;
-            buf = (char*)tick_gc_realloc(buf, cap);
+            buf = (char*)realloc(buf, cap);
         }
         buf[len++] = (char)c;
     }
@@ -192,11 +192,11 @@ TickFile* tick_file_open(const char* path, const char* mode) {
 }
 
 char* tick_file_read(TickFile* f) {
-    if (!f || !f->handle) { char* r = (char*)tick_gc_alloc(1); r[0] = '\0'; return r; }
+    if (!f || !f->handle) { char* r = (char*)malloc(1); r[0] = '\0'; return r; }
     fseek(f->handle, 0, SEEK_END);
     long size = ftell(f->handle);
     fseek(f->handle, 0, SEEK_SET);
-    char* buf = (char*)tick_gc_alloc(size + 1);
+    char* buf = (char*)malloc(size + 1);
     fread(buf, 1, size, f->handle);
     buf[size] = '\0';
     return buf;
@@ -222,7 +222,7 @@ bool tick_file_exists(const char* path) {
 void tick_array_push(TickArray* arr, size_t elem_size) {
     if (arr->len >= arr->cap) {
         int32_t new_cap = (arr->cap == 0) ? 4 : (arr->cap * 2);
-        arr->ptr = tick_gc_realloc(arr->ptr, (size_t)new_cap * elem_size);
+        arr->ptr = realloc(arr->ptr, (size_t)new_cap * elem_size);
         arr->cap = new_cap;
     }
     arr->len++;
@@ -230,60 +230,4 @@ void tick_array_push(TickArray* arr, size_t elem_size) {
 
 void tick_array_pop(TickArray* arr) {
     if (arr->len > 0) arr->len--;
-}
-
-static TickGC _tick_gc = {{NULL}, 0};
-
-void tick_gc_init(void) {
-    _tick_gc.count = 0;
-}
-
-void* tick_gc_realloc(void* old_ptr, size_t new_size) {
-    void* new_ptr = realloc(old_ptr, new_size);
-    if (!new_ptr) return NULL;
-    if (new_ptr == old_ptr) return new_ptr;
-    for (int i = 0; i < _tick_gc.count; i++) {
-        if (_tick_gc.ptrs[i] == old_ptr) {
-            _tick_gc.ptrs[i] = new_ptr;
-            return new_ptr;
-        }
-    }
-    if (_tick_gc.count < TICK_GC_MAX_OBJECTS) {
-        _tick_gc.ptrs[_tick_gc.count++] = new_ptr;
-    }
-    return new_ptr;
-}
-
-void* tick_gc_alloc(size_t size) {
-    void* ptr = malloc(size);
-    if (ptr && _tick_gc.count < TICK_GC_MAX_OBJECTS) {
-        _tick_gc.ptrs[_tick_gc.count++] = ptr;
-    }
-    return ptr;
-}
-
-void tick_gc_free(void* ptr) {
-    if (!ptr) return;
-    for (int i = 0; i < _tick_gc.count; i++) {
-        if (_tick_gc.ptrs[i] == ptr) {
-            _tick_gc.ptrs[i] = _tick_gc.ptrs[_tick_gc.count - 1];
-            _tick_gc.count--;
-            free(ptr);
-            return;
-        }
-    }
-}
-
-void tick_gc_collect(void) {
-    tick_gc_cleanup();
-}
-
-void tick_gc_cleanup(void) {
-    for (int i = 0; i < _tick_gc.count; i++) {
-        if (_tick_gc.ptrs[i]) {
-            free(_tick_gc.ptrs[i]);
-            _tick_gc.ptrs[i] = NULL;
-        }
-    }
-    _tick_gc.count = 0;
 }

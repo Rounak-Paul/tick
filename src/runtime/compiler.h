@@ -33,6 +33,7 @@ public:
 private:
     static Tick::FunctionDecl* _current_func;
     static Tick::ClassDecl* _current_class;
+    static Tick::ProcessDecl* _current_process;
     static char _defines[64][128];
     static int _define_count;
     static Tick::StmtNode* _defer_scopes[MAX_DEFER_SCOPES][MAX_DEFERS_PER_SCOPE];

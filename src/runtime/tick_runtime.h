@@ -71,18 +71,4 @@ typedef struct {
 void tick_array_push(TickArray* arr, size_t elem_size);
 void tick_array_pop(TickArray* arr);
 
-#define TICK_GC_MAX_OBJECTS 65536
-
-typedef struct {
-    void* ptrs[TICK_GC_MAX_OBJECTS];
-    int count;
-} TickGC;
-
-void tick_gc_init(void);
-void* tick_gc_alloc(size_t size);
-void* tick_gc_realloc(void* ptr, size_t new_size);
-void tick_gc_free(void* ptr);
-void tick_gc_collect(void);
-void tick_gc_cleanup(void);
-
 #endif
