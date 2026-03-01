@@ -2117,15 +2117,10 @@ bool Compiler::invoke_gcc(const char* c_file, const char* output_file, const cha
 #ifdef __APPLE__
     uint32_t size = sizeof(exe_path);
     if (_NSGetExecutablePath(exe_path, &size) == 0) {
+        char real[1024];
+        if (realpath(exe_path, real)) strncpy(exe_path, real, sizeof(exe_path) - 1);
         char* last_slash = strrchr(exe_path, '/');
-        if (last_slash) {
-            *last_slash = '\0';
-            snprintf(runtime_path, sizeof(runtime_path), "%s/../src/runtime/tick_runtime.c", exe_path);
-        } else {
-            strcpy(runtime_path, "src/runtime/tick_runtime.c");
-        }
-    } else {
-        strcpy(runtime_path, "src/runtime/tick_runtime.c");
+        if (last_slash) *last_slash = '\0';
     }
 #else
     char link_path[64];
@@ -2134,19 +2129,31 @@ bool Compiler::invoke_gcc(const char* c_file, const char* output_file, const cha
     if (len != -1) {
         exe_path[len] = '\0';
         char* last_slash = strrchr(exe_path, '/');
-        if (last_slash) {
-            *last_slash = '\0';
-            snprintf(runtime_path, sizeof(runtime_path), "%s/../src/runtime/tick_runtime.c", exe_path);
-        } else {
-            strcpy(runtime_path, "src/runtime/tick_runtime.c");
-        }
-    } else {
-        strcpy(runtime_path, "src/runtime/tick_runtime.c");
+        if (last_slash) *last_slash = '\0';
     }
 #endif
 
+    char candidate[1024];
+    snprintf(candidate, sizeof(candidate), "%s/../src/runtime/tick_runtime.c", exe_path);
+    if (access(candidate, F_OK) == 0) {
+        strncpy(runtime_path, candidate, sizeof(runtime_path) - 1);
+    } else {
+        snprintf(candidate, sizeof(candidate), "%s/../share/tick/runtime/tick_runtime.c", exe_path);
+        if (access(candidate, F_OK) == 0) {
+            strncpy(runtime_path, candidate, sizeof(runtime_path) - 1);
+        } else {
+            strcpy(runtime_path, "src/runtime/tick_runtime.c");
+        }
+    }
+
     char include_path[1024];
-    snprintf(include_path, sizeof(include_path), "-I%s/../src", exe_path);
+    char inc_candidate[1024];
+    snprintf(inc_candidate, sizeof(inc_candidate), "%s/../src", exe_path);
+    if (access(inc_candidate, F_OK) == 0) {
+        snprintf(include_path, sizeof(include_path), "-I%s", inc_candidate);
+    } else {
+        snprintf(include_path, sizeof(include_path), "-I%s/../share/tick", exe_path);
+    }
 
     snprintf(cmd, sizeof(cmd), "gcc -O2 -o %s %s %s -pthread -lm %s %s",
         output_file, c_file, runtime_path, include_path, extra_flags ? extra_flags : "");

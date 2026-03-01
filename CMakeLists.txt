@@ -14,3 +14,4 @@ file(GLOB_RECURSE SOURCES
 add_executable(tick ${SOURCES})
 
 install(TARGETS tick DESTINATION bin)
+install(FILES src/runtime/tick_runtime.c src/runtime/tick_runtime.h DESTINATION share/tick/runtime)
