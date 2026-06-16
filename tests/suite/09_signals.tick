@@ -1,0 +1,18 @@
+signal done : i32;
+event start;
+
+var result : i32 = 0;
+
+process worker on start {
+    result = 21 * 2;
+    done.emit(result);
+}
+
+func main() : i32 {
+    start.fire();
+    let r = done.recv();
+    if r != 42 { return 1; }
+    if result != 42 { return 2; }
+    println("PASS signals");
+    return 0;
+}

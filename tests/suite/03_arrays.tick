@@ -1,0 +1,42 @@
+func fill_squares(ref var a : i32[], n : i32) {
+    var i = 0;
+    while i < n {
+        a.push(i * i);
+        i = i + 1;
+    }
+}
+
+func sum(ref a : i32[]) : i32 {
+    var total = 0;
+    for x in a {
+        total = total + x;
+    }
+    return total;
+}
+
+func main() : i32 {
+    var a : i32[] = [1, 2, 3];
+    if a.len() != 3 { return 1; }
+    if a[0] != 1 { return 2; }
+    a[1] = 20;
+    if a[1] != 20 { return 3; }
+
+    fill_squares(ref var a, 4);
+    if a.len() != 7 { return 4; }
+    if a[6] != 9 { return 5; }
+
+    // deep value copy
+    var b = a;
+    b.push(1000);
+    if a.len() != 7 { return 6; }
+    if b.len() != 8 { return 7; }
+
+    if sum(ref a) != (1 + 20 + 3 + 0 + 1 + 4 + 9) { return 8; }
+
+    let last = a.pop();
+    if last != 9 { return 9; }
+    if a.len() != 6 { return 10; }
+
+    println("PASS arrays");
+    return 0;
+}

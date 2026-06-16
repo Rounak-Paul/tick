@@ -4,1345 +4,942 @@
 
 namespace Tick {
 
-Parser::Parser(const DynamicArray<Token>& tokens) 
-    : _tokens(tokens), _current(0) {}
+Parser::Parser(const DynamicArray<Token>& tokens)
+    : _tokens(tokens), _current(0), _no_struct_lit(false) {}
 
-Token Parser::current_token() {
-    return _tokens[_current];
-}
+const Token& Parser::cur() const { return _tokens[_current]; }
 
-Token Parser::peek_token(int offset) {
-    if (_current + offset < _tokens.size()) {
-        return _tokens[_current + offset];
-    }
+const Token& Parser::peek(int offset) const {
+    size_t i = _current + offset;
+    if (i < _tokens.size()) return _tokens[i];
     return _tokens[_tokens.size() - 1];
 }
 
-bool Parser::match(TokenType type) {
-    if (check(type)) {
-        advance();
-        return true;
-    }
+bool Parser::check(TokenType t) const { return cur().type == t; }
+
+bool Parser::match(TokenType t) {
+    if (check(t)) { advance(); return true; }
     return false;
-}
-
-bool Parser::check(TokenType type) {
-    return current_token().type == type;
-}
-
-Token Parser::consume(TokenType type, const char* message) {
-    if (check(type)) {
-        Token token = current_token();
-        advance();
-        return token;
-    }
-    fprintf(stderr, "Parse error at line %d: %s\n", current_token().line, message);
-    exit(1);
 }
 
 void Parser::advance() {
-    if (current_token().type != TokenType::END_OF_FILE) {
-        _current++;
-    }
+    if (cur().type != TokenType::END_OF_FILE) _current++;
 }
 
-bool Parser::is_type_keyword() {
-    TokenType type = current_token().type;
-    if (type == TokenType::U8 || type == TokenType::U16 ||
-        type == TokenType::U32 || type == TokenType::U64 ||
-        type == TokenType::I8 || type == TokenType::I16 ||
-        type == TokenType::I32 || type == TokenType::I64 ||
-        type == TokenType::F32 || type == TokenType::F64 ||
-        type == TokenType::B8 || type == TokenType::STR ||
-        type == TokenType::VOID_TYPE || type == TokenType::PTR ||
-        type == TokenType::FUNC) {
-        return true;
+Token Parser::consume(TokenType t, const char* message) {
+    if (check(t)) {
+        Token tok = cur();
+        advance();
+        return tok;
     }
-    if (type == TokenType::IDENTIFIER) {
-        Token next = peek_token(1);
-        return next.type == TokenType::IDENTIFIER || next.type == TokenType::LBRACKET;
-    }
-    return false;
+    fail(message);
 }
 
-Token Parser::parse_type() {
-    TokenType type = current_token().type;
-    if (type == TokenType::FUNC) {
-        Token type_token = current_token();
-        advance();
-        consume(TokenType::LPAREN, "Expected '(' after 'func' in function pointer type");
-        char buf[512];
-        int pos = 0;
-        pos += snprintf(buf + pos, sizeof(buf) - pos, "func(");
-        if (!check(TokenType::RPAREN)) {
-            Token pt = parse_type();
-            pos += snprintf(buf + pos, sizeof(buf) - pos, "%s", pt.lexeme.c_str());
-            while (match(TokenType::COMMA)) {
-                pt = parse_type();
-                pos += snprintf(buf + pos, sizeof(buf) - pos, ",%s", pt.lexeme.c_str());
-            }
-        }
-        consume(TokenType::RPAREN, "Expected ')' after function pointer params");
-        consume(TokenType::COLON, "Expected ':' after function pointer params");
-        Token ret = parse_type();
-        pos += snprintf(buf + pos, sizeof(buf) - pos, "):%s", ret.lexeme.c_str());
-        type_token.lexeme = String(buf);
-        return type_token;
-    }
-    if (type == TokenType::U8 || type == TokenType::U16 ||
-        type == TokenType::U32 || type == TokenType::U64 ||
-        type == TokenType::I8 || type == TokenType::I16 ||
-        type == TokenType::I32 || type == TokenType::I64 ||
-        type == TokenType::F32 || type == TokenType::F64 ||
-        type == TokenType::B8 || type == TokenType::STR ||
-        type == TokenType::VOID_TYPE || type == TokenType::PTR ||
-        type == TokenType::IDENTIFIER) {
-        Token type_token = current_token();
-        advance();
-        
-        if (type == TokenType::PTR && check(TokenType::LT)) {
-            advance();
-            Token inner = parse_type();
-            consume(TokenType::GT, "Expected '>' after ptr<type");
-            char buf[256];
-            snprintf(buf, sizeof(buf), "ptr<%s>", inner.lexeme.c_str());
-            type_token.lexeme = String(buf);
-            return type_token;
-        }
-        
-        if (check(TokenType::LBRACKET)) {
-            advance();
-            if (check(TokenType::INTEGER)) {
-                Token size_tok = current_token();
-                advance();
-                consume(TokenType::RBRACKET, "Expected ']' after array size");
-                size_t base_len = type_token.lexeme.length();
-                size_t size_len = size_tok.lexeme.length();
-                char* array_type = (char*)malloc(base_len + size_len + 3);
-                memcpy(array_type, type_token.lexeme.c_str(), base_len);
-                array_type[base_len] = '[';
-                memcpy(array_type + base_len + 1, size_tok.lexeme.c_str(), size_len);
-                array_type[base_len + 1 + size_len] = ']';
-                array_type[base_len + 2 + size_len] = '\0';
-                type_token.lexeme = String(array_type);
-                free(array_type);
-            } else {
-                consume(TokenType::RBRACKET, "Expected ']' after '['");
-                size_t base_len = type_token.lexeme.length();
-                char* array_type = (char*)malloc(base_len + 3);
-                memcpy(array_type, type_token.lexeme.c_str(), base_len);
-                array_type[base_len] = '[';
-                array_type[base_len + 1] = ']';
-                array_type[base_len + 2] = '\0';
-                type_token.lexeme = String(array_type);
-                free(array_type);
-            }
-        }
-        
-        return type_token;
-    }
-    
-    fprintf(stderr, "Parse error at line %d: Expected type\n", current_token().line);
+void Parser::fail(const char* message) const {
+    fprintf(stderr, "Parse error at line %d: %s (found '%s')\n",
+            cur().line, message, cur().lexeme.c_str());
     exit(1);
 }
 
-Program* Parser::parse() {
-    Program* program = new Program();
-    
-    while (!check(TokenType::END_OF_FILE)) {
-        if (!parse_top_level_decl(program)) {
-            fprintf(stderr, "Parse error at line %d: Unexpected token at top level\n", current_token().line);
-            exit(1);
-        }
-    }
-    
-    return program;
-}
+// ---- types ----
 
-ImportDecl* Parser::parse_import_decl() {
-    int ln = current_token().line;
-    if (check(TokenType::FROM)) {
-        advance();
-        Token module = consume(TokenType::IDENTIFIER, "Expected module name");
-        consume(TokenType::IMPORT, "Expected 'import'");
-        
-        ImportDecl* import_decl = new ImportDecl(module.lexeme);
-        import_decl->line = ln;
-        import_decl->import_all = false;
-        
-        if (check(TokenType::STAR)) {
+TypeRef* Parser::parse_base_type() {
+    TokenType t = cur().type;
+    switch (t) {
+        case TokenType::VOID: advance(); return new TypeRef(TypeKind::VOID);
+        case TokenType::BOOL: advance(); return new TypeRef(TypeKind::BOOL);
+        case TokenType::STR:  advance(); return new TypeRef(TypeKind::STR);
+        case TokenType::I8: case TokenType::I16: case TokenType::I32: case TokenType::I64:
+        case TokenType::U8: case TokenType::U16: case TokenType::U32: case TokenType::U64: {
+            TypeRef* tr = new TypeRef(TypeKind::INT);
+            const char* lx = cur().lexeme.c_str();
+            tr->int_unsigned = (lx[0] == 'u');
+            tr->int_bits = atoi(lx + 1);
             advance();
-            import_decl->import_all = true;
-        } else {
-            Token name = consume(TokenType::IDENTIFIER, "Expected identifier");
-            import_decl->imported_names.push(name.lexeme);
-            
-            while (check(TokenType::COMMA)) {
-                advance();
-                Token next_name = consume(TokenType::IDENTIFIER, "Expected identifier");
-                import_decl->imported_names.push(next_name.lexeme);
-            }
+            return tr;
         }
-        
-        consume(TokenType::SEMICOLON, "Expected ';' after import");
-        return import_decl;
-    } else {
-        advance();
-        Token module = consume(TokenType::IDENTIFIER, "Expected module name");
-        consume(TokenType::SEMICOLON, "Expected ';' after import");
-        
-        ImportDecl* decl = new ImportDecl(module.lexeme);
-        decl->line = ln;
-        return decl;
-    }
-}
-
-EventDecl* Parser::parse_event_decl() {
-    int ln = current_token().line;
-    consume(TokenType::EVENT, "Expected 'event'");
-    Token name = consume(TokenType::IDENTIFIER, "Expected event name");
-    consume(TokenType::SEMICOLON, "Expected ';' after event declaration");
-    
-    EventDecl* decl = new EventDecl(name.lexeme);
-    decl->line = ln;
-    return decl;
-}
-
-SignalDecl* Parser::parse_signal_decl() {
-    int ln = current_token().line;
-    consume(TokenType::SIGNAL, "Expected 'signal'");
-    Token name = consume(TokenType::IDENTIFIER, "Expected signal name");
-    
-    int array_size = 0;
-    if (check(TokenType::LBRACKET)) {
-        advance();
-        if (!check(TokenType::RBRACKET)) {
-            Token size_token = consume(TokenType::INTEGER, "Expected array size");
-            array_size = atoi(size_token.lexeme.c_str());
-        }
-        consume(TokenType::RBRACKET, "Expected ']'");
-    }
-    
-    consume(TokenType::COLON, "Expected ':'");
-    Token type = parse_type();
-    consume(TokenType::SEMICOLON, "Expected ';' after signal declaration");
-    
-    SignalDecl* decl = new SignalDecl(type.lexeme, name.lexeme, array_size);
-    decl->line = ln;
-    return decl;
-}
-
-ProcessDecl* Parser::parse_process_decl() {
-    int ln = current_token().line;
-    consume(TokenType::AT, "Expected '@'");
-    Token event_name = consume(TokenType::IDENTIFIER, "Expected event name");
-    consume(TokenType::PROCESS, "Expected 'process'");
-    Token name = consume(TokenType::IDENTIFIER, "Expected process name");
-    BlockStmt* body = parse_block();
-    
-    ProcessDecl* decl = new ProcessDecl(event_name.lexeme, name.lexeme, body);
-    decl->line = ln;
-    return decl;
-}
-
-void Parser::parse_class_decl(Program* program, bool is_dataclass) {
-    int ln = current_token().line;
-    consume(TokenType::CLASS, "Expected 'class'");
-    Token name = consume(TokenType::IDENTIFIER, "Expected class name");
-    
-    String base_class;
-    DynamicArray<String> iface_list;
-    
-    if (!is_dataclass && match(TokenType::COLON)) {
-        Token base = consume(TokenType::IDENTIFIER, "Expected base class name after ':'");
-        base_class = base.lexeme;
-    }
-    
-    if (!is_dataclass && match(TokenType::IMPLEMENTS)) {
-        do {
-            Token iface = consume(TokenType::IDENTIFIER, "Expected interface name");
-            iface_list.push(iface.lexeme);
-        } while (match(TokenType::COMMA));
-    }
-    
-    consume(TokenType::LBRACE, "Expected '{' after class declaration");
-    
-    ClassDecl* cls = new ClassDecl(name.lexeme);
-    cls->line = ln;
-    cls->base_class = base_class;
-    cls->is_dataclass = is_dataclass;
-    for (size_t i = 0; i < iface_list.size(); i++) {
-        cls->interfaces.push(iface_list[i]);
-    }
-    
-    while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
-        if (check(TokenType::VAR)) {
-            int fln = current_token().line;
+        case TokenType::F32: case TokenType::F64: {
+            TypeRef* tr = new TypeRef(TypeKind::FLOAT);
+            tr->float_bits = atoi(cur().lexeme.c_str() + 1);
             advance();
-            Token field_name = consume(TokenType::IDENTIFIER, "Expected field name after 'var'");
-            consume(TokenType::COLON, "Expected ':' after field name");
-            Token type = parse_type();
-            
-            ExprNode* initializer = nullptr;
-            if (match(TokenType::ASSIGN)) {
-                initializer = parse_expression();
-            }
-            consume(TokenType::SEMICOLON, "Expected ';' after field declaration");
-            VarDecl* field = new VarDecl(type.lexeme, field_name.lexeme, initializer);
-            field->line = fln;
-            cls->fields.push(field);
-        } else if (!is_dataclass && check(TokenType::FUNC)) {
-            int mln = current_token().line;
+            return tr;
+        }
+        case TokenType::PTR: {
             advance();
-            
-            bool is_dtor = false;
-            if (match(TokenType::TILDE)) {
-                is_dtor = true;
+            TypeRef* tr = new TypeRef(TypeKind::PTR);
+            if (match(TokenType::LANGLE)) {
+                tr->inner = parse_type();
+                consume(TokenType::RANGLE, "Expected '>' after ptr<T>");
             }
-            
-            Token method_name = consume(TokenType::IDENTIFIER, "Expected method name after 'func'");
-            consume(TokenType::LPAREN, "Expected '(' after method name");
-            
-            FunctionDecl* method = new FunctionDecl("", method_name.lexeme, nullptr);
-            method->line = mln;
-            method->class_name = name.lexeme;
-            method->is_destructor = is_dtor;
-            
-            if (!check(TokenType::RPAREN)) {
-                do {
-                    Token param_name = consume(TokenType::IDENTIFIER, "Expected parameter name");
-                    consume(TokenType::COLON, "Expected ':' after parameter name");
-                    Token param_type = parse_type();
-                    method->parameters.push(new Parameter(param_type.lexeme, param_name.lexeme));
-                } while (match(TokenType::COMMA));
-            }
-            
-            consume(TokenType::RPAREN, "Expected ')' after parameters");
-            consume(TokenType::COLON, "Expected ':' after parameters");
-            Token return_type = parse_type();
-            method->return_type = return_type.lexeme;
-            method->body = parse_block();
-            program->methods.push(method);
-        } else {
-            fprintf(stderr, "Parse error at line %d: Expected 'var' or 'func' in class body\n", current_token().line);
-            exit(1);
+            return tr;
         }
-    }
-    
-    consume(TokenType::RBRACE, "Expected '}' after class body");
-    program->classes.push(cls);
-}
-
-FunctionDecl* Parser::parse_function_decl() {
-    int ln = current_token().line;
-    advance();
-    
-    Token name = consume(TokenType::IDENTIFIER, "Expected function name after 'func'");
-    consume(TokenType::LPAREN, "Expected '(' after function name");
-    
-    FunctionDecl* func = new FunctionDecl("", name.lexeme, nullptr);
-    func->line = ln;
-    
-    if (!check(TokenType::RPAREN)) {
-        do {
-            Token param_name = consume(TokenType::IDENTIFIER, "Expected parameter name");
-            consume(TokenType::COLON, "Expected ':' after parameter name");
-            Token param_type = parse_type();
-            
-            func->parameters.push(new Parameter(param_type.lexeme, param_name.lexeme));
-        } while (match(TokenType::COMMA));
-    }
-    
-    consume(TokenType::RPAREN, "Expected ')' after parameters");
-    consume(TokenType::COLON, "Expected ':' after parameters");
-    Token return_type = parse_type();
-    
-    func->return_type = return_type.lexeme;
-    func->body = parse_block();
-    
-    return func;
-}
-
-BlockStmt* Parser::parse_block() {
-    consume(TokenType::LBRACE, "Expected '{'");
-    
-    BlockStmt* block = new BlockStmt();
-    block->line = current_token().line;
-    
-    while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
-        block->statements.push(parse_statement());
-    }
-    
-    consume(TokenType::RBRACE, "Expected '}'");
-    return block;
-}
-
-StmtNode* Parser::parse_statement() {
-    if (check(TokenType::VAR) || check(TokenType::CONST)) {
-        return parse_var_decl();
-    }
-    if (check(TokenType::IF)) {
-        return parse_if_stmt();
-    }
-    if (check(TokenType::WHILE)) {
-        return parse_while_stmt();
-    }
-    if (check(TokenType::FOR)) {
-        return parse_for_stmt();
-    }
-    if (check(TokenType::RETURN)) {
-        return parse_return_stmt();
-    }
-    if (check(TokenType::BREAK)) {
-        return parse_break_stmt();
-    }
-    if (check(TokenType::CONTINUE)) {
-        return parse_continue_stmt();
-    }
-    if (check(TokenType::DEFER)) {
-        return parse_defer_stmt();
-    }
-    if (check(TokenType::SWITCH)) {
-        return parse_switch_stmt();
-    }
-    if (check(TokenType::TRY)) {
-        return parse_try_catch_stmt();
-    }
-    if (check(TokenType::THROW)) {
-        return parse_throw_stmt();
-    }
-    if (check(TokenType::LBRACE)) {
-        return parse_block();
-    }
-    return parse_expr_stmt();
-}
-
-StmtNode* Parser::parse_var_decl() {
-    int ln = current_token().line;
-    bool is_const = false;
-    if (check(TokenType::CONST)) {
-        is_const = true;
-        advance();
-    } else {
-        advance();
-    }
-    
-    Token name = consume(TokenType::IDENTIFIER, "Expected variable name after 'var' or 'const'");
-    consume(TokenType::COLON, "Expected ':' after variable name");
-    Token type = parse_type();
-    
-    ExprNode* initializer = nullptr;
-    if (match(TokenType::ASSIGN)) {
-        initializer = parse_expression();
-    } else if (is_const) {
-        fprintf(stderr, "Parse error at line %d: const variables must be initialized\n", ln);
-        exit(1);
-    }
-    
-    consume(TokenType::SEMICOLON, "Expected ';' after variable declaration");
-    VarDecl* decl = new VarDecl(type.lexeme, name.lexeme, initializer, is_const);
-    decl->line = ln;
-    return decl;
-}
-
-StmtNode* Parser::parse_if_stmt() {
-    int ln = current_token().line;
-    consume(TokenType::IF, "Expected 'if'");
-    consume(TokenType::LPAREN, "Expected '(' after 'if'");
-    ExprNode* condition = parse_expression();
-    consume(TokenType::RPAREN, "Expected ')' after condition");
-    
-    StmtNode* then_branch = parse_statement();
-    StmtNode* else_branch = nullptr;
-    
-    if (match(TokenType::ELSE)) {
-        else_branch = parse_statement();
-    }
-    
-    IfStmt* stmt = new IfStmt(condition, then_branch, else_branch);
-    stmt->line = ln;
-    return stmt;
-}
-
-StmtNode* Parser::parse_while_stmt() {
-    int ln = current_token().line;
-    consume(TokenType::WHILE, "Expected 'while'");
-    consume(TokenType::LPAREN, "Expected '(' after 'while'");
-    ExprNode* condition = parse_expression();
-    consume(TokenType::RPAREN, "Expected ')' after condition");
-    StmtNode* body = parse_statement();
-    
-    WhileStmt* stmt = new WhileStmt(condition, body);
-    stmt->line = ln;
-    return stmt;
-}
-
-StmtNode* Parser::parse_for_stmt() {
-    int ln = current_token().line;
-    consume(TokenType::FOR, "Expected 'for'");
-    consume(TokenType::LPAREN, "Expected '(' after 'for'");
-    
-    StmtNode* initializer = nullptr;
-    if (check(TokenType::VAR)) {
-        initializer = parse_var_decl();
-    } else if (!check(TokenType::SEMICOLON)) {
-        initializer = parse_expr_stmt();
-    } else {
-        advance();
-    }
-    
-    ExprNode* condition = nullptr;
-    if (!check(TokenType::SEMICOLON)) {
-        condition = parse_expression();
-    }
-    consume(TokenType::SEMICOLON, "Expected ';' after for condition");
-    
-    ExprNode* increment = nullptr;
-    if (!check(TokenType::RPAREN)) {
-        increment = parse_expression();
-    }
-    consume(TokenType::RPAREN, "Expected ')' after for clauses");
-    
-    StmtNode* body = parse_statement();
-    
-    ForStmt* stmt = new ForStmt(initializer, condition, increment, body);
-    stmt->line = ln;
-    return stmt;
-}
-
-StmtNode* Parser::parse_return_stmt() {
-    int ln = current_token().line;
-    consume(TokenType::RETURN, "Expected 'return'");
-    ExprNode* value = nullptr;
-    
-    if (!check(TokenType::SEMICOLON)) {
-        value = parse_expression();
-    }
-    
-    consume(TokenType::SEMICOLON, "Expected ';' after return statement");
-    ReturnStmt* stmt = new ReturnStmt(value);
-    stmt->line = ln;
-    return stmt;
-}
-
-StmtNode* Parser::parse_break_stmt() {
-    int ln = current_token().line;
-    consume(TokenType::BREAK, "Expected 'break'");
-    consume(TokenType::SEMICOLON, "Expected ';' after break statement");
-    BreakStmt* stmt = new BreakStmt();
-    stmt->line = ln;
-    return stmt;
-}
-
-StmtNode* Parser::parse_continue_stmt() {
-    int ln = current_token().line;
-    consume(TokenType::CONTINUE, "Expected 'continue'");
-    consume(TokenType::SEMICOLON, "Expected ';' after continue statement");
-    ContinueStmt* stmt = new ContinueStmt();
-    stmt->line = ln;
-    return stmt;
-}
-
-StmtNode* Parser::parse_defer_stmt() {
-    int ln = current_token().line;
-    consume(TokenType::DEFER, "Expected 'defer'");
-    StmtNode* stmt = parse_statement();
-    DeferStmt* defer = new DeferStmt(stmt);
-    defer->line = ln;
-    return defer;
-}
-
-StmtNode* Parser::parse_switch_stmt() {
-    int ln = current_token().line;
-    consume(TokenType::SWITCH, "Expected 'switch'");
-    consume(TokenType::LPAREN, "Expected '(' after 'switch'");
-    ExprNode* subject = parse_expression();
-    consume(TokenType::RPAREN, "Expected ')' after switch expression");
-    consume(TokenType::LBRACE, "Expected '{' after switch");
-
-    SwitchStmt* sw = new SwitchStmt(subject);
-    sw->line = ln;
-
-    while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
-        SwitchCase* sc = new SwitchCase();
-        if (check(TokenType::CASE)) {
+        case TokenType::DYN: {
             advance();
-            sc->values.push(parse_expression());
-            consume(TokenType::COLON, "Expected ':' after case value");
-
-            while (check(TokenType::CASE)) {
-                advance();
-                sc->values.push(parse_expression());
-                consume(TokenType::COLON, "Expected ':' after case value");
-            }
-
-            BlockStmt* body = new BlockStmt();
-            body->line = current_token().line;
-            while (!check(TokenType::CASE) && !check(TokenType::DEFAULT) &&
-                   !check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
-                body->statements.push(parse_statement());
-            }
-            sc->body = body;
-        } else if (check(TokenType::DEFAULT)) {
+            TypeRef* tr = new TypeRef(TypeKind::DYN);
+            tr->name = consume(TokenType::IDENTIFIER, "Expected interface name after 'dyn'").lexeme;
+            return tr;
+        }
+        case TokenType::IDENTIFIER: {
+            TypeRef* tr = new TypeRef(TypeKind::NAMED);
+            tr->name = cur().lexeme;
             advance();
-            consume(TokenType::COLON, "Expected ':' after 'default'");
-            sc->is_default = true;
-
-            BlockStmt* body = new BlockStmt();
-            body->line = current_token().line;
-            while (!check(TokenType::CASE) && !check(TokenType::DEFAULT) &&
-                   !check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
-                body->statements.push(parse_statement());
-            }
-            sc->body = body;
-        } else {
-            delete sc;
-            fprintf(stderr, "Parse error at line %d: Expected 'case' or 'default' in switch\n", current_token().line);
-            exit(1);
+            return tr;
         }
-        sw->cases.push(sc);
+        default:
+            fail("Expected a type");
     }
-
-    consume(TokenType::RBRACE, "Expected '}' after switch body");
-    return sw;
 }
 
-EnumDecl* Parser::parse_enum_decl() {
-    int ln = current_token().line;
-    consume(TokenType::ENUM, "Expected 'enum'");
-    Token name = consume(TokenType::IDENTIFIER, "Expected enum name");
-    consume(TokenType::LBRACE, "Expected '{' after enum name");
-
-    EnumDecl* decl = new EnumDecl(name.lexeme);
-    decl->line = ln;
-
-    while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
-        Token val_name = consume(TokenType::IDENTIFIER, "Expected enum value name");
-        if (match(TokenType::ASSIGN)) {
-            Token val = consume(TokenType::INTEGER, "Expected integer value");
-            int v = 0;
-            for (size_t i = 0; i < val.lexeme.length(); i++) {
-                v = v * 10 + (val.lexeme[i] - '0');
-            }
-            decl->values.push(new EnumValue(val_name.lexeme, v));
-        } else {
-            decl->values.push(new EnumValue(val_name.lexeme));
-        }
-        if (!check(TokenType::RBRACE)) {
-            consume(TokenType::COMMA, "Expected ',' between enum values");
-        }
+Param* Parser::parse_param() {
+    // optional `ref` / `ref var` / `shared` / `weak` qualifier precedes the name
+    Ownership own = Ownership::VALUE;
+    bool ref_mut = false;
+    if (match(TokenType::REF)) {
+        own = Ownership::REF;
+        if (match(TokenType::VAR)) ref_mut = true;
+    } else if (match(TokenType::SHARED)) {
+        own = Ownership::SHARED;
+    } else if (match(TokenType::WEAK)) {
+        own = Ownership::WEAK;
     }
-
-    consume(TokenType::RBRACE, "Expected '}' after enum body");
-    return decl;
+    Param* p = new Param();
+    p->name = consume(TokenType::IDENTIFIER, "Expected parameter name").lexeme;
+    consume(TokenType::COLON, "Expected ':' after parameter name");
+    p->type = parse_type();
+    if (own != Ownership::VALUE) {
+        p->type->ownership = own;
+        p->type->ref_mutable = ref_mut;
+    }
+    return p;
 }
 
-UnionDecl* Parser::parse_union_decl() {
-    int ln = current_token().line;
-    consume(TokenType::UNION, "Expected 'union'");
-    Token name = consume(TokenType::IDENTIFIER, "Expected union name");
-    consume(TokenType::LBRACE, "Expected '{' after union name");
-
-    UnionDecl* decl = new UnionDecl(name.lexeme);
-    decl->line = ln;
-
-    while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
-        Token field_name = consume(TokenType::IDENTIFIER, "Expected field name");
-        consume(TokenType::COLON, "Expected ':' after field name");
-        Token type = parse_type();
-        consume(TokenType::SEMICOLON, "Expected ';' after union field");
-        decl->fields.push(new UnionField(type.lexeme, field_name.lexeme));
+TypeRef* Parser::parse_type() {
+    // ownership prefix
+    Ownership own = Ownership::VALUE;
+    bool ref_mut = false;
+    if (match(TokenType::REF)) {
+        own = Ownership::REF;
+        if (match(TokenType::VAR)) ref_mut = true;
+    } else if (match(TokenType::SHARED)) {
+        own = Ownership::SHARED;
+    } else if (match(TokenType::WEAK)) {
+        own = Ownership::WEAK;
     }
 
-    consume(TokenType::RBRACE, "Expected '}' after union body");
-    return decl;
-}
+    TypeRef* base = parse_base_type();
 
-StmtNode* Parser::parse_expr_stmt() {
-    int ln = current_token().line;
-    ExprNode* expr = parse_expression();
-    consume(TokenType::SEMICOLON, "Expected ';' after expression");
-    ExprStmt* stmt = new ExprStmt(expr);
-    stmt->line = ln;
-    return stmt;
-}
-
-ExprNode* Parser::parse_expression() {
-    return parse_assignment();
-}
-
-ExprNode* Parser::parse_assignment() {
-    ExprNode* expr = parse_logical_or();
-    int ln = current_token().line;
-    
-    if (match(TokenType::ASSIGN)) {
-        ExprNode* value = parse_assignment();
-        AssignExpr* node = new AssignExpr(expr, value);
-        node->line = ln;
-        return node;
-    }
-    
-    if (match(TokenType::PLUS_ASSIGN)) {
-        ExprNode* value = parse_assignment();
-        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String("+"), value);
-        node->line = ln;
-        return node;
-    }
-    
-    if (match(TokenType::MINUS_ASSIGN)) {
-        ExprNode* value = parse_assignment();
-        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String("-"), value);
-        node->line = ln;
-        return node;
-    }
-    
-    if (match(TokenType::STAR_ASSIGN)) {
-        ExprNode* value = parse_assignment();
-        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String("*"), value);
-        node->line = ln;
-        return node;
-    }
-    
-    if (match(TokenType::SLASH_ASSIGN)) {
-        ExprNode* value = parse_assignment();
-        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String("/"), value);
-        node->line = ln;
-        return node;
-    }
-    
-    if (match(TokenType::PERCENT_ASSIGN)) {
-        ExprNode* value = parse_assignment();
-        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String("%"), value);
-        node->line = ln;
-        return node;
-    }
-    
-    if (match(TokenType::AMPERSAND_ASSIGN)) {
-        ExprNode* value = parse_assignment();
-        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String("&"), value);
-        node->line = ln;
-        return node;
-    }
-    
-    if (match(TokenType::PIPE_ASSIGN)) {
-        ExprNode* value = parse_assignment();
-        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String("|"), value);
-        node->line = ln;
-        return node;
-    }
-    
-    if (match(TokenType::CARET_ASSIGN)) {
-        ExprNode* value = parse_assignment();
-        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String("^"), value);
-        node->line = ln;
-        return node;
-    }
-    
-    if (match(TokenType::LSHIFT_ASSIGN)) {
-        ExprNode* value = parse_assignment();
-        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String("<<"), value);
-        node->line = ln;
-        return node;
-    }
-    
-    if (match(TokenType::RSHIFT_ASSIGN)) {
-        ExprNode* value = parse_assignment();
-        CompoundAssignExpr* node = new CompoundAssignExpr(expr, String(">>"), value);
-        node->line = ln;
-        return node;
-    }
-    
-    return expr;
-}
-
-ExprNode* Parser::parse_logical_or() {
-    ExprNode* expr = parse_logical_and();
-    
-    while (match(TokenType::OR)) {
-        int ln = _tokens[_current - 1].line;
-        String op("||");
-        ExprNode* right = parse_logical_and();
-        BinaryExpr* node = new BinaryExpr(expr, op, right);
-        node->line = ln;
-        expr = node;
-    }
-    
-    return expr;
-}
-
-ExprNode* Parser::parse_logical_and() {
-    ExprNode* expr = parse_bitwise_or();
-    
-    while (match(TokenType::AND)) {
-        int ln = _tokens[_current - 1].line;
-        String op("&&");
-        ExprNode* right = parse_bitwise_or();
-        BinaryExpr* node = new BinaryExpr(expr, op, right);
-        node->line = ln;
-        expr = node;
-    }
-    
-    return expr;
-}
-
-ExprNode* Parser::parse_equality() {
-    ExprNode* expr = parse_comparison();
-    
-    while (match(TokenType::EQ) || match(TokenType::NEQ)) {
-        int ln = _tokens[_current - 1].line;
-        String op = _tokens[_current - 1].lexeme;
-        ExprNode* right = parse_comparison();
-        BinaryExpr* node = new BinaryExpr(expr, op, right);
-        node->line = ln;
-        expr = node;
-    }
-    
-    return expr;
-}
-
-ExprNode* Parser::parse_comparison() {
-    ExprNode* expr = parse_shift();
-    
-    while (match(TokenType::LT) || match(TokenType::GT) || 
-           match(TokenType::LTE) || match(TokenType::GTE)) {
-        int ln = _tokens[_current - 1].line;
-        String op = _tokens[_current - 1].lexeme;
-        ExprNode* right = parse_shift();
-        BinaryExpr* node = new BinaryExpr(expr, op, right);
-        node->line = ln;
-        expr = node;
-    }
-    
-    return expr;
-}
-
-ExprNode* Parser::parse_term() {
-    ExprNode* expr = parse_factor();
-    
-    while (match(TokenType::PLUS) || match(TokenType::MINUS)) {
-        int ln = _tokens[_current - 1].line;
-        String op = _tokens[_current - 1].lexeme;
-        ExprNode* right = parse_factor();
-        BinaryExpr* node = new BinaryExpr(expr, op, right);
-        node->line = ln;
-        expr = node;
-    }
-    
-    return expr;
-}
-
-ExprNode* Parser::parse_factor() {
-    ExprNode* expr = parse_unary();
-    
-    while (match(TokenType::STAR) || match(TokenType::SLASH) || match(TokenType::PERCENT)) {
-        int ln = _tokens[_current - 1].line;
-        String op = _tokens[_current - 1].lexeme;
-        ExprNode* right = parse_unary();
-        BinaryExpr* node = new BinaryExpr(expr, op, right);
-        node->line = ln;
-        expr = node;
-    }
-    
-    return expr;
-}
-
-ExprNode* Parser::parse_unary() {
-    if (match(TokenType::NOT) || match(TokenType::MINUS) || match(TokenType::TILDE)) {
-        int ln = _tokens[_current - 1].line;
-        String op = _tokens[_current - 1].lexeme;
-        ExprNode* operand = parse_unary();
-        UnaryExpr* node = new UnaryExpr(op, operand);
-        node->line = ln;
-        return node;
-    }
-    
-    if (match(TokenType::INCREMENT)) {
-        int ln = _tokens[_current - 1].line;
-        ExprNode* operand = parse_unary();
-        UnaryExpr* node = new UnaryExpr(String("++"), operand);
-        node->line = ln;
-        return node;
-    }
-    
-    if (match(TokenType::DECREMENT)) {
-        int ln = _tokens[_current - 1].line;
-        ExprNode* operand = parse_unary();
-        UnaryExpr* node = new UnaryExpr(String("--"), operand);
-        node->line = ln;
-        return node;
-    }
-    
-    return parse_postfix();
-}
-
-ExprNode* Parser::parse_postfix() {
-    ExprNode* expr = parse_primary();
-    
+    // suffixes: T[], T[N], T?
     for (;;) {
-        if (match(TokenType::DOT)) {
-            int ln = _tokens[_current - 1].line;
-            Token member = consume(TokenType::IDENTIFIER, "Expected member name");
-            MemberExpr* node = new MemberExpr(expr, member.lexeme);
-            node->line = ln;
-            expr = node;
-        } else if (check(TokenType::LBRACKET)) {
-            int ln = current_token().line;
+        if (check(TokenType::LBRACKET)) {
             advance();
-            ExprNode* index = parse_expression();
-            consume(TokenType::RBRACKET, "Expected ']' after index");
-            IndexExpr* node = new IndexExpr(expr, index);
-            node->line = ln;
-            expr = node;
-        } else if (match(TokenType::LPAREN)) {
-            int ln = _tokens[_current - 1].line;
-            CallExpr* call = new CallExpr(expr);
-            call->line = ln;
-            if (!check(TokenType::RPAREN)) {
-                do {
-                    call->arguments.push(parse_expression());
-                } while (match(TokenType::COMMA));
+            if (check(TokenType::INT_LITERAL)) {
+                TypeRef* arr = new TypeRef(TypeKind::FIXED_ARRAY);
+                arr->fixed_size = atoi(cur().lexeme.c_str());
+                advance();
+                consume(TokenType::RBRACKET, "Expected ']' after fixed array size");
+                arr->inner = base;
+                base = arr;
+            } else {
+                consume(TokenType::RBRACKET, "Expected ']' for dynamic array");
+                TypeRef* arr = new TypeRef(TypeKind::ARRAY);
+                arr->inner = base;
+                base = arr;
             }
-            consume(TokenType::RPAREN, "Expected ')' after arguments");
-            expr = call;
-        } else if (check(TokenType::INCREMENT)) {
-            int ln = current_token().line;
-            advance();
-            PostfixExpr* node = new PostfixExpr(expr, String("++"));
-            node->line = ln;
-            expr = node;
-        } else if (check(TokenType::DECREMENT)) {
-            int ln = current_token().line;
-            advance();
-            PostfixExpr* node = new PostfixExpr(expr, String("--"));
-            node->line = ln;
-            expr = node;
         } else {
             break;
         }
     }
-    
-    return expr;
+
+    base->ownership = own;
+    base->ref_mutable = ref_mut;
+    return base;
 }
 
-ExprNode* Parser::parse_primary() {
-    int ln = current_token().line;
-    
-    if (match(TokenType::TRUE)) {
-        BoolLiteral* node = new BoolLiteral(true);
-        node->line = ln;
-        return node;
+// ---- top level ----
+
+Program* Parser::parse() {
+    Program* program = new Program();
+    while (!check(TokenType::END_OF_FILE)) {
+        parse_top_level(program);
     }
-    if (match(TokenType::FALSE)) {
-        BoolLiteral* node = new BoolLiteral(false);
-        node->line = ln;
-        return node;
-    }
-    if (match(TokenType::NULL_LIT)) {
-        NullLiteral* node = new NullLiteral();
-        node->line = ln;
-        return node;
-    }
-    if (match(TokenType::CAST)) {
-        consume(TokenType::LPAREN, "Expected '(' after 'cast'");
-        ExprNode* expr = parse_expression();
-        consume(TokenType::COMMA, "Expected ',' after cast expression");
-        Token target = parse_type();
-        consume(TokenType::RPAREN, "Expected ')' after cast type");
-        CastExpr* node = new CastExpr(expr, target.lexeme);
-        node->line = ln;
-        return node;
-    }
-    if (match(TokenType::SIZEOF)) {
-        consume(TokenType::LPAREN, "Expected '(' after 'sizeof'");
-        Token target = parse_type();
-        consume(TokenType::RPAREN, "Expected ')' after sizeof type");
-        SizeofExpr* node = new SizeofExpr(target.lexeme);
-        node->line = ln;
-        return node;
-    }
-    if (match(TokenType::INTEGER)) {
-        Token token = _tokens[_current - 1];
-        int value = 0;
-        for (size_t i = 0; i < token.lexeme.length(); i++) {
-            value = value * 10 + (token.lexeme[i] - '0');
-        }
-        IntegerLiteral* node = new IntegerLiteral(value);
-        node->line = ln;
-        return node;
-    }
-    if (match(TokenType::FLOAT_LITERAL)) {
-        Token token = _tokens[_current - 1];
-        float value = 0.0f;
-        float decimal = 0.0f;
-        int decimal_places = 0;
-        bool is_decimal = false;
-        
-        for (size_t i = 0; i < token.lexeme.length(); i++) {
-            if (token.lexeme[i] == '.') {
-                is_decimal = true;
-                continue;
-            }
-            if (token.lexeme[i] == 'f') break;
-            
-            if (is_decimal) {
-                decimal = decimal * 10.0f + (token.lexeme[i] - '0');
-                decimal_places++;
-            } else {
-                value = value * 10.0f + (token.lexeme[i] - '0');
-            }
-        }
-        
-        for (int i = 0; i < decimal_places; i++) {
-            decimal /= 10.0f;
-        }
-        value += decimal;
-        
-        FloatLiteral* node = new FloatLiteral(value);
-        node->line = ln;
-        return node;
-    }
-    if (match(TokenType::DOUBLE_LITERAL)) {
-        Token token = _tokens[_current - 1];
-        double value = 0.0;
-        double decimal = 0.0;
-        int decimal_places = 0;
-        bool is_decimal = false;
-        
-        for (size_t i = 0; i < token.lexeme.length(); i++) {
-            if (token.lexeme[i] == '.') {
-                is_decimal = true;
-                continue;
-            }
-            
-            if (is_decimal) {
-                decimal = decimal * 10.0 + (token.lexeme[i] - '0');
-                decimal_places++;
-            } else {
-                value = value * 10.0 + (token.lexeme[i] - '0');
-            }
-        }
-        
-        for (int i = 0; i < decimal_places; i++) {
-            decimal /= 10.0;
-        }
-        value += decimal;
-        
-        DoubleLiteral* node = new DoubleLiteral(value);
-        node->line = ln;
-        return node;
-    }
-    if (match(TokenType::STRING)) {
-        Token token = _tokens[_current - 1];
-        char* str_val = (char*)malloc(token.lexeme.length() + 1);
-        size_t j = 0;
-        for (size_t i = 0; i < token.lexeme.length(); i++) {
-            if (token.lexeme[i] == '\\' && i + 1 < token.lexeme.length()) {
-                i++;
-                if (token.lexeme[i] == 'n') str_val[j++] = '\n';
-                else if (token.lexeme[i] == 't') str_val[j++] = '\t';
-                else if (token.lexeme[i] == '\\') str_val[j++] = '\\';
-                else if (token.lexeme[i] == '"') str_val[j++] = '"';
-                else str_val[j++] = token.lexeme[i];
-            } else {
-                str_val[j++] = token.lexeme[i];
-            }
-        }
-        str_val[j] = '\0';
-        String result(str_val);
-        free(str_val);
-        StringLiteral* node = new StringLiteral(result);
-        node->line = ln;
-        return node;
-    }
-    if (match(TokenType::IDENTIFIER)) {
-        IdentifierExpr* node = new IdentifierExpr(_tokens[_current - 1].lexeme);
-        node->line = ln;
-        return node;
-    }
-    if (match(TokenType::THIS)) {
-        ThisExpr* node = new ThisExpr();
-        node->line = ln;
-        return node;
-    }
-    if (match(TokenType::LPAREN)) {
-        ExprNode* expr = parse_expression();
-        consume(TokenType::RPAREN, "Expected ')' after expression");
-        return expr;
-    }
-    if (match(TokenType::LBRACKET)) {
-        ArrayExpr* array = new ArrayExpr();
-        array->line = ln;
-        
-        if (!check(TokenType::RBRACKET)) {
-            do {
-                array->elements.push(parse_expression());
-            } while (match(TokenType::COMMA));
-        }
-        
-        consume(TokenType::RBRACKET, "Expected ']' after array elements");
-        return array;
-    }
-    
-    fprintf(stderr, "Parse error at line %d: Unexpected token in expression\n", ln);
-    exit(1);
+    return program;
 }
 
-ExprNode* Parser::parse_bitwise_or() {
-    ExprNode* expr = parse_bitwise_xor();
-    
-    while (match(TokenType::PIPE)) {
-        int ln = _tokens[_current - 1].line;
-        ExprNode* right = parse_bitwise_xor();
-        BinaryExpr* node = new BinaryExpr(expr, String("|"), right);
-        node->line = ln;
-        expr = node;
+void Parser::parse_top_level(Program* program) {
+    bool is_pub = match(TokenType::PUB);
+
+    switch (cur().type) {
+        case TokenType::FUNC:
+            program->functions.push(parse_func(is_pub, false));
+            break;
+        case TokenType::STRUCT:
+            program->structs.push(parse_struct(is_pub));
+            break;
+        case TokenType::ENUM:
+            program->enums.push(parse_enum(is_pub));
+            break;
+        case TokenType::INTERFACE:
+            program->interfaces.push(parse_interface(is_pub));
+            break;
+        case TokenType::IMPL:
+            if (is_pub) fail("'impl' cannot be 'pub'");
+            program->impls.push(parse_impl());
+            break;
+        case TokenType::EXTERN:
+            if (is_pub) fail("'extern' cannot be 'pub'");
+            program->externs.push(parse_extern());
+            break;
+        case TokenType::SIGNAL:
+            if (is_pub) fail("'signal' cannot be 'pub'");
+            program->signals.push(parse_signal());
+            break;
+        case TokenType::EVENT:
+            if (is_pub) fail("'event' cannot be 'pub'");
+            program->events.push(parse_event());
+            break;
+        case TokenType::PROCESS:
+            if (is_pub) fail("'process' cannot be 'pub'");
+            program->processes.push(parse_process());
+            break;
+        case TokenType::LET:
+            advance();
+            program->globals.push(parse_global(false));
+            break;
+        case TokenType::VAR:
+            advance();
+            program->globals.push(parse_global(true));
+            break;
+        case TokenType::LINK: {
+            if (is_pub) fail("'link' cannot be 'pub'");
+            advance();
+            Token flag = consume(TokenType::STRING_LITERAL, "Expected string after 'link'");
+            program->link_flags.push(flag.lexeme);
+            break;
+        }
+        default:
+            fail("Expected a top-level declaration");
     }
-    
-    return expr;
 }
 
-ExprNode* Parser::parse_bitwise_xor() {
-    ExprNode* expr = parse_bitwise_and();
-    
-    while (match(TokenType::CARET)) {
-        int ln = _tokens[_current - 1].line;
-        ExprNode* right = parse_bitwise_and();
-        BinaryExpr* node = new BinaryExpr(expr, String("^"), right);
-        node->line = ln;
-        expr = node;
-    }
-    
-    return expr;
-}
-
-ExprNode* Parser::parse_bitwise_and() {
-    ExprNode* expr = parse_equality();
-    
-    while (match(TokenType::AMPERSAND)) {
-        int ln = _tokens[_current - 1].line;
-        ExprNode* right = parse_equality();
-        BinaryExpr* node = new BinaryExpr(expr, String("&"), right);
-        node->line = ln;
-        expr = node;
-    }
-    
-    return expr;
-}
-
-ExprNode* Parser::parse_shift() {
-    ExprNode* expr = parse_term();
-    
-    while (match(TokenType::LSHIFT) || match(TokenType::RSHIFT)) {
-        int ln = _tokens[_current - 1].line;
-        String op = _tokens[_current - 1].lexeme;
-        ExprNode* right = parse_term();
-        BinaryExpr* node = new BinaryExpr(expr, op, right);
-        node->line = ln;
-        expr = node;
-    }
-    
-    return expr;
-}
-
-ExternFuncDecl* Parser::parse_extern_func_decl() {
-    int ln = current_token().line;
-    consume(TokenType::EXTERN, "Expected 'extern'");
-    consume(TokenType::FUNC, "Expected 'func' after 'extern'");
+FuncDecl* Parser::parse_func(bool is_pub, bool allow_self) {
+    int ln = cur().line;
+    consume(TokenType::FUNC, "Expected 'func'");
     Token name = consume(TokenType::IDENTIFIER, "Expected function name");
+    FuncDecl* fn = new FuncDecl(name.lexeme);
+    fn->is_pub = is_pub;
+    fn->line = ln;
+
     consume(TokenType::LPAREN, "Expected '(' after function name");
-    
-    ExternFuncDecl* decl = new ExternFuncDecl(String(""), name.lexeme);
-    decl->line = ln;
-    
+
+    // optional self receiver as first parameter
+    if (allow_self && (check(TokenType::SELF) || check(TokenType::REF))) {
+        if (check(TokenType::REF)) {
+            advance();
+            bool mut = match(TokenType::VAR);
+            consume(TokenType::SELF, "Expected 'self' after 'ref'");
+            fn->self_kind = mut ? SelfKind::REF_MUT : SelfKind::REF;
+        } else {
+            advance(); // self
+            fn->self_kind = SelfKind::VALUE;
+        }
+        if (!check(TokenType::RPAREN)) consume(TokenType::COMMA, "Expected ',' after self");
+    }
+
     if (!check(TokenType::RPAREN)) {
         do {
-            Token param_name = consume(TokenType::IDENTIFIER, "Expected parameter name");
-            consume(TokenType::COLON, "Expected ':' after parameter name");
-            Token param_type = parse_type();
-            decl->parameters.push(new Parameter(param_type.lexeme, param_name.lexeme));
+            fn->params.push(parse_param());
         } while (match(TokenType::COMMA));
     }
-    
     consume(TokenType::RPAREN, "Expected ')' after parameters");
-    consume(TokenType::COLON, "Expected ':' after parameters");
-    Token return_type = parse_type();
-    decl->return_type = return_type.lexeme;
-    consume(TokenType::SEMICOLON, "Expected ';' after extern function declaration");
-    
-    return decl;
+
+    if (match(TokenType::COLON)) {
+        fn->return_type = parse_type();
+    } else {
+        fn->return_type = new TypeRef(TypeKind::VOID);
+    }
+
+    if (check(TokenType::LBRACE)) {
+        fn->body = parse_block();
+    } else {
+        consume(TokenType::SEMICOLON, "Expected '{' or ';' after function signature");
+    }
+    return fn;
 }
 
-void Parser::parse_interface_decl(Program* program) {
-    int ln = current_token().line;
-    consume(TokenType::INTERFACE, "Expected 'interface'");
-    Token name = consume(TokenType::IDENTIFIER, "Expected interface name");
-    consume(TokenType::LBRACE, "Expected '{' after interface name");
-    
-    InterfaceDecl* iface = new InterfaceDecl(name.lexeme);
-    iface->line = ln;
-    
+StructDecl* Parser::parse_struct(bool is_pub) {
+    int ln = cur().line;
+    consume(TokenType::STRUCT, "Expected 'struct'");
+    StructDecl* st = new StructDecl(consume(TokenType::IDENTIFIER, "Expected struct name").lexeme);
+    st->is_pub = is_pub;
+    st->line = ln;
+    consume(TokenType::LBRACE, "Expected '{' after struct name");
     while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
-        consume(TokenType::FUNC, "Expected 'func' in interface body");
-        Token method_name = consume(TokenType::IDENTIFIER, "Expected method name");
-        consume(TokenType::LPAREN, "Expected '(' after method name");
-        
-        InterfaceMethod* method = new InterfaceMethod(method_name.lexeme, String(""));
-        
-        if (!check(TokenType::RPAREN)) {
-            do {
-                Token param_name = consume(TokenType::IDENTIFIER, "Expected parameter name");
-                consume(TokenType::COLON, "Expected ':' after parameter name");
-                Token param_type = parse_type();
-                method->parameters.push(new Parameter(param_type.lexeme, param_name.lexeme));
-            } while (match(TokenType::COMMA));
-        }
-        
-        consume(TokenType::RPAREN, "Expected ')' after parameters");
-        consume(TokenType::COLON, "Expected ':' after parameters");
-        Token return_type = parse_type();
-        method->return_type = return_type.lexeme;
-        consume(TokenType::SEMICOLON, "Expected ';' after interface method");
-        
-        iface->methods.push(method);
+        FieldDecl* f = new FieldDecl();
+        f->name = consume(TokenType::IDENTIFIER, "Expected field name").lexeme;
+        consume(TokenType::COLON, "Expected ':' after field name");
+        f->type = parse_type();
+        match(TokenType::COMMA);
+        st->fields.push(f);
     }
-    
+    consume(TokenType::RBRACE, "Expected '}' after struct body");
+    return st;
+}
+
+EnumDecl* Parser::parse_enum(bool is_pub) {
+    int ln = cur().line;
+    consume(TokenType::ENUM, "Expected 'enum'");
+    EnumDecl* en = new EnumDecl(consume(TokenType::IDENTIFIER, "Expected enum name").lexeme);
+    en->is_pub = is_pub;
+    en->line = ln;
+    consume(TokenType::LBRACE, "Expected '{' after enum name");
+    while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
+        EnumVariant* v = new EnumVariant();
+        v->name = consume(TokenType::IDENTIFIER, "Expected variant name").lexeme;
+        if (match(TokenType::ASSIGN)) {
+            v->has_int_value = true;
+            v->int_value = atoll(consume(TokenType::INT_LITERAL, "Expected integer value").lexeme.c_str());
+        }
+        match(TokenType::COMMA);
+        en->variants.push(v);
+    }
+    consume(TokenType::RBRACE, "Expected '}' after enum body");
+    return en;
+}
+
+InterfaceDecl* Parser::parse_interface(bool is_pub) {
+    int ln = cur().line;
+    consume(TokenType::INTERFACE, "Expected 'interface'");
+    InterfaceDecl* it = new InterfaceDecl(consume(TokenType::IDENTIFIER, "Expected interface name").lexeme);
+    it->is_pub = is_pub;
+    it->line = ln;
+    consume(TokenType::LBRACE, "Expected '{' after interface name");
+    while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
+        it->methods.push(parse_func(false, true));
+    }
     consume(TokenType::RBRACE, "Expected '}' after interface body");
-    program->interfaces.push(iface);
+    return it;
 }
 
-StmtNode* Parser::parse_try_catch_stmt() {
-    int ln = current_token().line;
-    consume(TokenType::TRY, "Expected 'try'");
-    BlockStmt* try_body = parse_block();
-    
-    consume(TokenType::CATCH, "Expected 'catch' after try block");
-    consume(TokenType::LPAREN, "Expected '(' after 'catch'");
-    Token catch_var = consume(TokenType::IDENTIFIER, "Expected catch variable name");
-    consume(TokenType::COLON, "Expected ':' after catch variable");
-    Token catch_type = parse_type();
-    consume(TokenType::RPAREN, "Expected ')' after catch type");
-    BlockStmt* catch_body = parse_block();
-    
-    TryCatchStmt* stmt = new TryCatchStmt(try_body, catch_var.lexeme, catch_type.lexeme, catch_body);
-    stmt->line = ln;
-    return stmt;
-}
-
-StmtNode* Parser::parse_throw_stmt() {
-    int ln = current_token().line;
-    consume(TokenType::THROW, "Expected 'throw'");
-    ExprNode* value = parse_expression();
-    consume(TokenType::SEMICOLON, "Expected ';' after throw expression");
-    ThrowStmt* stmt = new ThrowStmt(value);
-    stmt->line = ln;
-    return stmt;
-}
-
-void Parser::add_define(const char* name) {
-    _defines.push(String(name));
-}
-
-bool Parser::has_define(const char* name) const {
-    for (size_t i = 0; i < _defines.size(); i++) {
-        if (_defines[i] == name) return true;
-    }
-    return false;
-}
-
-void Parser::skip_to_matching_brace() {
-    int depth = 1;
-    while (!check(TokenType::END_OF_FILE)) {
-        if (check(TokenType::LBRACE)) depth++;
-        else if (check(TokenType::RBRACE)) {
-            depth--;
-            if (depth == 0) { advance(); return; }
-        }
+ImplDecl* Parser::parse_impl() {
+    int ln = cur().line;
+    consume(TokenType::IMPL, "Expected 'impl'");
+    String first = consume(TokenType::IDENTIFIER, "Expected type or interface name").lexeme;
+    ImplDecl* impl;
+    // syntax: `impl T { ... }`  or  `impl I for T { ... }`
+    if (check(TokenType::FOR)) {
         advance();
-    }
-}
-
-bool Parser::parse_top_level_decl(Program* program) {
-    if (check(TokenType::IMPORT) || check(TokenType::FROM)) {
-        program->imports.push(parse_import_decl());
-    } else if (check(TokenType::VAR) || check(TokenType::CONST)) {
-        program->globals.push((VarDecl*)parse_var_decl());
-    } else if (check(TokenType::EVENT)) {
-        program->events.push(parse_event_decl());
-    } else if (check(TokenType::SIGNAL)) {
-        program->signals.push(parse_signal_decl());
-    } else if (check(TokenType::DATACLASS)) {
-        advance();
-        parse_class_decl(program, true);
-    } else if (check(TokenType::AT)) {
-        if (peek_token(1).type == TokenType::IF) {
-            parse_conditional_compile(program);
-        } else {
-            program->processes.push(parse_process_decl());
-        }
-    } else if (check(TokenType::CLASS)) {
-        parse_class_decl(program);
-    } else if (check(TokenType::FUNC)) {
-        program->functions.push(parse_function_decl());
-    } else if (check(TokenType::ENUM)) {
-        program->enums.push(parse_enum_decl());
-    } else if (check(TokenType::UNION)) {
-        program->unions.push(parse_union_decl());
-    } else if (check(TokenType::INTERFACE)) {
-        parse_interface_decl(program);
-    } else if (check(TokenType::EXTERN)) {
-        program->extern_functions.push(parse_extern_func_decl());
-    } else if (check(TokenType::LINK)) {
-        advance();
-        Token flag = consume(TokenType::STRING, "Expected string after 'link'");
-        consume(TokenType::SEMICOLON, "Expected ';' after link directive");
-        program->link_flags.push(flag.lexeme);
+        String type_name = consume(TokenType::IDENTIFIER, "Expected type name after 'for'").lexeme;
+        impl = new ImplDecl(type_name);
+        impl->interface_name = first;
     } else {
-        return false;
+        impl = new ImplDecl(first);
     }
-    return true;
+    impl->line = ln;
+    consume(TokenType::LBRACE, "Expected '{' after impl header");
+    while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
+        FuncDecl* m = parse_func(false, true);
+        m->impl_type = impl->type_name;
+        impl->methods.push(m);
+    }
+    consume(TokenType::RBRACE, "Expected '}' after impl body");
+    return impl;
 }
 
-void Parser::parse_conditional_compile(Program* program) {
-    consume(TokenType::AT, "Expected '@'");
-    consume(TokenType::IF, "Expected 'if' after '@'");
-    consume(TokenType::LPAREN, "Expected '(' after '@if'");
-    Token define_name = consume(TokenType::IDENTIFIER, "Expected define name");
-    consume(TokenType::RPAREN, "Expected ')' after define name");
-    consume(TokenType::LBRACE, "Expected '{' after '@if(...)'");
+ExternDecl* Parser::parse_extern() {
+    int ln = cur().line;
+    consume(TokenType::EXTERN, "Expected 'extern'");
+    consume(TokenType::FUNC, "Expected 'func' after 'extern'");
+    ExternDecl* ex = new ExternDecl(consume(TokenType::IDENTIFIER, "Expected function name").lexeme);
+    ex->line = ln;
+    consume(TokenType::LPAREN, "Expected '(' after function name");
+    if (!check(TokenType::RPAREN)) {
+        do {
+            ex->params.push(parse_param());
+        } while (match(TokenType::COMMA));
+    }
+    consume(TokenType::RPAREN, "Expected ')' after parameters");
+    if (match(TokenType::COLON)) ex->return_type = parse_type();
+    else ex->return_type = new TypeRef(TypeKind::VOID);
+    consume(TokenType::SEMICOLON, "Expected ';' after extern declaration");
+    return ex;
+}
 
-    bool active = has_define(define_name.lexeme.c_str());
+SignalDecl* Parser::parse_signal() {
+    int ln = cur().line;
+    consume(TokenType::SIGNAL, "Expected 'signal'");
+    SignalDecl* sg = new SignalDecl(consume(TokenType::IDENTIFIER, "Expected signal name").lexeme);
+    sg->line = ln;
+    consume(TokenType::COLON, "Expected ':' after signal name");
+    sg->payload_type = parse_type();
+    consume(TokenType::SEMICOLON, "Expected ';' after signal declaration");
+    return sg;
+}
 
-    if (active) {
-        while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
-            if (!parse_top_level_decl(program)) {
-                fprintf(stderr, "Parse error at line %d: Unexpected token inside @if block\n",
-                        current_token().line);
-                exit(1);
+EventDecl* Parser::parse_event() {
+    int ln = cur().line;
+    consume(TokenType::EVENT, "Expected 'event'");
+    EventDecl* ev = new EventDecl(consume(TokenType::IDENTIFIER, "Expected event name").lexeme);
+    ev->line = ln;
+    consume(TokenType::SEMICOLON, "Expected ';' after event declaration");
+    return ev;
+}
+
+ProcessDecl* Parser::parse_process() {
+    int ln = cur().line;
+    consume(TokenType::PROCESS, "Expected 'process'");
+    String name = consume(TokenType::IDENTIFIER, "Expected process name").lexeme;
+    consume(TokenType::ON, "Expected 'on' after process name");
+    String event = consume(TokenType::IDENTIFIER, "Expected event name after 'on'").lexeme;
+    ProcessDecl* pr = new ProcessDecl(name, event);
+    pr->line = ln;
+    pr->body = parse_block();
+    return pr;
+}
+
+GlobalDecl* Parser::parse_global(bool is_mutable) {
+    int ln = cur().line;
+    GlobalDecl* g = new GlobalDecl(is_mutable, consume(TokenType::IDENTIFIER, "Expected global name").lexeme);
+    g->line = ln;
+    if (match(TokenType::COLON)) g->type = parse_type();
+    consume(TokenType::ASSIGN, "Global must be initialized");
+    g->init = parse_expression();
+    consume(TokenType::SEMICOLON, "Expected ';' after global declaration");
+    return g;
+}
+
+// ---- statements ----
+
+Block* Parser::parse_block() {
+    int ln = cur().line;
+    consume(TokenType::LBRACE, "Expected '{'");
+    Block* block = new Block();
+    block->line = ln;
+    while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
+        block->statements.push(parse_statement());
+    }
+    consume(TokenType::RBRACE, "Expected '}'");
+    return block;
+}
+
+Node* Parser::parse_statement() {
+    switch (cur().type) {
+        case TokenType::LET: advance(); return parse_let_decl(false);
+        case TokenType::VAR: advance(); return parse_let_decl(true);
+        case TokenType::IF: return parse_if();
+        case TokenType::WHILE: return parse_while();
+        case TokenType::FOR: return parse_for();
+        case TokenType::RETURN: return parse_return();
+        case TokenType::DEFER: return parse_defer();
+        case TokenType::UNSAFE: return parse_unsafe();
+        case TokenType::MATCH: {
+            int ln = cur().line;
+            Node* m = parse_match();
+            ExprStmt* s = new ExprStmt(m);
+            s->line = ln;
+            return s;
+        }
+        case TokenType::BREAK: { advance(); consume(TokenType::SEMICOLON, "Expected ';' after break"); return new BreakStmt(); }
+        case TokenType::CONTINUE: { advance(); consume(TokenType::SEMICOLON, "Expected ';' after continue"); return new ContinueStmt(); }
+        case TokenType::LBRACE: return parse_block();
+        default: {
+            int ln = cur().line;
+            Node* e = parse_expression();
+            consume(TokenType::SEMICOLON, "Expected ';' after expression");
+            ExprStmt* s = new ExprStmt(e);
+            s->line = ln;
+            return s;
+        }
+    }
+}
+
+// parse a let/var binding; the let/var keyword is already consumed.
+LetDecl* Parser::parse_let_decl(bool is_mutable) {
+    int ln = cur().line;
+    LetDecl* d = new LetDecl(is_mutable, consume(TokenType::IDENTIFIER, "Expected binding name").lexeme);
+    d->line = ln;
+    if (match(TokenType::COLON)) d->declared_type = parse_type();
+    if (match(TokenType::ASSIGN)) d->init = parse_expression();
+    else if (!is_mutable) fail("'let' binding must be initialized");
+    consume(TokenType::SEMICOLON, "Expected ';' after binding");
+    return d;
+}
+
+Node* Parser::parse_if() {
+    int ln = cur().line;
+    consume(TokenType::IF, "Expected 'if'");
+    _no_struct_lit = true;
+    Node* cond = parse_expression();
+    _no_struct_lit = false;
+    Block* then_branch = parse_block();
+    Node* else_branch = nullptr;
+    if (match(TokenType::ELSE)) {
+        if (check(TokenType::IF)) else_branch = parse_if();
+        else else_branch = parse_block();
+    }
+    IfStmt* s = new IfStmt(cond, then_branch, else_branch);
+    s->line = ln;
+    return s;
+}
+
+Node* Parser::parse_while() {
+    int ln = cur().line;
+    consume(TokenType::WHILE, "Expected 'while'");
+    _no_struct_lit = true;
+    Node* cond = parse_expression();
+    _no_struct_lit = false;
+    Block* body = parse_block();
+    WhileStmt* s = new WhileStmt(cond, body);
+    s->line = ln;
+    return s;
+}
+
+Node* Parser::parse_for() {
+    int ln = cur().line;
+    consume(TokenType::FOR, "Expected 'for'");
+    bool bind_ref = match(TokenType::REF);
+    String var = consume(TokenType::IDENTIFIER, "Expected loop variable").lexeme;
+    consume(TokenType::IN, "Expected 'in' after loop variable");
+    ForStmt* s = new ForStmt(var);
+    s->bind_ref = bind_ref;
+    s->line = ln;
+    _no_struct_lit = true;
+    s->iterable = parse_expression();
+    _no_struct_lit = false;
+    s->body = parse_block();
+    return s;
+}
+
+Node* Parser::parse_return() {
+    int ln = cur().line;
+    consume(TokenType::RETURN, "Expected 'return'");
+    Node* value = nullptr;
+    if (!check(TokenType::SEMICOLON)) value = parse_expression();
+    consume(TokenType::SEMICOLON, "Expected ';' after return");
+    ReturnStmt* s = new ReturnStmt(value);
+    s->line = ln;
+    return s;
+}
+
+Node* Parser::parse_defer() {
+    int ln = cur().line;
+    consume(TokenType::DEFER, "Expected 'defer'");
+    Node* inner = parse_statement();
+    DeferStmt* s = new DeferStmt(inner);
+    s->line = ln;
+    return s;
+}
+
+Node* Parser::parse_unsafe() {
+    int ln = cur().line;
+    consume(TokenType::UNSAFE, "Expected 'unsafe'");
+    UnsafeBlock* s = new UnsafeBlock(parse_block());
+    s->line = ln;
+    return s;
+}
+
+// ---- expressions ----
+
+Node* Parser::parse_expression() { return parse_assignment(); }
+
+Node* Parser::parse_assignment() {
+    Node* left = parse_range();
+    int ln = cur().line;
+
+    if (match(TokenType::ASSIGN)) {
+        Node* value = parse_assignment();
+        Assign* a = new Assign(left, value);
+        a->line = ln;
+        return a;
+    }
+
+    static const struct { TokenType tok; const char* op; } compounds[] = {
+        {TokenType::PLUS_ASSIGN, "+"}, {TokenType::MINUS_ASSIGN, "-"},
+        {TokenType::STAR_ASSIGN, "*"}, {TokenType::SLASH_ASSIGN, "/"},
+        {TokenType::PERCENT_ASSIGN, "%"}, {TokenType::AMPERSAND_ASSIGN, "&"},
+        {TokenType::PIPE_ASSIGN, "|"}, {TokenType::CARET_ASSIGN, "^"},
+        {TokenType::LSHIFT_ASSIGN, "<<"}, {TokenType::RSHIFT_ASSIGN, ">>"},
+    };
+    for (const auto& c : compounds) {
+        if (match(c.tok)) {
+            Node* value = parse_assignment();
+            CompoundAssign* a = new CompoundAssign(left, String(c.op), value);
+            a->line = ln;
+            return a;
+        }
+    }
+    return left;
+}
+
+Node* Parser::parse_range() {
+    Node* left = parse_or();
+    if (match(TokenType::DOTDOT)) {
+        int ln = cur().line;
+        Node* right = parse_or();
+        RangeExpr* r = new RangeExpr(left, right);
+        r->line = ln;
+        return r;
+    }
+    return left;
+}
+
+Node* Parser::parse_or() {
+    Node* left = parse_and();
+    while (check(TokenType::OR)) {
+        int ln = cur().line; advance();
+        Node* right = parse_and();
+        left = new Binary(left, String("||"), right);
+        left->line = ln;
+    }
+    return left;
+}
+
+Node* Parser::parse_and() {
+    Node* left = parse_bit_or();
+    while (check(TokenType::AND)) {
+        int ln = cur().line; advance();
+        Node* right = parse_bit_or();
+        left = new Binary(left, String("&&"), right);
+        left->line = ln;
+    }
+    return left;
+}
+
+Node* Parser::parse_bit_or() {
+    Node* left = parse_bit_xor();
+    while (check(TokenType::PIPE)) {
+        int ln = cur().line; advance();
+        Node* right = parse_bit_xor();
+        left = new Binary(left, String("|"), right);
+        left->line = ln;
+    }
+    return left;
+}
+
+Node* Parser::parse_bit_xor() {
+    Node* left = parse_bit_and();
+    while (check(TokenType::CARET)) {
+        int ln = cur().line; advance();
+        Node* right = parse_bit_and();
+        left = new Binary(left, String("^"), right);
+        left->line = ln;
+    }
+    return left;
+}
+
+Node* Parser::parse_bit_and() {
+    Node* left = parse_equality();
+    while (check(TokenType::AMPERSAND)) {
+        int ln = cur().line; advance();
+        Node* right = parse_equality();
+        left = new Binary(left, String("&"), right);
+        left->line = ln;
+    }
+    return left;
+}
+
+Node* Parser::parse_equality() {
+    Node* left = parse_comparison();
+    while (check(TokenType::EQ) || check(TokenType::NEQ)) {
+        String op = cur().lexeme; int ln = cur().line; advance();
+        Node* right = parse_comparison();
+        left = new Binary(left, op, right);
+        left->line = ln;
+    }
+    return left;
+}
+
+Node* Parser::parse_comparison() {
+    Node* left = parse_shift();
+    while (check(TokenType::LANGLE) || check(TokenType::RANGLE) ||
+           check(TokenType::LTE) || check(TokenType::GTE)) {
+        String op = cur().lexeme; int ln = cur().line; advance();
+        Node* right = parse_shift();
+        left = new Binary(left, op, right);
+        left->line = ln;
+    }
+    return left;
+}
+
+Node* Parser::parse_shift() {
+    Node* left = parse_term();
+    while (check(TokenType::LSHIFT) || check(TokenType::RSHIFT)) {
+        String op = cur().lexeme; int ln = cur().line; advance();
+        Node* right = parse_term();
+        left = new Binary(left, op, right);
+        left->line = ln;
+    }
+    return left;
+}
+
+Node* Parser::parse_term() {
+    Node* left = parse_factor();
+    while (check(TokenType::PLUS) || check(TokenType::MINUS)) {
+        String op = cur().lexeme; int ln = cur().line; advance();
+        Node* right = parse_factor();
+        left = new Binary(left, op, right);
+        left->line = ln;
+    }
+    return left;
+}
+
+Node* Parser::parse_factor() {
+    Node* left = parse_unary();
+    while (check(TokenType::STAR) || check(TokenType::SLASH) || check(TokenType::PERCENT)) {
+        String op = cur().lexeme; int ln = cur().line; advance();
+        Node* right = parse_unary();
+        left = new Binary(left, op, right);
+        left->line = ln;
+    }
+    return left;
+}
+
+Node* Parser::parse_unary() {
+    if (check(TokenType::BANG) || check(TokenType::NOT) ||
+        check(TokenType::MINUS) || check(TokenType::TILDE)) {
+        String op = cur().lexeme; int ln = cur().line; advance();
+        Node* operand = parse_unary();
+        // BANG as prefix means logical not
+        Unary* u = new Unary(op == "!" ? String("!") : op, operand);
+        u->line = ln;
+        return u;
+    }
+    if (check(TokenType::REF)) {
+        int ln = cur().line; advance();
+        bool mut = match(TokenType::VAR);
+        Node* operand = parse_unary();
+        RefExpr* r = new RefExpr(operand, mut);
+        r->line = ln;
+        return r;
+    }
+    if (check(TokenType::SHARED)) {
+        int ln = cur().line; advance();
+        Node* operand = parse_unary();
+        SharedExpr* s = new SharedExpr(operand);
+        s->line = ln;
+        return s;
+    }
+    if (check(TokenType::WEAK)) {
+        int ln = cur().line; advance();
+        Node* operand = parse_unary();
+        WeakExpr* w = new WeakExpr(operand);
+        w->line = ln;
+        return w;
+    }
+    return parse_postfix();
+}
+
+DynamicArray<Arg> Parser::parse_args() {
+    DynamicArray<Arg> args;
+    bool saved = _no_struct_lit;
+    _no_struct_lit = false;
+    if (!check(TokenType::RPAREN)) {
+        do {
+            Arg a;
+            if (match(TokenType::REF)) {
+                a.is_ref = true;
+                a.ref_mutable = match(TokenType::VAR);
             }
-        }
-        consume(TokenType::RBRACE, "Expected '}' to close @if block");
-    } else {
-        skip_to_matching_brace();
+            a.value = parse_expression();
+            args.push(a);
+        } while (match(TokenType::COMMA));
     }
+    _no_struct_lit = saved;
+    return args;
+}
 
-    if (check(TokenType::AT) && peek_token(1).type == TokenType::ELSE) {
-        consume(TokenType::AT, "Expected '@'");
-        consume(TokenType::ELSE, "Expected 'else' after '@'");
-        consume(TokenType::LBRACE, "Expected '{' after '@else'");
+Node* Parser::parse_postfix() {
+    Node* expr = parse_primary();
+    for (;;) {
+        if (match(TokenType::DOT)) {
+            int ln = cur().line;
+            String member = consume(TokenType::IDENTIFIER, "Expected member name after '.'").lexeme;
+            if (match(TokenType::LPAREN)) {
+                MethodCall* mc = new MethodCall(expr, member);
+                mc->line = ln;
+                mc->args = parse_args();
+                consume(TokenType::RPAREN, "Expected ')' after method arguments");
+                expr = mc;
+            } else {
+                Field* f = new Field(expr, member);
+                f->line = ln;
+                expr = f;
+            }
+        } else if (check(TokenType::LBRACKET)) {
+            int ln = cur().line; advance();
+            Node* idx = parse_expression();
+            consume(TokenType::RBRACKET, "Expected ']' after index");
+            Index* ix = new Index(expr, idx);
+            ix->line = ln;
+            expr = ix;
+        } else {
+            break;
+        }
+    }
+    return expr;
+}
 
-        if (!active) {
-            while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
-                if (!parse_top_level_decl(program)) {
-                    fprintf(stderr, "Parse error at line %d: Unexpected token inside @else block\n",
-                            current_token().line);
-                    exit(1);
+Node* Parser::parse_primary() {
+    int ln = cur().line;
+    Token tok = cur();
+
+    switch (tok.type) {
+        case TokenType::INT_LITERAL: {
+            advance();
+            IntLit* n = new IntLit(atoll(tok.lexeme.c_str()));
+            n->line = ln; return n;
+        }
+        case TokenType::FLOAT_LITERAL: {
+            advance();
+            FloatLit* n = new FloatLit(atof(tok.lexeme.c_str()));
+            n->line = ln; return n;
+        }
+        case TokenType::TRUE: { advance(); BoolLit* n = new BoolLit(true); n->line = ln; return n; }
+        case TokenType::FALSE: { advance(); BoolLit* n = new BoolLit(false); n->line = ln; return n; }
+        case TokenType::SELF: { advance(); SelfExpr* n = new SelfExpr(); n->line = ln; return n; }
+        case TokenType::STRING_LITERAL: {
+            advance();
+            // process escapes
+            String raw = tok.lexeme;
+            char* buf = (char*)malloc(raw.length() + 1);
+            size_t j = 0;
+            for (size_t i = 0; i < raw.length(); i++) {
+                if (raw[i] == '\\' && i + 1 < raw.length()) {
+                    i++;
+                    char e = raw[i];
+                    buf[j++] = (e == 'n') ? '\n' : (e == 't') ? '\t' :
+                               (e == '\\') ? '\\' : (e == '"') ? '"' : e;
+                } else buf[j++] = raw[i];
+            }
+            buf[j] = '\0';
+            StringLit* n = new StringLit(String(buf, j));
+            free(buf);
+            n->line = ln; return n;
+        }
+        case TokenType::MATCH:
+            return parse_match();
+        case TokenType::CAST: {
+            advance();
+            consume(TokenType::LPAREN, "Expected '(' after 'cast'");
+            Node* operand = parse_expression();
+            consume(TokenType::COMMA, "Expected ',' in cast");
+            TypeRef* t = parse_type();
+            consume(TokenType::RPAREN, "Expected ')' after cast");
+            CastExpr* c = new CastExpr(operand, t);
+            c->line = ln; return c;
+        }
+        case TokenType::SIZEOF: {
+            advance();
+            consume(TokenType::LPAREN, "Expected '(' after 'sizeof'");
+            TypeRef* t = parse_type();
+            consume(TokenType::RPAREN, "Expected ')' after sizeof");
+            SizeofExpr* s = new SizeofExpr(t);
+            s->line = ln; return s;
+        }
+        case TokenType::LPAREN: {
+            advance();
+            bool saved = _no_struct_lit;
+            _no_struct_lit = false;
+            Node* inner = parse_expression();
+            _no_struct_lit = saved;
+            consume(TokenType::RPAREN, "Expected ')'");
+            return inner;
+        }
+        case TokenType::LBRACKET: {
+            advance();
+            ArrayLit* arr = new ArrayLit();
+            arr->line = ln;
+            if (!check(TokenType::RBRACKET)) {
+                do { arr->elements.push(parse_expression()); } while (match(TokenType::COMMA));
+            }
+            consume(TokenType::RBRACKET, "Expected ']' after array literal");
+            return arr;
+        }
+        case TokenType::IDENTIFIER: {
+            String name = tok.lexeme;
+            advance();
+            // struct literal: Name { field = expr, ... }
+            if (!_no_struct_lit && check(TokenType::LBRACE) && peek().type == TokenType::IDENTIFIER &&
+                peek(2).type == TokenType::ASSIGN) {
+                advance(); // {
+                StructLit* lit = new StructLit(name);
+                lit->line = ln;
+                if (!check(TokenType::RBRACE)) {
+                    do {
+                        FieldInit fi;
+                        fi.name = consume(TokenType::IDENTIFIER, "Expected field name").lexeme;
+                        consume(TokenType::ASSIGN, "Expected '=' in struct literal");
+                        fi.value = parse_expression();
+                        lit->fields.push(fi);
+                    } while (match(TokenType::COMMA));
                 }
+                consume(TokenType::RBRACE, "Expected '}' after struct literal");
+                return lit;
             }
-            consume(TokenType::RBRACE, "Expected '}' to close @else block");
-        } else {
-            skip_to_matching_brace();
+            // call: name(args)
+            if (match(TokenType::LPAREN)) {
+                Call* call = new Call(name);
+                call->line = ln;
+                call->args = parse_args();
+                consume(TokenType::RPAREN, "Expected ')' after arguments");
+                return call;
+            }
+            Ident* id = new Ident(name);
+            id->line = ln;
+            return id;
         }
+        default:
+            fail("Unexpected token in expression");
     }
+}
+
+Node* Parser::parse_match() {
+    int ln = cur().line;
+    consume(TokenType::MATCH, "Expected 'match'");
+    Node* subject = parse_expression();
+    consume(TokenType::LBRACE, "Expected '{' after match subject");
+    MatchExpr* m = new MatchExpr(subject);
+    m->line = ln;
+    while (!check(TokenType::RBRACE) && !check(TokenType::END_OF_FILE)) {
+        MatchArm* arm = new MatchArm();
+        if (cur().type == TokenType::IDENTIFIER && cur().lexeme == "_") {
+            arm->is_wildcard = true;
+            advance();
+        } else {
+            arm->variant = consume(TokenType::IDENTIFIER, "Expected variant name in match arm").lexeme;
+        }
+        consume(TokenType::ARROW, "Expected '=>' in match arm");
+        // arm body: a block, or a single comma-terminated statement
+        if (check(TokenType::LBRACE)) {
+            arm->body = parse_block();
+        } else {
+            Block* b = new Block();
+            b->line = cur().line;
+            if (check(TokenType::RETURN)) {
+                int rln = cur().line;
+                advance();
+                Node* val = (check(TokenType::COMMA) || check(TokenType::RBRACE))
+                            ? nullptr : parse_expression();
+                ReturnStmt* rs = new ReturnStmt(val);
+                rs->line = rln;
+                b->statements.push(rs);
+            } else if (check(TokenType::BREAK)) {
+                advance(); b->statements.push(new BreakStmt());
+            } else if (check(TokenType::CONTINUE)) {
+                advance(); b->statements.push(new ContinueStmt());
+            } else {
+                Node* e = parse_expression();
+                ExprStmt* s = new ExprStmt(e);
+                s->line = e->line;
+                b->statements.push(s);
+            }
+            arm->body = b;
+            match(TokenType::COMMA);
+        }
+        match(TokenType::COMMA);
+        m->arms.push(arm);
+    }
+    consume(TokenType::RBRACE, "Expected '}' after match arms");
+    return m;
 }
 
 }

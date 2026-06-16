@@ -1,0 +1,41 @@
+var order : i32[] = [];
+
+func record(n : i32) {
+    order.push(n);
+}
+
+func with_defers() {
+    defer record(1);
+    defer record(2);
+    record(3);
+}
+
+func main() : i32 {
+    with_defers();
+    // defers run LIFO at scope exit: 3, then 2, then 1
+    if order.len() != 3 { return 1; }
+    if order[0] != 3 { return 2; }
+    if order[1] != 2 { return 3; }
+    if order[2] != 1 { return 4; }
+
+    var found = -1;
+    for i in 0..100 {
+        if i == 42 {
+            found = i;
+            break;
+        }
+    }
+    if found != 42 { return 5; }
+
+    var evens = 0;
+    for i in 0..10 {
+        if i % 2 != 0 {
+            continue;
+        }
+        evens = evens + 1;
+    }
+    if evens != 5 { return 6; }
+
+    println("PASS control_defer");
+    return 0;
+}

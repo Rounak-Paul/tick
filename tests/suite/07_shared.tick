@@ -1,0 +1,25 @@
+struct Node {
+    value : i32,
+}
+
+func read_value(n : shared Node) : i32 {
+    return n.value;
+}
+
+func main() : i32 {
+    var a : shared Node = shared Node { value = 42 };
+    var b = a;            // shares ownership (refcount 2)
+    var c = a;            // refcount 3
+
+    if a.value != 42 { return 1; }
+    if b.value != 42 { return 2; }
+    if c.value != 42 { return 3; }
+
+    b.value = 99;         // shared mutation is visible through all handles
+    if a.value != 99 { return 4; }
+
+    if read_value(a) != 99 { return 5; }
+
+    println("PASS shared");
+    return 0;
+}

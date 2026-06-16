@@ -1,233 +1,192 @@
 #include "tick_runtime.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <sys/stat.h>
 
-void tick_signal_init(TickSignal* sig) {
-    sig->head = 0;
-    sig->tail = 0;
-    sig->count = 0;
-    pthread_mutex_init(&sig->mutex, NULL);
-    pthread_cond_init(&sig->cond, NULL);
+/* ---- validation traps ---- */
+
+void tick_trap_bounds(const char* where, int64_t index, int64_t len) {
+    fflush(stdout);
+    fprintf(stderr, "tick: out-of-bounds access at %s: index %lld, length %lld\n",
+            where, (long long)index, (long long)len);
+    abort();
+}
+void tick_trap_unwrap(const char* where) {
+    fprintf(stderr, "tick: unwrap of empty value at %s\n", where);
+    abort();
+}
+void tick_trap_overflow(const char* where) {
+    fprintf(stderr, "tick: integer overflow at %s\n", where);
+    abort();
+}
+void tick_trap_use_after_move(const char* where) {
+    fprintf(stderr, "tick: use after move at %s\n", where);
+    abort();
+}
+void tick_trap_weak_dead(const char* where) {
+    fprintf(stderr, "tick: upgrade of dead weak reference at %s\n", where);
+    abort();
 }
 
-void tick_signal_emit(TickSignal* sig, void* value) {
-    pthread_mutex_lock(&sig->mutex);
-
-    if (sig->count < SIGNAL_QUEUE_SIZE) {
-        sig->data[sig->tail] = value;
-        sig->tail = (sig->tail + 1) % SIGNAL_QUEUE_SIZE;
-        sig->count++;
-        pthread_cond_signal(&sig->cond);
-    } else {
-        fprintf(stderr, "tick: signal queue full, value dropped\n");
-    }
-
-    pthread_mutex_unlock(&sig->mutex);
-}
-
-void* tick_signal_recv(TickSignal* sig) {
-    pthread_mutex_lock(&sig->mutex);
-
-    while (sig->count == 0) {
-        pthread_cond_wait(&sig->cond, &sig->mutex);
-    }
-
-    void* value = sig->data[sig->head];
-    sig->head = (sig->head + 1) % SIGNAL_QUEUE_SIZE;
-    sig->count--;
-
-    pthread_mutex_unlock(&sig->mutex);
-    return value;
-}
-
-void tick_signal_destroy(TickSignal* sig) {
-    pthread_mutex_destroy(&sig->mutex);
-    pthread_cond_destroy(&sig->cond);
-}
-
-void tick_event_init(TickEvent* evt, int capacity) {
-    evt->process_funcs = (TickProcessFunc*)malloc(sizeof(TickProcessFunc) * capacity);
-    evt->threads = (pthread_t*)malloc(sizeof(pthread_t) * capacity);
-    evt->process_count = 0;
-}
-
-void tick_event_add_process(TickEvent* evt, TickProcessFunc func) {
-    evt->process_funcs[evt->process_count++] = func;
-}
-
-void tick_event_execute(TickEvent* evt) {
-    for (int i = 0; i < evt->process_count; i++) {
-        pthread_create(&evt->threads[i], NULL, evt->process_funcs[i], NULL);
-    }
-}
-
-void tick_event_wait(TickEvent* evt) {
-    for (int i = 0; i < evt->process_count; i++) {
-        pthread_join(evt->threads[i], NULL);
-    }
-}
-
-void tick_event_destroy(TickEvent* evt) {
-    free(evt->process_funcs);
-    free(evt->threads);
-}
-
-int32_t tick_str_length(const char* s) {
-    if (!s) return 0;
-    return (int32_t)strlen(s);
-}
+/* ---- strings ---- */
 
 char* tick_str_concat(const char* a, const char* b) {
     if (!a) a = "";
     if (!b) b = "";
-    size_t la = strlen(a);
-    size_t lb = strlen(b);
-    char* result = (char*)malloc(la + lb + 1);
-    memcpy(result, a, la);
-    memcpy(result + la, b, lb);
-    result[la + lb] = '\0';
-    return result;
+    size_t la = strlen(a), lb = strlen(b);
+    char* r = (char*)malloc(la + lb + 1);
+    memcpy(r, a, la);
+    memcpy(r + la, b, lb);
+    r[la + lb] = '\0';
+    return r;
 }
-
-char* tick_str_substring(const char* s, int32_t start, int32_t end) {
-    if (!s) { char* r = (char*)malloc(1); r[0] = '\0'; return r; }
-    int32_t len = (int32_t)strlen(s);
-    if (start < 0) start = 0;
-    if (end > len) end = len;
-    if (start >= end) { char* r = (char*)malloc(1); r[0] = '\0'; return r; }
-    int32_t sub_len = end - start;
-    char* result = (char*)malloc(sub_len + 1);
-    memcpy(result, s + start, sub_len);
-    result[sub_len] = '\0';
-    return result;
-}
-
-int32_t tick_str_index_of(const char* s, const char* substr) {
-    if (!s || !substr) return -1;
-    const char* found = strstr(s, substr);
-    if (!found) return -1;
-    return (int32_t)(found - s);
-}
-
-int32_t tick_str_compare(const char* a, const char* b) {
+int32_t tick_str_len(const char* s) { return s ? (int32_t)strlen(s) : 0; }
+int32_t tick_str_order(const char* a, const char* b) {
     if (!a && !b) return 0;
     if (!a) return -1;
     if (!b) return 1;
     return (int32_t)strcmp(a, b);
 }
-
-char tick_str_char_at(const char* s, int32_t index) {
-    if (!s || index < 0 || index >= (int32_t)strlen(s)) return '\0';
-    return s[index];
+bool tick_str_eq(const char* a, const char* b) {
+    if (a == b) return true;
+    if (!a || !b) return false;
+    return strcmp(a, b) == 0;
+}
+char* tick_str_from_i64(int64_t v) {
+    char* b = (char*)malloc(24); snprintf(b, 24, "%lld", (long long)v); return b;
+}
+char* tick_str_from_u64(uint64_t v) {
+    char* b = (char*)malloc(24); snprintf(b, 24, "%llu", (unsigned long long)v); return b;
+}
+char* tick_str_from_f64(double v) {
+    char* b = (char*)malloc(40); snprintf(b, 40, "%g", v); return b;
+}
+char* tick_str_from_bool(bool v) {
+    return tick_str_dup(v ? "true" : "false");
+}
+char* tick_str_dup(const char* s) {
+    if (!s) s = "";
+    size_t n = strlen(s);
+    char* r = (char*)malloc(n + 1);
+    memcpy(r, s, n + 1);
+    return r;
 }
 
-char* tick_str_from_i64(int64_t val) {
-    char* buf = (char*)malloc(32);
-    snprintf(buf, 32, "%lld", (long long)val);
-    return buf;
-}
+/* ---- dynamic arrays ---- */
 
-int64_t tick_str_to_i64(const char* s) {
-    if (!s) return 0;
-    return (int64_t)atoll(s);
+TickArray tick_array_new(int32_t elem_size) {
+    TickArray a;
+    a.data = NULL; a.len = 0; a.cap = 0; a.elem_size = elem_size;
+    return a;
 }
-
-char* tick_str_from_u64(uint64_t val) {
-    char* buf = (char*)malloc(32);
-    snprintf(buf, 32, "%llu", (unsigned long long)val);
-    return buf;
-}
-
-char* tick_str_from_f64(double val) {
-    char* buf = (char*)malloc(64);
-    snprintf(buf, 64, "%f", val);
-    return buf;
-}
-
-double tick_str_to_f64(const char* s) {
-    if (!s) return 0.0;
-    return atof(s);
-}
-
-char* tick_str_from_b8(bool val) {
-    char* buf = (char*)malloc(6);
-    snprintf(buf, 6, "%s", val ? "true" : "false");
-    return buf;
-}
-
-bool tick_str_to_b8(const char* s) {
-    if (!s) return false;
-    return strcmp(s, "true") == 0 || strcmp(s, "1") == 0;
-}
-
-char* tick_input_readline(const char* prompt) {
-    if (prompt && prompt[0] != '\0') {
-        fputs(prompt, stdout);
-        fflush(stdout);
+TickArray tick_array_copy(TickArray src) {
+    TickArray a = tick_array_new(src.elem_size);
+    if (src.len > 0) {
+        tick_array_reserve(&a, src.len);
+        memcpy(a.data, src.data, (size_t)src.len * src.elem_size);
+        a.len = src.len;
     }
-    size_t cap = 128;
-    size_t len = 0;
-    char* buf = (char*)malloc(cap);
-    int c;
-    while ((c = fgetc(stdin)) != EOF && c != '\n') {
-        if (len + 1 >= cap) {
-            cap *= 2;
-            buf = (char*)realloc(buf, cap);
-        }
-        buf[len++] = (char)c;
+    return a;
+}
+void tick_array_reserve(TickArray* a, int32_t needed) {
+    if (needed <= a->cap) return;
+    int32_t cap = a->cap == 0 ? 4 : a->cap;
+    while (cap < needed) cap *= 2;
+    a->data = realloc(a->data, (size_t)cap * a->elem_size);
+    a->cap = cap;
+}
+void* tick_array_at(TickArray* a, int32_t index) {
+    if (index < 0 || index >= a->len) tick_trap_bounds("array index", index, a->len);
+    return (char*)a->data + (size_t)index * a->elem_size;
+}
+void* tick_array_at_unchecked(TickArray* a, int32_t index) {
+    return (char*)a->data + (size_t)index * a->elem_size;
+}
+void tick_array_push(TickArray* a, const void* elem) {
+    tick_array_reserve(a, a->len + 1);
+    memcpy((char*)a->data + (size_t)a->len * a->elem_size, elem, a->elem_size);
+    a->len++;
+}
+void tick_array_free(TickArray* a) {
+    if (a->data) { free(a->data); a->data = NULL; }
+    a->len = 0; a->cap = 0;
+}
+
+/* ---- shared / weak ---- */
+
+void* tick_shared_new(int32_t payload_size) {
+    TickShared* h = (TickShared*)malloc(sizeof(TickShared) + payload_size);
+    h->strong = 1;
+    h->weak = 0;
+    return (void*)(h + 1);
+}
+static TickShared* header_of(void* payload) {
+    return ((TickShared*)payload) - 1;
+}
+void* tick_shared_retain(void* payload) {
+    if (payload) header_of(payload)->strong++;
+    return payload;
+}
+void tick_shared_release(void* payload) {
+    if (!payload) return;
+    TickShared* h = header_of(payload);
+    h->strong--;
+    if (h->strong == 0 && h->weak == 0) free(h);
+}
+void* tick_weak_from(void* payload) {
+    if (payload) header_of(payload)->weak++;
+    return payload;
+}
+void tick_weak_drop(void* payload) {
+    if (!payload) return;
+    TickShared* h = header_of(payload);
+    h->weak--;
+    if (h->strong == 0 && h->weak == 0) free(h);
+}
+bool tick_weak_alive(void* payload) {
+    return payload && header_of(payload)->strong > 0;
+}
+
+/* ---- signals & events ---- */
+
+void tick_signal_init(TickSignal* s) {
+    s->head = s->tail = s->count = 0;
+    pthread_mutex_init(&s->mutex, NULL);
+    pthread_cond_init(&s->cond, NULL);
+}
+void tick_signal_emit(TickSignal* s, void* value) {
+    pthread_mutex_lock(&s->mutex);
+    if (s->count < TICK_SIGNAL_CAP) {
+        s->data[s->tail] = value;
+        s->tail = (s->tail + 1) % TICK_SIGNAL_CAP;
+        s->count++;
+        pthread_cond_signal(&s->cond);
+    } else {
+        fprintf(stderr, "tick: signal queue full, value dropped\n");
     }
-    buf[len] = '\0';
-    return buf;
+    pthread_mutex_unlock(&s->mutex);
 }
-
-TickFile* tick_file_open(const char* path, const char* mode) {
-    if (!path || !mode) return NULL;
-    FILE* h = fopen(path, mode);
-    if (!h) return NULL;
-    TickFile* f = (TickFile*)malloc(sizeof(TickFile));
-    f->handle = h;
-    return f;
+void* tick_signal_recv(TickSignal* s) {
+    pthread_mutex_lock(&s->mutex);
+    while (s->count == 0) pthread_cond_wait(&s->cond, &s->mutex);
+    void* v = s->data[s->head];
+    s->head = (s->head + 1) % TICK_SIGNAL_CAP;
+    s->count--;
+    pthread_mutex_unlock(&s->mutex);
+    return v;
 }
-
-char* tick_file_read(TickFile* f) {
-    if (!f || !f->handle) { char* r = (char*)malloc(1); r[0] = '\0'; return r; }
-    fseek(f->handle, 0, SEEK_END);
-    long size = ftell(f->handle);
-    fseek(f->handle, 0, SEEK_SET);
-    char* buf = (char*)malloc(size + 1);
-    fread(buf, 1, size, f->handle);
-    buf[size] = '\0';
-    return buf;
+void tick_event_init(TickEvent* e, int cap) {
+    e->fns = (TickProcessFn*)malloc(sizeof(TickProcessFn) * (cap > 0 ? cap : 1));
+    e->threads = (pthread_t*)malloc(sizeof(pthread_t) * (cap > 0 ? cap : 1));
+    e->count = 0;
+    e->cap = cap;
 }
-
-void tick_file_write(TickFile* f, const char* data) {
-    if (!f || !f->handle || !data) return;
-    fputs(data, f->handle);
+void tick_event_bind(TickEvent* e, TickProcessFn fn) {
+    if (e->count < e->cap) e->fns[e->count++] = fn;
 }
-
-void tick_file_close(TickFile* f) {
-    if (!f) return;
-    if (f->handle) fclose(f->handle);
-    free(f);
-}
-
-bool tick_file_exists(const char* path) {
-    if (!path) return false;
-    struct stat st;
-    return stat(path, &st) == 0;
-}
-
-void tick_array_push(TickArray* arr, size_t elem_size) {
-    if (arr->len >= arr->cap) {
-        int32_t new_cap = (arr->cap == 0) ? 4 : (arr->cap * 2);
-        arr->ptr = realloc(arr->ptr, (size_t)new_cap * elem_size);
-        arr->cap = new_cap;
-    }
-    arr->len++;
-}
-
-void tick_array_pop(TickArray* arr) {
-    if (arr->len > 0) arr->len--;
+void tick_event_fire(TickEvent* e) {
+    for (int i = 0; i < e->count; i++)
+        pthread_create(&e->threads[i], NULL, e->fns[i], NULL);
+    for (int i = 0; i < e->count; i++)
+        pthread_join(e->threads[i], NULL);
 }

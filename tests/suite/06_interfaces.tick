@@ -1,0 +1,27 @@
+interface Shape {
+    func area(self) : f64;
+}
+
+struct Circle { r : f64 }
+struct Square { side : f64 }
+
+impl Circle {
+    func area(self) : f64 { return 3.14159 * self.r * self.r; }
+}
+impl Square {
+    func area(self) : f64 { return self.side * self.side; }
+}
+
+impl Shape for Circle {}
+impl Shape for Square {}
+
+func main() : i32 {
+    let c = Circle { r = 2.0 };
+    let s = Square { side = 3.0 };
+    if c.area() < 12.56 { return 1; }
+    if c.area() > 12.57 { return 2; }
+    if s.area() != 9.0 { return 3; }
+
+    println("PASS interfaces");
+    return 0;
+}

@@ -1,0 +1,45 @@
+enum Dir {
+    North,
+    East,
+    South,
+    West,
+}
+
+enum Status {
+    Ok = 0,
+    Warn = 10,
+    Fail = 20,
+}
+
+func turn_right(d : Dir) : Dir {
+    match d {
+        North => return East,
+        East  => return South,
+        South => return West,
+        West  => return North,
+    }
+    return North;
+}
+
+func main() : i32 {
+    let d = Dir.North;
+    if d != Dir.North { return 1; }
+
+    let r = turn_right(Dir.North);
+    if r != Dir.East { return 2; }
+
+    if Status.Warn != 10 { return 3; }
+    if Status.Fail != 20 { return 4; }
+
+    var hits = 0;
+    let s = Dir.West;
+    match s {
+        North => hits = 1,
+        West  => hits = 100,
+        _     => hits = 999,
+    }
+    if hits != 100 { return 5; }
+
+    println("PASS enums_match");
+    return 0;
+}

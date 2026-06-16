@@ -1,0 +1,45 @@
+struct Vec2 {
+    x : f64,
+    y : f64,
+}
+
+struct Rect {
+    origin : Vec2,
+    w : f64,
+    h : f64,
+}
+
+impl Vec2 {
+    func length_sq(self) : f64 {
+        return self.x * self.x + self.y * self.y;
+    }
+    func translate(ref var self, dx : f64, dy : f64) {
+        self.x = self.x + dx;
+        self.y = self.y + dy;
+    }
+}
+
+func main() : i32 {
+    var v = Vec2 { x = 3.0, y = 4.0 };
+    if v.length_sq() != 25.0 { return 1; }
+
+    // value semantics: copy is independent
+    var w = v;
+    w.x = 100.0;
+    if v.x != 3.0 { return 2; }
+
+    // mutate in place via ref method
+    v.translate(1.0, 1.0);
+    if v.x != 4.0 { return 3; }
+    if v.y != 5.0 { return 4; }
+
+    // nested struct by value
+    var r = Rect { origin = Vec2 { x = 1.0, y = 2.0 }, w = 10.0, h = 20.0 };
+    if r.origin.x != 1.0 { return 5; }
+    var r2 = r;
+    r2.origin.x = 99.0;
+    if r.origin.x != 1.0 { return 6; }
+
+    println("PASS structs");
+    return 0;
+}

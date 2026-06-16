@@ -1,0 +1,28 @@
+func greet(name : str) : str {
+    return "hello " + name;
+}
+
+func main() : i32 {
+    let a = "foo";
+    let b = "bar";
+    let c = a + b;
+    if c.len() != 6 { return 1; }
+    if c != "foobar" { return 2; }
+    if a == b { return 3; }
+
+    let g = greet("world");
+    if g != "hello world" { return 4; }
+
+    // dup binding is independent and freed correctly
+    let d = c;
+    if d != "foobar" { return 5; }
+
+    let n = to_str(42);
+    if n != "42" { return 6; }
+
+    if str_order("apple", "banana") >= 0 { return 7; }
+    if str_order("same", "same") != 0 { return 8; }
+
+    println("PASS strings");
+    return 0;
+}

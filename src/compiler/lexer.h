@@ -3,33 +3,34 @@
 
 #include "token.h"
 #include "../core/dynamic_array.h"
-#include "../core/string.h"
 
 namespace Tick {
 
+/// Converts Tick source text into a flat token stream.
 class Lexer {
 public:
-    Lexer(const char* source);
+    /// @param source null-terminated source buffer (not owned)
+    explicit Lexer(const char* source);
+
+    /// Tokenize the whole source. Always terminates with END_OF_FILE.
     DynamicArray<Token> tokenize();
 
 private:
     const char* _source;
-    size_t _position;
-    size_t _line;
-    size_t _column;
-    
-    char current_char();
-    char peek_char(int offset = 1);
+    size_t _pos;
+    int _line;
+    int _column;
+
+    char current() const;
+    char peek(int offset = 1) const;
     void advance();
-    void skip_whitespace();
-    void skip_comment();
-    
-    Token make_token(TokenType type, const char* start, size_t length);
+    void skip_trivia();
+
+    Token make(TokenType type, const char* start, size_t length);
     Token read_identifier();
     Token read_number();
     Token read_string();
-    Token read_multiline_string();
-    TokenType check_keyword(const char* str, size_t length);
+    static TokenType keyword_type(const char* str, size_t length);
 };
 
 }
