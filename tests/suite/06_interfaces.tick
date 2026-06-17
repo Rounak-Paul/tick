@@ -16,8 +16,8 @@ impl Shape for Circle {}
 impl Shape for Square {}
 
 func main() : i32 {
-    let c = Circle { r = 2.0 };
-    let s = Square { side = 3.0 };
+    var c = Circle { r = 2.0 };
+    var s = Square { side = 3.0 };
     if c.area() < 12.56 { return 1; }
     if c.area() > 12.57 { return 2; }
     if s.area() != 9.0 { return 3; }

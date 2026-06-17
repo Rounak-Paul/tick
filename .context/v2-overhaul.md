@@ -5,7 +5,7 @@ Vision + full spec: `DESIGN_V2.md`. User-facing docs: `README.md`.
 
 ## Core model
 - Value-by-default. Aliasing only via explicit `ref` (borrow) or `shared` (refcount).
-- `let` (immutable) / `var` (mutable). Mutation through refs needs `ref var`.
+- `var` is the single binding keyword. `const` is a type qualifier: `var x : const i32 = 10` makes the binding immutable (zero cost, statically enforced). Mutation through refs needs `ref var`.
 - Owned heap data (`str`, `T[]`, `shared`) reclaimed at compiler-chosen points; no GC.
 - Validation layer = build mode: default (bounds+null), `--validate` (all), `--release` (none).
 
@@ -38,7 +38,7 @@ Vision + full spec: `DESIGN_V2.md`. User-facing docs: `README.md`.
 primitives, structs+impl+methods (`self`/`ref self`/`ref var self`), interfaces
 (static), plain enums (int constants) + exhaustive `match`, dynamic arrays (`push`/
 `pop`/`len`/index/`for-in`/`for ref`), fixed arrays, strings (`+`/`==`/`len`/
-`str_order`/`to_str`), `ref`/`shared`/`weak`, `let`/`var`, control flow, `defer`,
+`str_order`/`to_str`), `ref`/`shared`/`weak`, `var` + `const` type qualifier, control flow, `defer`,
 `unsafe` + `extern`/`link`, signals/events/processes, globals, `cast`/`sizeof`,
 three build modes.
 

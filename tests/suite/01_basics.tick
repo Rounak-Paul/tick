@@ -10,8 +10,8 @@ func factorial(n : i32) : i32 {
 }
 
 func main() : i32 {
-    let x = 3;
-    let y = 4;
+    var x = 3;
+    var y = 4;
     if add(x, y) != 7 { return 1; }
     if factorial(5) != 120 { return 2; }
 

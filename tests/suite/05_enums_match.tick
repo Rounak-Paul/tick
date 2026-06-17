@@ -22,17 +22,17 @@ func turn_right(d : Dir) : Dir {
 }
 
 func main() : i32 {
-    let d = Dir.North;
+    var d = Dir.North;
     if d != Dir.North { return 1; }
 
-    let r = turn_right(Dir.North);
+    var r = turn_right(Dir.North);
     if r != Dir.East { return 2; }
 
     if Status.Warn != 10 { return 3; }
     if Status.Fail != 20 { return 4; }
 
     var hits = 0;
-    let s = Dir.West;
+    var s = Dir.West;
     match s {
         North => hits = 1,
         West  => hits = 100,

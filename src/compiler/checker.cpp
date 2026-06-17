@@ -196,7 +196,7 @@ void Checker::collect_globals() {
         Symbol* s = new Symbol();
         s->kind = SymKind::GLOBAL;
         s->name = g->name;
-        s->is_mutable = g->is_mutable;
+        s->is_mutable = !g->is_const;
         s->type = g->type ? g->type->clone() : nullptr;
         declare(g->name, s);
     }
@@ -268,7 +268,7 @@ void Checker::check_block(Block* block) {
 
 void Checker::check_stmt(Node* stmt) {
     switch (stmt->kind) {
-        case NodeKind::LET_DECL: check_let(static_cast<LetDecl*>(stmt)); break;
+        case NodeKind::VAR_DECL: check_var(static_cast<VarDecl*>(stmt)); break;
         case NodeKind::EXPR_STMT: check_expr(static_cast<ExprStmt*>(stmt)->expr); break;
         case NodeKind::BLOCK: check_block(static_cast<Block*>(stmt)); break;
         case NodeKind::IF: {
@@ -332,7 +332,7 @@ void Checker::check_stmt(Node* stmt) {
     }
 }
 
-void Checker::check_let(LetDecl* d) {
+void Checker::check_var(VarDecl* d) {
     TypeRef* it = nullptr;
     if (d->init) {
         it = check_expr(d->init);
@@ -345,7 +345,7 @@ void Checker::check_let(LetDecl* d) {
     Symbol* s = new Symbol();
     s->kind = SymKind::LOCAL;
     s->name = d->name;
-    s->is_mutable = d->is_mutable;
+    s->is_mutable = !d->is_const;
     s->type = bind_type;
     declare(d->name, s);
 

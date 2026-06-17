@@ -155,6 +155,7 @@ String CodeGen::generate() {
     for (size_t i = 0; i < _program->globals.size(); i++) {
         GlobalDecl* g = _program->globals[i];
         String ct = c_type_str(g->type);
+        if (g->is_const) _out.put("const ");
         _out.put("%s %s;\n", ct.c_str(), g->name.c_str());
     }
 
@@ -344,7 +345,7 @@ void CodeGen::gen_block(Block* block, int indent, bool new_scope) {
 
 void CodeGen::gen_stmt(Node* stmt, int indent) {
     switch (stmt->kind) {
-        case NodeKind::LET_DECL: gen_let(static_cast<LetDecl*>(stmt), indent); break;
+        case NodeKind::VAR_DECL: gen_var(static_cast<VarDecl*>(stmt), indent); break;
         case NodeKind::EXPR_STMT: {
             Node* e = static_cast<ExprStmt*>(stmt)->expr;
             if (e->kind == NodeKind::MATCH) { gen_match(static_cast<MatchExpr*>(e), indent); break; }
@@ -467,7 +468,7 @@ void CodeGen::gen_stmt(Node* stmt, int indent) {
     }
 }
 
-void CodeGen::gen_let(LetDecl* d, int indent) {
+void CodeGen::gen_var(VarDecl* d, int indent) {
     TypeRef* t = d->declared_type ? d->declared_type
                : (d->init ? d->init->resolved_type : nullptr);
     String ct = c_type_str(t);
@@ -477,7 +478,7 @@ void CodeGen::gen_let(LetDecl* d, int indent) {
         _out.put("%s %s[%d]", et.c_str(), d->name.c_str(), t->fixed_size);
         if (!d->init) _out.put(" = {0}");
     } else {
-        if (!d->is_mutable) _out.put("const ");
+        if (d->is_const) _out.put("const ");
         _out.put("%s %s", ct.c_str(), d->name.c_str());
         if (d->init) {
             _out.put(" = ");

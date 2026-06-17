@@ -14,9 +14,9 @@ struct Symbol {
     SymKind kind;
     String name;
     TypeRef* type;        // owned by the symbol
-    bool is_mutable;
+    bool is_mutable;  // true unless binding was declared with `const` qualifier
     SymKind decl;
-    Symbol() : kind(SymKind::LOCAL), type(nullptr), is_mutable(false), decl(SymKind::LOCAL) {}
+    Symbol() : kind(SymKind::LOCAL), type(nullptr), is_mutable(true), decl(SymKind::LOCAL) {}
 };
 
 /// Per-binding ownership decision computed by the analyzer, consumed by codegen.
@@ -40,7 +40,7 @@ public:
 
     /// Codegen queries: was this expression node the last use of an owned value?
     bool is_move(Node* node) const;
-    /// Codegen queries: does this LetDecl/GlobalDecl own a heap value to reclaim?
+    /// Codegen queries: does this VarDecl/GlobalDecl own a heap value to reclaim?
     bool needs_reclaim(Node* decl) const;
 
 private:
@@ -79,7 +79,7 @@ private:
     // statements
     void check_block(Block* block);
     void check_stmt(Node* stmt);
-    void check_let(LetDecl* d);
+    void check_var(VarDecl* d);
 
     // expressions: returns the resolved type (owned by the node)
     TypeRef* check_expr(Node* expr);

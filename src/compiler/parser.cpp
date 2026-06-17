@@ -126,6 +126,9 @@ TypeRef* Parser::parse_type() {
         own = Ownership::WEAK;
     }
 
+    // const qualifier: `const T` — immutable binding, zero runtime cost
+    bool is_const = match(TokenType::CONST);
+
     TypeRef* base = parse_base_type();
 
     // suffixes: T[], T[N], T?
@@ -152,6 +155,7 @@ TypeRef* Parser::parse_type() {
 
     base->ownership = own;
     base->ref_mutable = ref_mut;
+    base->is_const = is_const;
     return base;
 }
 
@@ -201,13 +205,9 @@ void Parser::parse_top_level(Program* program) {
             if (is_pub) fail("'process' cannot be 'pub'");
             program->processes.push(parse_process());
             break;
-        case TokenType::LET:
-            advance();
-            program->globals.push(parse_global(false));
-            break;
         case TokenType::VAR:
             advance();
-            program->globals.push(parse_global(true));
+            program->globals.push(parse_global(false));
             break;
         case TokenType::LINK: {
             if (is_pub) fail("'link' cannot be 'pub'");
@@ -396,11 +396,14 @@ ProcessDecl* Parser::parse_process() {
     return pr;
 }
 
-GlobalDecl* Parser::parse_global(bool is_mutable) {
+GlobalDecl* Parser::parse_global(bool is_const) {
     int ln = cur().line;
-    GlobalDecl* g = new GlobalDecl(is_mutable, consume(TokenType::IDENTIFIER, "Expected global name").lexeme);
+    GlobalDecl* g = new GlobalDecl(is_const, consume(TokenType::IDENTIFIER, "Expected global name").lexeme);
     g->line = ln;
-    if (match(TokenType::COLON)) g->type = parse_type();
+    if (match(TokenType::COLON)) {
+        g->type = parse_type();
+        if (g->type->is_const) g->is_const = true;
+    }
     consume(TokenType::ASSIGN, "Global must be initialized");
     g->init = parse_expression();
     consume(TokenType::SEMICOLON, "Expected ';' after global declaration");
@@ -423,8 +426,7 @@ Block* Parser::parse_block() {
 
 Node* Parser::parse_statement() {
     switch (cur().type) {
-        case TokenType::LET: advance(); return parse_let_decl(false);
-        case TokenType::VAR: advance(); return parse_let_decl(true);
+        case TokenType::VAR: advance(); return parse_var_decl(false);
         case TokenType::IF: return parse_if();
         case TokenType::WHILE: return parse_while();
         case TokenType::FOR: return parse_for();
@@ -452,14 +454,18 @@ Node* Parser::parse_statement() {
     }
 }
 
-// parse a let/var binding; the let/var keyword is already consumed.
-LetDecl* Parser::parse_let_decl(bool is_mutable) {
+// parse a var binding; the `var` keyword is already consumed.
+// is_const is derived from `var x : const T` — set when the declared_type has is_const.
+VarDecl* Parser::parse_var_decl(bool is_const) {
     int ln = cur().line;
-    LetDecl* d = new LetDecl(is_mutable, consume(TokenType::IDENTIFIER, "Expected binding name").lexeme);
+    VarDecl* d = new VarDecl(is_const, consume(TokenType::IDENTIFIER, "Expected binding name").lexeme);
     d->line = ln;
-    if (match(TokenType::COLON)) d->declared_type = parse_type();
+    if (match(TokenType::COLON)) {
+        d->declared_type = parse_type();
+        if (d->declared_type->is_const) d->is_const = true;
+    }
     if (match(TokenType::ASSIGN)) d->init = parse_expression();
-    else if (!is_mutable) fail("'let' binding must be initialized");
+    else if (d->is_const) fail("'const' binding must be initialized");
     consume(TokenType::SEMICOLON, "Expected ';' after binding");
     return d;
 }

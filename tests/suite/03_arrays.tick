@@ -33,7 +33,7 @@ func main() : i32 {
 
     if sum(ref a) != (1 + 20 + 3 + 0 + 1 + 4 + 9) { return 8; }
 
-    let last = a.pop();
+    var last = a.pop();
     if last != 9 { return 9; }
     if a.len() != 6 { return 10; }
 

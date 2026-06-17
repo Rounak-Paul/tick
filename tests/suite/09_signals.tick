@@ -10,7 +10,7 @@ process worker on start {
 
 func main() : i32 {
     start.fire();
-    let r = done.recv();
+    var r = done.recv();
     if r != 42 { return 1; }
     if result != 42 { return 2; }
     println("PASS signals");

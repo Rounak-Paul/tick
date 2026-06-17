@@ -18,7 +18,7 @@ enum class NodeKind {
     MATCH,
 
     // statements
-    BLOCK, LET_DECL, EXPR_STMT,
+    BLOCK, VAR_DECL, EXPR_STMT,
     IF, WHILE, FOR, RETURN, BREAK, CONTINUE, DEFER, UNSAFE_BLOCK,
 
     // declarations
@@ -219,14 +219,14 @@ struct Block : Node {
     ~Block() { for (size_t i = 0; i < statements.size(); i++) delete statements[i]; }
 };
 
-struct LetDecl : Node {
-    bool is_mutable;        // let vs var
+struct VarDecl : Node {
+    bool is_const;          // var x : const T — binding is immutable
     String name;
     TypeRef* declared_type; // may be null -> inferred
     Node* init;             // may be null
-    LetDecl(bool m, const String& n)
-        : Node(NodeKind::LET_DECL), is_mutable(m), name(n), declared_type(nullptr), init(nullptr) {}
-    ~LetDecl() { delete declared_type; delete init; }
+    VarDecl(bool c, const String& n)
+        : Node(NodeKind::VAR_DECL), is_const(c), name(n), declared_type(nullptr), init(nullptr) {}
+    ~VarDecl() { delete declared_type; delete init; }
 };
 
 struct ExprStmt : Node {
@@ -388,12 +388,12 @@ struct ProcessDecl : Node {
 };
 
 struct GlobalDecl : Node {
-    bool is_mutable;
+    bool is_const;
     String name;
     TypeRef* type;
     Node* init;
-    GlobalDecl(bool m, const String& n)
-        : Node(NodeKind::GLOBAL_DECL), is_mutable(m), name(n), type(nullptr), init(nullptr) {}
+    GlobalDecl(bool c, const String& n)
+        : Node(NodeKind::GLOBAL_DECL), is_const(c), name(n), type(nullptr), init(nullptr) {}
     ~GlobalDecl() { delete type; delete init; }
 };
 

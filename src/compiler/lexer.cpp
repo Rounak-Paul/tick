@@ -67,7 +67,6 @@ TokenType Lexer::keyword_type(const char* str, size_t length) {
             if (memcmp(str, "fn", 2) == 0) return TokenType::FUNC;
             break;
         case 3:
-            if (memcmp(str, "let", 3) == 0) return TokenType::LET;
             if (memcmp(str, "var", 3) == 0) return TokenType::VAR;
             if (memcmp(str, "ref", 3) == 0) return TokenType::REF;
             if (memcmp(str, "dyn", 3) == 0) return TokenType::DYN;
@@ -99,6 +98,7 @@ TokenType Lexer::keyword_type(const char* str, size_t length) {
             if (memcmp(str, "link", 4) == 0) return TokenType::LINK;
             break;
         case 5:
+            if (memcmp(str, "const", 5) == 0) return TokenType::CONST;
             if (memcmp(str, "while", 5) == 0) return TokenType::WHILE;
             if (memcmp(str, "match", 5) == 0) return TokenType::MATCH;
             if (memcmp(str, "break", 5) == 0) return TokenType::BREAK;

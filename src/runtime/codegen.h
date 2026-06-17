@@ -62,7 +62,7 @@ private:
 
     void gen_block(Block* block, int indent, bool new_scope);
     void gen_stmt(Node* stmt, int indent);
-    void gen_let(LetDecl* d, int indent);
+    void gen_var(VarDecl* d, int indent);
     void gen_expr(Node* expr);
     void gen_call(Call* call);
     void gen_method_call(MethodCall* mc);

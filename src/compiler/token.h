@@ -12,7 +12,7 @@ enum class TokenType {
     STRING_LITERAL,
 
     // bindings & decls
-    LET,
+    CONST,
     VAR,
     FUNC,
     STRUCT,

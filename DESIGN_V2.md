@@ -51,25 +51,33 @@ The single rule that makes this intuitive:
 
 ## 2. Bindings and mutability
 
-Immutability is the default; mutation is visible.
+`var` is the single binding keyword. Mutability is the default; immutability is a
+type qualifier. This is exactly C's model — no `let`/`val` keyword clutter.
 
 ```
-let x = 10          // immutable binding
-var y = 20          // mutable binding
-y = 30              // ok
-x = 11              // error: cannot assign to `let` binding
+var x = 10                  // mutable
+var pi : const f64 = 3.14   // immutable — `const` qualifies the type, not the decl
+pi = 3.0                    // error: cannot assign to const binding
 ```
 
-A `let` value cannot be passed as `ref var` (mutable borrow). This keeps mutation
-through references intentional and visible.
+`const` composes with any type:
+
+```
+var root : const shared Node = Node(...)   // immutable handle; node fields follow their own mutability
+var buf  : const i32[] = [1, 2, 3]        // immutable array binding
+```
+
+A `const` binding cannot be passed as `ref var` (mutable borrow). `ref` alone is
+always read-only; mutation through a reference requires `ref var` at both declaration
+and call site.
 
 ```
 func grow(ref var a : i32[]) { a.push(1) }   // mutable borrow
-func sum(ref a : i32[]) : i32 { ... }          // read-only borrow
+func sum(ref a : i32[]) : i32 { ... }         // read-only borrow
 
 var nums : i32[] = [1, 2, 3]
-grow(ref var nums)     // intentional mutable share — visible at call site
-let total = sum(ref nums)
+grow(ref var nums)            // intentional mutable share — visible at call site
+var total = sum(ref nums)
 ```
 
 `ref` at the call site mirrors `ref` in the signature, so a reader sees aliasing on
@@ -139,9 +147,9 @@ is always visible in the type.
 
 ```
 struct Node {
-    let value : i32
-    var children : shared Node []
-    var parent : weak Node
+    value : i32
+    children : shared Node []
+    parent : weak Node
 }
 
 var root : shared Node = Node(value = 0, children = [], parent = none)
@@ -177,8 +185,8 @@ production.
   sound; the only code allowed to bypass proofs is inside an explicit `unsafe` block.
 
 ```
-let x = arr[i]          // validate/dev: bounds-checked; release: raw if proven
-let v = opt!            // unwrap T? : checked unwrap (traps on none in validate/dev)
+var x = arr[i]          // validate/dev: bounds-checked; release: raw if proven
+var v = opt!            // unwrap T? : checked unwrap (traps on none in validate/dev)
 ```
 
 ---
@@ -189,7 +197,7 @@ Raw pointers exist only for FFI and hand-tuned hot paths, confined to `unsafe`.
 
 ```
 unsafe {
-    let p : ptr = malloc(64)
+    var p : ptr = malloc(64)
     write(p, 0, 255)
     free(p)
 }
@@ -225,7 +233,7 @@ inference, not destructors — though a type may define `drop` for custom teardo
 called automatically at reclamation).
 
 ```
-struct Circle { let r : f64 }
+struct Circle { r : f64 }
 
 impl Circle {
     func area(self) : f64 { return 3.14159 * self.r * self.r }
@@ -284,7 +292,7 @@ func main() : i32 {
 
 - `Result<T>` is sugar for a built-in `enum { Ok(T), Err(str) }`.
 - `T?` is sugar for `enum { some(T), none }`.
-- `?` postfix propagates errors: `let n = parse(s)?` returns early on `Err`.
+- `?` postfix propagates errors: `var n = parse(s)?` returns early on `Err`.
 - `match` is exhaustive; the checker rejects missing cases.
 
 ---
@@ -323,7 +331,7 @@ process worker on on_start {
 
 func main() : i32 {
     on_start.fire()
-    let r = done.recv()            // receiver now owns r
+    var r = done.recv()            // receiver now owns r
     return 0
 }
 ```

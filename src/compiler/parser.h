@@ -40,7 +40,7 @@ private:
     SignalDecl* parse_signal();
     EventDecl* parse_event();
     ProcessDecl* parse_process();
-    GlobalDecl* parse_global(bool is_mutable);
+    GlobalDecl* parse_global(bool is_const);
 
     // types & params
     TypeRef* parse_type();
@@ -50,7 +50,7 @@ private:
     // statements
     Node* parse_statement();
     Block* parse_block();
-    LetDecl* parse_let_decl(bool is_mutable);
+    VarDecl* parse_var_decl(bool is_const);
     Node* parse_if();
     Node* parse_while();
     Node* parse_for();
