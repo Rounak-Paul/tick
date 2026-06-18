@@ -229,10 +229,10 @@ void Checker::check_func(FuncDecl* fn) {
         s->name = "self";
         TypeRef* st = new TypeRef(TypeKind::NAMED);
         st->name = fn->impl_type;
-        if (fn->self_kind == SelfKind::REF || fn->self_kind == SelfKind::REF_MUT)
+        if (fn->self_kind == SelfKind::REF)
             st->ownership = Ownership::REF;
         s->type = st;
-        s->is_mutable = (fn->self_kind == SelfKind::REF_MUT || fn->self_kind == SelfKind::VALUE);
+        s->is_mutable = (fn->self_kind == SelfKind::REF || fn->self_kind == SelfKind::VALUE);
         declare("self", s);
     }
     for (size_t i = 0; i < fn->params.size(); i++) {
@@ -240,8 +240,7 @@ void Checker::check_func(FuncDecl* fn) {
         s->kind = SymKind::PARAM;
         s->name = fn->params[i]->name;
         s->type = fn->params[i]->type->clone();
-        s->is_mutable = (fn->params[i]->type->ownership == Ownership::REF && fn->params[i]->type->ref_mutable)
-                        || fn->params[i]->type->ownership == Ownership::VALUE;
+        s->is_mutable = true;
         declare(s->name, s);
     }
     check_block(fn->body);
@@ -439,15 +438,8 @@ TypeRef* Checker::check_expr(Node* expr) {
         case NodeKind::REF_EXPR: {
             RefExpr* r = static_cast<RefExpr*>(expr);
             TypeRef* ot = check_expr(r->operand);
-            if (r->operand->kind == NodeKind::IDENT) {
-                Symbol* sym = lookup(static_cast<Ident*>(r->operand)->name);
-                if (r->mutable_ref && sym && !sym->is_mutable)
-                    error(r->line, "cannot take 'ref var' of immutable binding '%s'",
-                          static_cast<Ident*>(r->operand)->name.c_str());
-            }
             t = ot ? ot->clone() : new TypeRef(TypeKind::VOID);
             t->ownership = Ownership::REF;
-            t->ref_mutable = r->mutable_ref;
             break;
         }
         case NodeKind::SHARED_EXPR: {
@@ -561,22 +553,17 @@ TypeRef* Checker::check_call(Call* call) {
 
     for (size_t i = 0; i < call->args.size(); i++) {
         Arg& a = call->args[i];
-        TypeRef* at = check_expr(a.value);
-        bool param_is_ref = i < params.size() && params[i]->type->ownership == Ownership::REF;
-        if (a.is_ref != param_is_ref) {
-            if (param_is_ref)
-                error(call->line, "argument %d of '%s' must be passed with 'ref'", (int)i + 1, call->callee.c_str());
-            else
-                error(call->line, "argument %d of '%s' is by value; remove 'ref'", (int)i + 1, call->callee.c_str());
+        check_expr(a.value);
+        if (i < params.size()) {
+            bool param_is_ref = params[i]->type->ownership == Ownership::REF;
+            // by-value pass of an owned local at last use -> move
+            if (!param_is_ref && a.value->kind == NodeKind::IDENT) {
+                Symbol* sym = lookup(static_cast<Ident*>(a.value)->name);
+                if (sym && sym->type && sym->type->is_heap_owned() &&
+                    sym->type->ownership == Ownership::VALUE)
+                    mark_move(a.value);
+            }
         }
-        // by-value pass of an owned local at last use -> move
-        if (!a.is_ref && a.value->kind == NodeKind::IDENT) {
-            Symbol* sym = lookup(static_cast<Ident*>(a.value)->name);
-            if (sym && sym->type && sym->type->is_heap_owned() &&
-                sym->type->ownership == Ownership::VALUE)
-                mark_move(a.value);
-        }
-        (void)at;
     }
     TypeRef* ret = fn ? fn->return_type : ex->return_type;
     return ret ? ret->clone() : new TypeRef(TypeKind::VOID);

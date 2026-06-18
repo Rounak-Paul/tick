@@ -100,12 +100,9 @@ struct CompoundAssign : Node {
     ~CompoundAssign() { delete target; delete value; }
 };
 
-/// Argument with optional `ref` marker at the call site.
 struct Arg {
     Node* value;
-    bool is_ref;
-    bool ref_mutable;
-    Arg() : value(nullptr), is_ref(false), ref_mutable(false) {}
+    Arg() : value(nullptr) {}
 };
 
 struct Call : Node {
@@ -166,8 +163,7 @@ struct RangeExpr : Node {
 
 struct RefExpr : Node {
     Node* operand;
-    bool mutable_ref;
-    RefExpr(Node* x, bool m) : Node(NodeKind::REF_EXPR), operand(x), mutable_ref(m) {}
+    RefExpr(Node* x) : Node(NodeKind::REF_EXPR), operand(x) {}
     ~RefExpr() { delete operand; }
 };
 
@@ -290,7 +286,7 @@ struct Param {
     ~Param() { delete type; }
 };
 
-enum class SelfKind { NONE, VALUE, REF, REF_MUT };
+enum class SelfKind { NONE, VALUE, REF };
 
 struct FuncDecl : Node {
     bool is_pub;

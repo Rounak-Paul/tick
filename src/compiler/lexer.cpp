@@ -64,7 +64,6 @@ TokenType Lexer::keyword_type(const char* str, size_t length) {
             if (memcmp(str, "on", 2) == 0) return TokenType::ON;
             if (memcmp(str, "i8", 2) == 0) return TokenType::I8;
             if (memcmp(str, "u8", 2) == 0) return TokenType::U8;
-            if (memcmp(str, "fn", 2) == 0) return TokenType::FUNC;
             break;
         case 3:
             if (memcmp(str, "var", 3) == 0) return TokenType::VAR;

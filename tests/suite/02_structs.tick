@@ -13,7 +13,7 @@ impl Vec2 {
     func length_sq(self) : f64 {
         return self.x * self.x + self.y * self.y;
     }
-    func translate(ref var self, dx : f64, dy : f64) {
+    func translate(ref self, dx : f64, dy : f64) {
         self.x = self.x + dx;
         self.y = self.y + dy;
     }

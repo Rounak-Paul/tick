@@ -48,15 +48,13 @@ struct TypeRef {
     // FUNC
     DynamicArray<TypeRef*> param_types;
     TypeRef* return_type;
-    // mutability for REF (ref var)
-    bool ref_mutable;
     // const qualifier: `var x : const T` — binding cannot be reassigned
     bool is_const;
 
     TypeRef(TypeKind k)
         : kind(k), ownership(Ownership::VALUE),
           int_bits(0), int_unsigned(false), float_bits(0),
-          inner(nullptr), fixed_size(0), return_type(nullptr), ref_mutable(false), is_const(false) {}
+          inner(nullptr), fixed_size(0), return_type(nullptr), is_const(false) {}
 
     ~TypeRef() {
         delete inner;
@@ -72,7 +70,6 @@ struct TypeRef {
         t->float_bits = float_bits;
         t->name = name;
         t->fixed_size = fixed_size;
-        t->ref_mutable = ref_mutable;
         t->is_const = is_const;
         if (inner) t->inner = inner->clone();
         if (return_type) t->return_type = return_type->clone();

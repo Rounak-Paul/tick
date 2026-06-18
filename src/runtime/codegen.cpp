@@ -789,15 +789,20 @@ void CodeGen::gen_call(Call* call) {
     }
 
     // user function or extern
+    FuncDecl* fn_decl = nullptr;
     bool is_extern = false;
     for (size_t i = 0; i < _program->externs.size(); i++)
-        if (_program->externs[i]->name == n) is_extern = true;
+        if (_program->externs[i]->name == n) { is_extern = true; break; }
+    if (!is_extern)
+        for (size_t i = 0; i < _program->functions.size(); i++)
+            if (_program->functions[i]->name == n) { fn_decl = _program->functions[i]; break; }
     String cname = is_extern ? n : mangle_func(n);
     _out.put("%s(", cname.c_str());
     for (size_t i = 0; i < call->args.size(); i++) {
         if (i) _out.put(", ");
-        if (call->args[i].is_ref) {
-            // pass a pointer to the lvalue; arrays/values become T*
+        bool param_by_ref = fn_decl && i < fn_decl->params.size() &&
+                            fn_decl->params[i]->type->ownership == Ownership::REF;
+        if (param_by_ref) {
             TypeRef* at = call->args[i].value->resolved_type;
             bool already_ptr = at && (at->ownership == Ownership::REF ||
                                       at->ownership == Ownership::SHARED ||
@@ -878,7 +883,7 @@ void CodeGen::gen_method_call(MethodCall* mc) {
         if (m) {
             String cname = mangle_method(rt->name, mc->method);
             _out.put("%s(", cname.c_str());
-            bool by_ref = (m->self_kind == SelfKind::REF || m->self_kind == SelfKind::REF_MUT);
+            bool by_ref = (m->self_kind == SelfKind::REF);
             bool recv_is_ptr = rt->ownership == Ownership::REF || rt->ownership == Ownership::SHARED;
             if (by_ref && !recv_is_ptr) { _out.put("&("); gen_expr(mc->receiver); _out.put(")"); }
             else { gen_expr(mc->receiver); }

@@ -23,16 +23,14 @@ beats peak convenience.
 Everything is a **value** unless the code explicitly says otherwise. Aliasing never
 happens implicitly — it is always spelled out with `ref` or `shared`.
 
-| Form        | Meaning                                  | Runtime cost            | C lowering            |
-|-------------|------------------------------------------|-------------------------|-----------------------|
-| `T`         | Owned value (stack / inline)             | none                    | `T` by value          |
-| `ref T`     | Borrow — temporary, non-owning reference | none (a pointer)        | `T*` (lifetime-checked) |
-| `shared T`  | Shared ownership, reference counted       | refcount inc/dec        | `{ rc; T }*`          |
-| `weak T`    | Non-owning ref to a `shared T` (no cycle) | guard on upgrade        | `{ rc; T }*` (no rc)  |
-| `T[]`       | Dynamic array of values                   | one heap alloc          | `TickArray`           |
-| `T[N]`      | Fixed inline array                        | none                    | `T[N]`                |
-| `T?`        | Optional value                            | none (tag + value)      | tagged struct         |
-| `Result<T>` | Success-or-error value                    | none (tag + payload)    | tagged struct         |
+| Form       | Meaning                                   | Runtime cost     | C lowering              |
+|------------|-------------------------------------------|------------------|-------------------------|
+| `T`        | Owned value (stack / inline)              | none             | `T` by value            |
+| `ref T`    | Borrow — temporary, non-owning reference  | none (a pointer) | `T*` (lifetime-checked) |
+| `shared T` | Shared ownership, reference counted       | refcount inc/dec | `{ rc; T }*`            |
+| `weak T`   | Non-owning ref to a `shared T` (no cycle) | guard on upgrade | `{ rc; T }*` (no rc)    |
+| `T[]`      | Dynamic array of values                   | one heap alloc   | `TickArray`             |
+| `T[N]`     | Fixed inline array                        | none             | `T[N]`                  |
 
 The single rule that makes this intuitive:
 
@@ -67,21 +65,25 @@ var root : const shared Node = Node(...)   // immutable handle; node fields foll
 var buf  : const i32[] = [1, 2, 3]        // immutable array binding
 ```
 
-A `const` binding cannot be passed as `ref var` (mutable borrow). `ref` alone is
-always read-only; mutation through a reference requires `ref var` at both declaration
-and call site.
+`ref` is the single borrow form — it means pass by pointer, no copy. Whether the
+function mutates through that pointer is the function's own business, same as C.
+The call site is always clean — just pass the value.
 
 ```
-func grow(ref var a : i32[]) { a.push(1) }   // mutable borrow
-func sum(ref a : i32[]) : i32 { ... }         // read-only borrow
+func grow(ref a : i32[]) { a.push(1) }  // borrows a, mutates through it
+func sum(ref a : i32[]) : i32 { ... }   // borrows a, read-only
 
 var nums : i32[] = [1, 2, 3]
-grow(ref var nums)            // intentional mutable share — visible at call site
-var total = sum(ref nums)
+grow(nums)             // no annotation needed — compiler passes &nums
+var total = sum(nums)
 ```
 
-`ref` at the call site mirrors `ref` in the signature, so a reader sees aliasing on
-both ends.
+Method receivers follow the same model:
+
+```
+func area(self) : f64 { ... }        // value copy of self
+func inspect(ref self) : str { ... } // borrow self — may or may not mutate
+```
 
 ---
 
@@ -93,7 +95,7 @@ memory at deterministic points.
 ```
 func build() : Mesh {
     var m = Mesh.empty()
-    fill(ref var m)        // borrow, mutate in place — no copy
+    fill(m)                // mut borrow, mutate in place — no copy
     return m               // last use of `m` -> MOVE out, not copy
 }
 
@@ -118,7 +120,7 @@ What the compiler does, invisibly:
 - **Move on last-use pass**: a value passed by value at its last use is moved, not
   copied. Earlier uses copy.
 - **Borrow checking**: a `ref` may not outlive the value it borrows; a value may not
-  be moved while a live `ref` to it exists; no two `ref var` borrows of the same
+  be moved while a live `ref` to it exists; no two `mut` borrows of the same
   value are simultaneously live.
 
 ### The keystone rule (no annotations + always-compiles + no GC)
@@ -159,25 +161,46 @@ child.parent = weak root    // back-edge, no cycle leak
 
 - `shared T`: heap object `{ strong_rc, weak_rc, T }`. Copy increments strong rc;
   drop decrements; freed at zero.
-- `weak T`: holds the object without owning it. Upgrading (`value of w`) yields
-  `T?` — `none` if the object was already freed. This is the cycle breaker.
+- `weak T`: holds the object without owning it. No refcount bump; the pointed-to
+  object is freed when all `shared` handles drop regardless of live `weak` handles.
 
 There is no other shared/aliased state in the language. If a type is not `shared`,
-it cannot be long-term aliased — exactly the "what is not shared cannot be ref"
-principle.
+it cannot be long-term aliased.
 
 ---
 
-## 5. Safety as a validation layer (build modes)
+## 5. Memory model
+
+The type tells you where data lives. There are no surprises.
+
+| Type          | Handle (variable) | Backing data  | Freed by              |
+|---------------|-------------------|---------------|-----------------------|
+| `i32`, `f64`  | stack             | —             | scope exit (automatic)|
+| `bool`        | stack             | —             | scope exit (automatic)|
+| `struct T`    | stack (inline)    | —             | scope exit (automatic)|
+| `T[N]`        | stack (inline)    | —             | scope exit (automatic)|
+| `ref T`       | stack (pointer)   | wherever T is | never (non-owning)    |
+| `weak T`      | stack (pointer)   | wherever T is | never (non-owning)    |
+| `str`         | stack (handle)    | heap (buffer) | compiler-inserted free|
+| `T[]`         | stack (handle)    | heap (buffer) | compiler-inserted free|
+| `shared T`    | stack (handle)    | heap (box+T)  | refcount → 0          |
+
+**The rule:** you only think about stack. The compiler handles heap. The type tells
+you whether heap is involved at all — if you don't see `str`, `T[]`, or `shared`,
+nothing is on the heap.
+
+---
+
+## 6. Safety as a validation layer (build modes)
 
 Modeled on Vulkan validation layers: exhaustive during development, zero cost in
 production.
 
-| Command               | Checks inserted                                                              | Use            |
-|-----------------------|-----------------------------------------------------------------------------|----------------|
-| `tick build --validate` | bounds, null/none-unwrap, integer overflow, use-after-move, weak-upgrade, leak audit | development    |
-| `tick build`            | bounds + null/none-unwrap                                                  | daily iteration |
-| `tick build --release`  | **none** — only statically proven-safe code; checks elided                 | shipping        |
+| Command                 | Checks inserted                                                              | Use            |
+|-------------------------|-----------------------------------------------------------------------------|----------------|
+| `tick build --validate` | bounds, integer overflow, use-after-move, weak-upgrade, leak audit          | development    |
+| `tick build`            | bounds                                                                       | daily iteration|
+| `tick build --release`  | **none** — only statically proven-safe code; checks elided                  | shipping       |
 
 - In every mode the optimizer **elides checks it can prove unnecessary** (e.g.
   `for i in 0..a.len { a[i] }` needs no bounds check). Validation builds stay usable.
@@ -186,12 +209,11 @@ production.
 
 ```
 var x = arr[i]          // validate/dev: bounds-checked; release: raw if proven
-var v = opt!            // unwrap T? : checked unwrap (traps on none in validate/dev)
 ```
 
 ---
 
-## 6. Unsafe and FFI
+## 7. Unsafe and FFI
 
 Raw pointers exist only for FFI and hand-tuned hot paths, confined to `unsafe`.
 
@@ -211,7 +233,7 @@ safe language has no way to produce a dangling pointer or a double free.
 
 ---
 
-## 7. Types
+## 8. Types
 
 ### Primitives
 `i8 i16 i32 i64  u8 u16 u32 u64  f32 f64  bool  str  void`
@@ -222,8 +244,7 @@ new value; the compiler frees temporaries by ownership inference (no manual `fre
 ### Composite
 - `struct` — the only user value type. Fields, no inheritance.
 - `interface` — a contract (set of method signatures).
-- `enum` — named integer constants.
-- Tagged unions via `enum` with payloads (sum types) — see §9.
+- `enum` — named integer constants, exactly like C enums.
 
 ### No classes, no inheritance
 
@@ -247,11 +268,11 @@ impl Shape for Circle {}        // Circle already has area(self):f64 -> satisfie
 ```
 
 `self` is the receiver, always explicit in the signature. `self` is a value;
-`ref self` borrows; `ref var self` mutates in place.
+`ref self` borrows read-only; `mut self` borrows mutably.
 
 ---
 
-## 8. Methods, interfaces, dispatch
+## 9. Methods, interfaces, dispatch
 
 - `impl T { ... }` adds methods to `T`.
 - `impl I for T {}` declares that `T` satisfies interface `I` (compiler verifies the
@@ -266,60 +287,28 @@ func area_of(c : Circle) : f64 { return c.area() }        // static, inlined
 
 ---
 
-## 9. Error handling
-
-No exceptions. Expected failures are values.
-
-```
-enum Parse {
-    Ok(i32)
-    Err(str)
-}
-
-func parse(s : str) : Result<i32> {
-    if (is_number(s)) { return Ok(to_i32(s)) }
-    return Err("not a number")
-}
-
-func main() : i32 {
-    match parse("42") {
-        Ok(n)  => println("got " + to_str(n)),
-        Err(e) => println("fail: " + e),
-    }
-    return 0
-}
-```
-
-- `Result<T>` is sugar for a built-in `enum { Ok(T), Err(str) }`.
-- `T?` is sugar for `enum { some(T), none }`.
-- `?` postfix propagates errors: `var n = parse(s)?` returns early on `Err`.
-- `match` is exhaustive; the checker rejects missing cases.
-
----
-
 ## 10. Control flow
 
 ```
 if cond { ... } else if cond { ... } else { ... }
 while cond { ... }
 for i in 0..n { ... }            // half-open range
-for x in items { ... }            // iterate values (copy) ...
-for ref x in items { ... }        // ... or borrow each element
+for x in items { ... }            // iterate values (copy)
+for ref x in items { ... }        // borrow each element
 match value { pattern => expr, ... }
 break    continue    return expr
 defer stmt                        // runs at scope exit, LIFO (for non-memory teardown)
 ```
 
-`defer` remains for *effectful* teardown (closing a handle, logging) — not for memory,
+`defer` is for *effectful* teardown (closing a handle, logging) — not for memory,
 which is automatic. Parentheses around conditions are optional (`if x > 0 {`).
 
 ---
 
 ## 11. Concurrency: signals, events, processes
 
-Retained from v1, adapted to value semantics. A value sent over a signal is **moved**
-into the channel (ownership transfers); the receiver owns it. No shared mutable state
-without `shared`.
+A value sent over a signal is **moved** into the channel (ownership transfers); the
+receiver owns it. No shared mutable state without `shared`.
 
 ```
 signal done : i32
@@ -331,7 +320,7 @@ process worker on on_start {
 
 func main() : i32 {
     on_start.fire()
-    var r = done.recv()            // receiver now owns r
+    var r = done.recv()           // receiver now owns r
     return 0
 }
 ```
@@ -385,6 +374,7 @@ Each stage has one responsibility; no stage reaches across boundaries.
 
 - No tracing GC, ever.
 - No exceptions / stack unwinding.
+- No enum payloads or sum types — enums are named integer constants (C model).
 - No class inheritance / implementation inheritance.
 - No implicit aliasing or implicit heap allocation.
 - No lifetime annotations or borrow operators in source syntax.

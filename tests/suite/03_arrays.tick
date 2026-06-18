@@ -1,4 +1,4 @@
-func fill_squares(ref var a : i32[], n : i32) {
+func fill_squares(ref a : i32[], n : i32) {
     var i = 0;
     while i < n {
         a.push(i * i);
@@ -21,7 +21,7 @@ func main() : i32 {
     a[1] = 20;
     if a[1] != 20 { return 3; }
 
-    fill_squares(ref var a, 4);
+    fill_squares(a, 4);
     if a.len() != 7 { return 4; }
     if a[6] != 9 { return 5; }
 
@@ -31,7 +31,7 @@ func main() : i32 {
     if a.len() != 7 { return 6; }
     if b.len() != 8 { return 7; }
 
-    if sum(ref a) != (1 + 20 + 3 + 0 + 1 + 4 + 9) { return 8; }
+    if sum(a) != (1 + 20 + 3 + 0 + 1 + 4 + 9) { return 8; }
 
     var last = a.pop();
     if last != 9 { return 9; }

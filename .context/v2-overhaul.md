@@ -5,9 +5,12 @@ Vision + full spec: `DESIGN_V2.md`. User-facing docs: `README.md`.
 
 ## Core model
 - Value-by-default. Aliasing only via explicit `ref` (borrow) or `shared` (refcount).
-- `var` is the single binding keyword. `const` is a type qualifier: `var x : const i32 = 10` makes the binding immutable (zero cost, statically enforced). Mutation through refs needs `ref var`.
+- `var` is the single binding keyword. `const` is a type qualifier: `var x : const i32 = 10` makes the binding immutable (zero cost, statically enforced).
+- `ref T` = single borrow form (pass by pointer, no copy). Whether the function mutates is its own concern — C model. No call-site annotation needed.
 - Owned heap data (`str`, `T[]`, `shared`) reclaimed at compiler-chosen points; no GC.
-- Validation layer = build mode: default (bounds+null), `--validate` (all), `--release` (none).
+- Validation layer = build mode: default (bounds), `--validate` (all), `--release` (none).
+- `enum` = named integer constants only (C model). No payloads, no sum types, no `Result<T>`, no `T?`.
+- Error handling: return a struct or use an out param via `ref var`. No exceptions.
 
 ## Pipeline & files
 `lexer -> parser -> checker -> codegen -> cc` (driver orchestrates).
@@ -44,10 +47,13 @@ three build modes.
 
 ## Deliberately deferred (NOT implemented; remove from DESIGN scope if not pursued)
 - Modules / `import` / `pub` enforcement (parser has no import; `pub` parsed, not enforced).
-- Sum-type enums with payloads, `Result<T>`, `T?` optionals, `?`/`!` operators
-  (need monomorphization to be non-hacky — removed rather than half-built).
 - `dyn Interface` runtime dispatch (type exists, no vtable codegen yet).
 - Auto-promote-to-shared inference + perf notes (move-elision is the simple last-use form).
+
+## Explicit non-goals (will not be added)
+- Sum-type enums with payloads — enums are C-style named integers only.
+- `Result<T>`, `T?` optionals, `?`/`!` operators — no special error type machinery.
+- Exceptions or stack unwinding.
 
 ## Build & test
 `cmake -B build && cmake --build build` (warning-free under -Wall).

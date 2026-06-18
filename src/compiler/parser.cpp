@@ -91,12 +91,10 @@ TypeRef* Parser::parse_base_type() {
 }
 
 Param* Parser::parse_param() {
-    // optional `ref` / `ref var` / `shared` / `weak` qualifier precedes the name
+    // optional `ref` / `shared` / `weak` qualifier precedes the name
     Ownership own = Ownership::VALUE;
-    bool ref_mut = false;
     if (match(TokenType::REF)) {
         own = Ownership::REF;
-        if (match(TokenType::VAR)) ref_mut = true;
     } else if (match(TokenType::SHARED)) {
         own = Ownership::SHARED;
     } else if (match(TokenType::WEAK)) {
@@ -106,20 +104,15 @@ Param* Parser::parse_param() {
     p->name = consume(TokenType::IDENTIFIER, "Expected parameter name").lexeme;
     consume(TokenType::COLON, "Expected ':' after parameter name");
     p->type = parse_type();
-    if (own != Ownership::VALUE) {
-        p->type->ownership = own;
-        p->type->ref_mutable = ref_mut;
-    }
+    if (own != Ownership::VALUE) p->type->ownership = own;
     return p;
 }
 
 TypeRef* Parser::parse_type() {
     // ownership prefix
     Ownership own = Ownership::VALUE;
-    bool ref_mut = false;
     if (match(TokenType::REF)) {
         own = Ownership::REF;
-        if (match(TokenType::VAR)) ref_mut = true;
     } else if (match(TokenType::SHARED)) {
         own = Ownership::SHARED;
     } else if (match(TokenType::WEAK)) {
@@ -154,7 +147,6 @@ TypeRef* Parser::parse_type() {
     }
 
     base->ownership = own;
-    base->ref_mutable = ref_mut;
     base->is_const = is_const;
     return base;
 }
@@ -235,9 +227,8 @@ FuncDecl* Parser::parse_func(bool is_pub, bool allow_self) {
     if (allow_self && (check(TokenType::SELF) || check(TokenType::REF))) {
         if (check(TokenType::REF)) {
             advance();
-            bool mut = match(TokenType::VAR);
             consume(TokenType::SELF, "Expected 'self' after 'ref'");
-            fn->self_kind = mut ? SelfKind::REF_MUT : SelfKind::REF;
+            fn->self_kind = SelfKind::REF;
         } else {
             advance(); // self
             fn->self_kind = SelfKind::VALUE;
@@ -711,9 +702,8 @@ Node* Parser::parse_unary() {
     }
     if (check(TokenType::REF)) {
         int ln = cur().line; advance();
-        bool mut = match(TokenType::VAR);
         Node* operand = parse_unary();
-        RefExpr* r = new RefExpr(operand, mut);
+        RefExpr* r = new RefExpr(operand);
         r->line = ln;
         return r;
     }
@@ -741,10 +731,6 @@ DynamicArray<Arg> Parser::parse_args() {
     if (!check(TokenType::RPAREN)) {
         do {
             Arg a;
-            if (match(TokenType::REF)) {
-                a.is_ref = true;
-                a.ref_mutable = match(TokenType::VAR);
-            }
             a.value = parse_expression();
             args.push(a);
         } while (match(TokenType::COMMA));
